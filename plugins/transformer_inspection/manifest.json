@@ -1,0 +1,43 @@
+{
+    "id": "transformer_inspection",
+    "name": "主变自主巡视插件",
+    "version": "0.1.0",
+    "description": "主变压器本体及附属设施的外观缺陷识别、状态识别和热成像分析",
+    "author": "A组",
+    "entrypoint": "plugin.py",
+    "plugin_class": "TransformerInspectionPlugin",
+    "capabilities": [
+        "defect_detection",
+        "state_recognition",
+        "thermal_analysis"
+    ],
+    "device_types": ["transformer"],
+    "dependencies": [
+        "opencv-python>=4.8.0",
+        "numpy>=1.24.0"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model_path": {"type": "string"},
+            "confidence_threshold": {"type": "number", "default": 0.5},
+            "enable_thermal": {"type": "boolean", "default": false}
+        }
+    },
+    "roi_types": [
+        "bushing",
+        "radiator",
+        "oil_level",
+        "breather",
+        "terminal_box"
+    ],
+    "recognition_types": [
+        "damage",
+        "rust",
+        "oil_leak",
+        "foreign_object",
+        "silica_gel_color",
+        "valve_state"
+    ]
+}

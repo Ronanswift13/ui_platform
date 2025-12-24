@@ -1,0 +1,13 @@
+{
+    "id": "busbar_inspection",
+    "name": "母线自主巡视插件",
+    "version": "0.1.0",
+    "description": "绝缘子串、金具、导线连接点的远距小目标检测",
+    "author": "C组",
+    "entrypoint": "plugin.py",
+    "plugin_class": "BusbarInspectionPlugin",
+    "capabilities": ["defect_detection"],
+    "device_types": ["busbar", "insulator"],
+    "roi_types": ["insulator", "fitting", "connection_point", "foreign_object"],
+    "recognition_types": ["pin_missing", "crack", "pollution", "foreign_object"]
+}

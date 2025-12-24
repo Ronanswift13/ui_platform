@@ -1,0 +1,23 @@
+{
+    "venvPath": ".",
+    "venv": "venv",
+    "pythonVersion": "3.9",
+    "extraPaths": [
+        ".",
+        "platform_core"
+    ],
+    "include": [
+        "platform_core",
+        "plugins",
+        "apps",
+        "tests"
+    ],
+    "exclude": [
+        "venv",
+        "build",
+        "dist",
+        "__pycache__"
+    ],
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": "none"
+}

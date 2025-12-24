@@ -1,0 +1,13 @@
+{
+    "id": "capacitor_inspection",
+    "name": "电容器自主巡视插件",
+    "version": "0.1.0",
+    "description": "电容器组的结构完整性检测和区域入侵检测",
+    "author": "D组",
+    "entrypoint": "plugin.py",
+    "plugin_class": "CapacitorInspectionPlugin",
+    "capabilities": ["defect_detection", "intrusion_detection"],
+    "device_types": ["capacitor"],
+    "roi_types": ["capacitor_bank", "connection", "fence", "warning_sign"],
+    "recognition_types": ["tilt", "collapse", "missing", "intrusion"]
+}

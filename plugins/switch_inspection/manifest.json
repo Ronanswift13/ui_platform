@@ -1,0 +1,40 @@
+{
+    "id": "switch_inspection",
+    "name": "开关间隔自主巡视插件",
+    "version": "0.1.0",
+    "description": "断路器、隔离开关、接地开关的分合位状态识别和逻辑校验",
+    "author": "B组",
+    "entrypoint": "plugin.py",
+    "plugin_class": "SwitchInspectionPlugin",
+    "capabilities": [
+        "state_recognition",
+        "image_quality"
+    ],
+    "device_types": ["switch", "breaker", "disconnector"],
+    "dependencies": [
+        "opencv-python>=4.8.0",
+        "numpy>=1.24.0"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model_path": {"type": "string"},
+            "confidence_threshold": {"type": "number", "default": 0.5},
+            "enable_logic_check": {"type": "boolean", "default": true}
+        }
+    },
+    "roi_types": [
+        "breaker",
+        "disconnector",
+        "ground_switch",
+        "mechanism_box",
+        "indicator"
+    ],
+    "recognition_types": [
+        "open",
+        "closed",
+        "intermediate",
+        "unclear"
+    ]
+}

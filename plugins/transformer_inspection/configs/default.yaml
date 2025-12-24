@@ -1,0 +1,30 @@
+# 主变自主巡视插件配置
+
+# 模型配置
+model:
+  path: "models/transformer_detector.onnx"
+  device: "cpu"  # cpu 或 cuda
+
+# 推理配置
+inference:
+  confidence_threshold: 0.5
+  nms_threshold: 0.4
+  max_detections: 100
+
+# 热成像配置
+thermal:
+  enabled: false
+  temperature_threshold: 80.0  # 摄氏度
+
+# 识别类型配置
+recognition:
+  defect_types:
+    - damage
+    - rust
+    - oil_leak
+    - foreign_object
+  state_types:
+    - silica_gel_normal
+    - silica_gel_abnormal
+    - valve_open
+    - valve_closed

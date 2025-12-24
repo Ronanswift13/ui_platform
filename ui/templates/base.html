@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}输变电监测平台{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/main.css" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-lightning-charge"></i>
+                输变电激光星芒监测平台
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <!-- 功能模块Tab -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'transformer' %}active{% endif %}" href="/module/transformer">
+                            <i class="bi bi-box"></i> 主变巡视
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'switch' %}active{% endif %}" href="/module/switch">
+                            <i class="bi bi-toggle-on"></i> 开关间隔
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'busbar' %}active{% endif %}" href="/module/busbar">
+                            <i class="bi bi-diagram-3"></i> 母线巡视
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'capacitor' %}active{% endif %}" href="/module/capacitor">
+                            <i class="bi bi-battery-charging"></i> 电容器
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'meter' %}active{% endif %}" href="/module/meter">
+                            <i class="bi bi-speedometer2"></i> 表计读数
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'replay' %}active{% endif %}" href="/replay">
+                            <i class="bi bi-play-circle"></i> 回放
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="/settings">
+                            <i class="bi bi-gear"></i> 系统设置
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span class="nav-link text-light">
+                            <i class="bi bi-circle-fill text-success"></i> 系统正常
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="container-fluid mt-3">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="footer mt-auto py-2 bg-light fixed-bottom">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-4">
+                    <small class="text-muted">
+                        <i class="bi bi-hdd"></i> 插件: <span id="plugin-count">0</span> 个已加载
+                    </small>
+                </div>
+                <div class="col-md-4 text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> <span id="current-time"></span>
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <small class="text-muted">
+                        版本 {{ version | default('1.0.0') }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
