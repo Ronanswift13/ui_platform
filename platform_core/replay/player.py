@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 import cv2
 import numpy as np
@@ -41,7 +41,7 @@ class ReplayComparison:
     original_output: PluginOutput
     replay_output: PluginOutput
     match: bool
-    differences: list[dict[str, Any]]
+    differences: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class ReplaySession:

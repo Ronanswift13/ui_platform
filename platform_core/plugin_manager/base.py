@@ -239,6 +239,10 @@ class BasePlugin(ABC):
         """配置更新回调 (可选实现)"""
         self._config = new_config
 
+    def analyze_thermal(self, frame: np.ndarray, config: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        """热成像分析 (可选实现)"""
+        return None
+
     def get_model_version(self) -> str:
         """获取模型版本 (可选实现)"""
         return self.version

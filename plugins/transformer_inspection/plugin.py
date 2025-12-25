@@ -10,6 +10,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
+import copy
 import importlib.util
 import sys
 import numpy as np
@@ -57,6 +58,7 @@ class TransformerInspectionPlugin(BasePlugin):
         self._detector: Any = None
         self._thermal_enabled = False
         self._initialized = False
+        self.confidence_threshold = 0.5
 
     def init(self, config: dict[str, Any]) -> bool:
         """
@@ -71,6 +73,7 @@ class TransformerInspectionPlugin(BasePlugin):
         try:
             self._config = config
             self._thermal_enabled = config.get("thermal", {}).get("enabled", False)
+            self.confidence_threshold = config.get("inference", {}).get("confidence_threshold", 0.5)
 
             # 创建检测器实例
             self._detector = TransformerDetector(config)
@@ -86,6 +89,22 @@ class TransformerInspectionPlugin(BasePlugin):
             import traceback
             traceback.print_exc()
             return False
+
+    def _merge_config(self, base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+        """合并运行时配置，避免覆盖默认配置"""
+        if not overrides:
+            return base
+        merged = copy.deepcopy(base)
+
+        def _merge(target: dict[str, Any], incoming: dict[str, Any]) -> None:
+            for key, value in incoming.items():
+                if isinstance(value, dict) and isinstance(target.get(key), dict):
+                    _merge(target[key], value)
+                else:
+                    target[key] = value
+
+        _merge(merged, overrides)
+        return merged
 
     def infer(
         self,
@@ -107,6 +126,10 @@ class TransformerInspectionPlugin(BasePlugin):
         if not self._initialized or self._detector is None:
             print(f"[{self.id}] 警告: 插件未初始化")
             return []
+
+        runtime_config = self._merge_config(self._config, context.config)
+        self._thermal_enabled = runtime_config.get("thermal", {}).get("enabled", False)
+        self._detector.update_config(runtime_config)
 
         results: list[RecognitionResult] = []
         h, w = frame.shape[:2]
@@ -134,56 +157,106 @@ class TransformerInspectionPlugin(BasePlugin):
                 roi_type = roi.roi_type
                 if hasattr(roi_type, 'value'):
                     roi_type = roi_type.value
+                roi_type = str(roi_type)
+
+                # 根据 README 定义的 ROI 类型映射检测任务
+                # bushing (套管) -> 破损、污损、渗漏油
+                # radiator (散热器) -> 渗漏油、锈蚀
+                # oil_level (油位计) -> 刻度读数、破损
+                # breather (呼吸器) -> 硅胶颜色变化
+                # terminal_box (端子箱) -> 外观异常、破损
+                roi_defect_map = {
+                    "bushing": ["damage", "oil_leak"],
+                    "radiator": ["oil_leak", "rust"],
+                    "oil_level": ["damage"],
+                    "terminal_box": ["damage", "foreign_object"],
+                    "defect": ["damage", "rust", "oil_leak", "foreign_object"],
+                }
+                roi_state_map = {
+                    "breather": ["silica_gel"],
+                    "valve": ["valve"],
+                    "state": ["silica_gel", "valve"],
+                }
+                roi_reading_map = {
+                    "oil_level": True,  # 需要读取刻度
+                }
+
+                run_defects = roi_type in roi_defect_map
+                run_state = roi_type in roi_state_map
+                run_reading = roi_type in roi_reading_map
 
                 # 执行缺陷检测
-                defects = self._detector.detect_defects(roi_image, str(roi_type))
+                if run_defects:
+                    defect_filter = roi_defect_map.get(roi_type, [])
+                    defects = self._detector.detect_defects(roi_image, roi_type, defect_filter)
 
-                # 转换检测结果为RecognitionResult
-                for defect in defects:
-                    # 将相对坐标转换为绝对坐标
-                    def_bbox = defect["bbox"]
-                    abs_x = roi_bbox.x + def_bbox["x"] * roi_bbox.width
-                    abs_y = roi_bbox.y + def_bbox["y"] * roi_bbox.height
-                    abs_width = def_bbox["width"] * roi_bbox.width
-                    abs_height = def_bbox["height"] * roi_bbox.height
+                    # 转换检测结果为RecognitionResult
+                    for defect in defects:
+                        # 将相对坐标转换为绝对坐标
+                        def_bbox = defect["bbox"]
+                        abs_x = roi_bbox.x + def_bbox["x"] * roi_bbox.width
+                        abs_y = roi_bbox.y + def_bbox["y"] * roi_bbox.height
+                        abs_width = def_bbox["width"] * roi_bbox.width
+                        abs_height = def_bbox["height"] * roi_bbox.height
 
-                    result = RecognitionResult(
-                        task_id=context.task_id,
-                        site_id=context.site_id,
-                        device_id=context.device_id,
-                        component_id=getattr(context, 'component_id', ''),
-                        roi_id=roi.id,
-                        bbox=BoundingBox(
-                            x=abs_x,
-                            y=abs_y,
-                            width=abs_width,
-                            height=abs_height
-                        ),
-                        label=defect["label"],
-                        value=None,
-                        confidence=defect["confidence"],
-                        model_version=self.version,
-                        code_version=self.code_hash,
-                    )
-                    results.append(result)
+                        result = RecognitionResult(
+                            task_id=context.task_id,
+                            site_id=context.site_id,
+                            device_id=context.device_id,
+                            component_id=getattr(context, 'component_id', ''),
+                            roi_id=roi.id,
+                            bbox=BoundingBox(
+                                x=abs_x,
+                                y=abs_y,
+                                width=abs_width,
+                                height=abs_height
+                            ),
+                            label=defect["label"],
+                            value=None,
+                            confidence=defect["confidence"],
+                            model_version=self.version,
+                            code_version=self.code_hash,
+                        )
+                        results.append(result)
 
                 # 执行状态检测
-                state = self._detector.detect_state(roi_image, str(roi_type))
-                if state:
-                    result = RecognitionResult(
-                        task_id=context.task_id,
-                        site_id=context.site_id,
-                        device_id=context.device_id,
-                        component_id=getattr(context, 'component_id', ''),
-                        roi_id=roi.id,
-                        bbox=roi.bbox,
-                        label=state["label"],
-                        value=state.get("value"),
-                        confidence=state["confidence"],
-                        model_version=self.version,
-                        code_version=self.code_hash,
-                    )
-                    results.append(result)
+                if run_state:
+                    state_filter = roi_state_map.get(roi_type, [])
+                    states = self._detector.detect_state(roi_image, roi_type, state_filter)
+                    for state in states:
+                        result = RecognitionResult(
+                            task_id=context.task_id,
+                            site_id=context.site_id,
+                            device_id=context.device_id,
+                            component_id=getattr(context, 'component_id', ''),
+                            roi_id=roi.id,
+                            bbox=roi.bbox,
+                            label=state["label"],
+                            value=state.get("value"),
+                            confidence=state["confidence"],
+                            model_version=self.version,
+                            code_version=self.code_hash,
+                        )
+                        results.append(result)
+
+                # 执行油位计刻度读数
+                if run_reading:
+                    reading = self._detector.read_oil_level(roi_image)
+                    if reading and reading["confidence"] >= self.confidence_threshold:
+                        result = RecognitionResult(
+                            task_id=context.task_id,
+                            site_id=context.site_id,
+                            device_id=context.device_id,
+                            component_id=getattr(context, 'component_id', ''),
+                            roi_id=roi.id,
+                            bbox=roi.bbox,
+                            label="oil_level_reading",
+                            value=reading["value"],
+                            confidence=reading["confidence"],
+                            model_version=self.version,
+                            code_version=self.code_hash,
+                        )
+                        results.append(result)
 
             except Exception as e:
                 print(f"[{self.id}] 处理ROI {roi.id} 时出错: {e}")
@@ -258,6 +331,19 @@ class TransformerInspectionPlugin(BasePlugin):
         print(f"[{self.id}] 生成 {len(alarms)} 个告警")
         return alarms
 
+    def analyze_thermal(self, frame: np.ndarray, config: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        """热成像温度提取"""
+        if self._detector is None:
+            return None
+
+        runtime_config = self._merge_config(self._config, config or {})
+        thermal_cfg = runtime_config.get("thermal", {})
+        if not thermal_cfg.get("enabled", False):
+            return None
+
+        self._detector.update_config(runtime_config)
+        return self._detector.extract_thermal_metrics(frame, thermal_cfg)
+
     def healthcheck(self) -> HealthStatus:
         """健康检查"""
         if not self._initialized:
@@ -293,6 +379,7 @@ class TransformerInspectionPlugin(BasePlugin):
             "silica_gel_abnormal": "硅胶变色",
             "valve_open": "阀门开启",
             "valve_closed": "阀门关闭",
+            "oil_level_reading": "油位读数",
         }
         return label_map.get(label, label)
 

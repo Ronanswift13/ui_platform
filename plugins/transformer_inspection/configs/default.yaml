@@ -15,6 +15,35 @@ inference:
 thermal:
   enabled: false
   temperature_threshold: 80.0  # 摄氏度
+  min_temp: 20.0
+  max_temp: 120.0
+
+# 算法参数配置
+algorithms:
+  oil_leak:
+    gray_threshold: 60
+    min_area: 500
+  rust:
+    min_area: 300
+  damage:
+    canny_low: 50
+    canny_high: 150
+    edge_density_threshold: 0.15
+  foreign_object:
+    canny_low: 30
+    canny_high: 100
+    min_area: 200
+    max_area: 2000
+    circularity_min: 0.2
+    circularity_max: 0.7
+  silica_gel:
+    blue_ratio_threshold: 0.1
+    pink_ratio_threshold: 0.1
+  valve:
+    angle_threshold: 30
+    hough_threshold: 50
+    min_line_length: 30
+    max_line_gap: 10
 
 # 识别类型配置
 recognition:
@@ -28,6 +57,7 @@ recognition:
     - silica_gel_abnormal   # 呼吸器硅胶变色
     - valve_open            # 阀门开启
     - valve_closed          # 阀门关闭
+    - oil_level_reading     # 油位计读数
 
 # ROI类型映射
 roi_types:
@@ -36,3 +66,9 @@ roi_types:
   oil_level: "油位计"
   breather: "呼吸器"
   terminal_box: "端子箱"
+
+# 油位计读数配置
+oil_level:
+  min_line_length_ratio: 0.33  # 最小线段长度比例
+  hough_threshold: 30          # 霍夫变换阈值
+  angle_tolerance: 15          # 水平线角度容差（度）

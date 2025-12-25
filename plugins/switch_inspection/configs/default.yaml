@@ -1,9 +1,10 @@
-# 开关间隔自主巡视插件配置 (B组)
+# 开关间隔自主巡视插件配置
+# Switch Bay Inspection Plugin Configuration
 
 # 模型配置
 model:
   path: "models/switch_detector.onnx"
-  device: "cpu"  # cpu 或 cuda
+  device: "cpu"   # cpu/cuda
 
 # 推理配置
 inference:
@@ -13,31 +14,137 @@ inference:
 
 # 状态识别配置
 state_recognition:
-  # 分合位状态类型
-  switch_states:
-    - closed      # 合位
-    - open        # 分位
-    - intermediate  # 中间态（异常）
-    - unknown     # 无法识别
+  # 最小状态得分阈值
+  min_state_score: 0.55
 
-  # 逻辑校验规则
-  logic_validation:
+  # 多证据融合权重
+  fusion_weights:
+    text: 0.5      # OCR文字权重
+    color: 0.3     # 颜色提示权重
+    angle: 0.2     # 连杆角度权重
+
+  # 角度评分的高斯衰减参数
+  angle_sigma_deg: 18
+
+  # 各类开关的标定参考角度（建议按点位标定；无标定时使用经验值）
+  angle_reference:
+    breaker:
+      open_deg: -60
+      closed_deg: 30
+    isolator:
+      open_deg: -70
+      closed_deg: 20
+    grounding:
+      open_deg: -80
+      closed_deg: 10
+
+  # OCR配置
+  ocr:
     enabled: true
-    # 五防逻辑：断路器-隔离开关-接地开关
-    rules:
-      - name: "防止带负荷拉刀闸"
-        condition: "breaker_open_before_isolator"
-      - name: "防止带电合接地刀"
-        condition: "isolator_open_before_grounding"
+    engine: "easyocr"
+    languages: ["ch_sim", "en"]
+    keywords_open: ["分", "OPEN", "OFF", "断开", "拉开"]
+    keywords_closed: ["合", "CLOSE", "ON", "闭合", "合上"]
 
-# 图像质量评价
+  # 颜色提示配置（HSV空间）
+  color_hint:
+    enabled: true
+    # 绿色范围（合闸指示）
+    hsv_green:
+      - [35, 40, 40]
+      - [85, 255, 255]
+    # 红色范围1（分闸指示，低色相端）
+    hsv_red1:
+      - [0, 60, 60]
+      - [10, 255, 255]
+    # 红色范围2（分闸指示，高色相端）
+    hsv_red2:
+      - [170, 60, 60]
+      - [180, 255, 255]
+
+# 互锁逻辑校验配置
+logic_validation:
+  enabled: true
+  rules:
+    - name: "防止带电合接地刀"
+      id: "interlock_grounding"
+      condition: "isolator_open_before_grounding"
+      description: "隔离开关未断开时，禁止合接地开关"
+      severity: "error"
+      reason_code: 2001
+    - name: "异常工况提示：合闸但刀闸断开"
+      id: "breaker_isolator_mismatch"
+      condition: "breaker_closed_while_isolator_open"
+      description: "断路器合闸但隔离开关断开，可能为识别错误或异常工况"
+      severity: "warning"
+      reason_code: 2002
+
+# 图像清晰度评价配置
 image_quality:
   enabled: true
-  min_clarity_score: 0.7
-  blur_threshold: 100
+  method: "laplacian_var"
+  # Laplacian方差评分参数
+  mu: 120              # 可接受清晰度阈值（经验值）
+  tau: 30              # Sigmoid陡峭度参数
+  min_clarity_score: 0.70   # 最低清晰度分数
+
+# 动态定位 + AI调焦联动参数
+focus_link:
+  stable_iou_threshold: 0.70   # 目标框稳定IoU阈值
+  stable_frames: 3             # 稳定帧数
+
+# SF6表计读数配置（升级功能，演示用）
+gauge_reading:
+  enabled: false  # 默认关闭，演示时可开启
+  # 指针式表计配置
+  pointer:
+    theta_min_deg: -120      # 最小刻度对应角度
+    theta_max_deg: 120       # 最大刻度对应角度
+    value_min: 0.0           # 最小刻度值
+    value_max: 1.0           # 最大刻度值（MPa）
+    unit: "MPa"
+    hough_threshold: 50
+    min_line_length: 30
+    max_line_gap: 10
+  # 数字式表计配置
+  digital:
+    enabled: false
+    ocr_engine: "easyocr"
+
+# 连杆角度检测算法参数
+linkage_detection:
+  canny_low: 80
+  canny_high: 160
+  hough_threshold: 60
+  min_line_length_ratio: 0.25   # 相对于ROI尺寸
+  max_line_gap: 10
 
 # 设备类型
 device_types:
-  - breaker       # 断路器
-  - isolator      # 隔离开关
-  - grounding     # 接地开关
+  - breaker      # 断路器
+  - isolator     # 隔离开关
+  - grounding    # 接地开关
+
+# 失败原因码定义
+reason_codes:
+  1001: "清晰度过低"
+  1002: "OCR失败或无文本"
+  1003: "未检测到有效角度/线段"
+  1004: "表盘/指针检测失败"
+  2001: "互锁逻辑异常：带电合接地刀风险"
+  2002: "异常工况提示：断路器合闸但隔离开关断开"
+  9000: "未知错误"
+
+# ROI类型映射
+roi_types:
+  breaker_indicator: "断路器分合指示窗"
+  isolator_indicator: "隔离开关指示窗"
+  grounding_indicator: "接地开关指示窗"
+  breaker_linkage: "断路器连杆"
+  isolator_linkage: "隔离刀闸连杆"
+  grounding_handle: "接地柄/连杆"
+  gauge_pressure: "SF6压强表"
+  gauge_density: "密度表"
+  mechanism_box: "机构箱外观"
+  arrester: "避雷器外观"
+  clarity_anchor: "清晰度评估锚点"

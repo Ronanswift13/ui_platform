@@ -117,34 +117,1059 @@
             </div>
         </div>
         {% else %}
-        <!-- 正常功能界面 (与首页类似的四区布局) -->
+        <!-- 正常功能界面 -->
+        {% if module_id == 'transformer' %}
         <div class="row">
             <!-- 左侧预览区 -->
             <div class="col-lg-8">
                 <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-camera-video"></i> 激光摄像头实时预览</h5>
+                        <span id="camera-connection-badge" class="badge bg-secondary">未连接</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="video-container position-relative" style="min-height: 450px; background: #0f1115;">
+                            <img id="camera-stream" class="w-100" style="display: none; max-height: 450px; object-fit: contain;">
+                            <div id="no-signal" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center text-secondary">
+                                <i class="bi bi-camera-video-off" style="font-size: 3rem;"></i>
+                                <p class="mt-2 mb-1">无信号输入</p>
+                                <small id="no-signal-text">请接入激光摄像头</small>
+                            </div>
+                            <div id="detect-loading" class="position-absolute top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.45);">
+                                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                                    <p class="text-white mt-3">正在检测中...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 检测截图 -->
+                <div class="card mt-3" id="snapshot-card" style="display: none;">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-camera-video"></i> 预览</h5>
+                        <h5 class="mb-0"><i class="bi bi-image"></i> 检测截图</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <img id="snapshot-image" class="w-100" style="max-height: 360px; object-fit: contain;">
+                    </div>
+                </div>
+
+                <!-- 检测结果区域 -->
+                <div class="card mt-3" id="results-card" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-list-check"></i> 检测结果</h5>
                     </div>
                     <div class="card-body">
-                        <div class="video-container" style="min-height: 400px; background: #1a1a1a;">
-                            <canvas id="video-canvas" class="w-100"></canvas>
+                        <div id="results-list"></div>
+                        <div id="no-results" class="text-center text-muted py-4" style="display: none;">
+                            <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                            <p class="mt-2">未检测到异常</p>
                         </div>
                     </div>
                 </div>
             </div>
+
             <!-- 右侧控制区 -->
             <div class="col-lg-4">
-                <!-- 与首页相同的控制面板 -->
-                <div class="card">
+                <!-- 摄像头接入 -->
+                <div class="card mb-3">
                     <div class="card-header">
-                        <h5 class="mb-0">控制面板</h5>
+                        <h5 class="mb-0"><i class="bi bi-plug"></i> 激光摄像头接入</h5>
                     </div>
                     <div class="card-body">
-                        <p>功能控制区域</p>
+                        <div class="mb-2">
+                            <label class="form-label">已接入设备</label>
+                            <div class="d-flex gap-2">
+                                <select class="form-select form-select-sm" id="camera-select">
+                                    <option value="">未发现摄像头</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-cameras" title="刷新">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <span id="camera-status" class="badge bg-secondary">未连接</span>
+                                <small id="camera-status-text" class="text-muted ms-2"></small>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mb-3">
+                            <button class="btn btn-sm btn-success" id="btn-connect-camera">
+                                <i class="bi bi-plug"></i> 连接
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" id="btn-disconnect-camera">
+                                <i class="bi bi-slash-circle"></i> 断开
+                            </button>
+                        </div>
+
+                        <hr>
+                        <h6 class="mb-2">新增接入</h6>
+                        <div class="mb-2">
+                            <label class="form-label">摄像头ID</label>
+                            <input type="text" class="form-control form-control-sm" id="camera-id" value="laser_cam">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">接入方式</label>
+                            <select class="form-select form-select-sm" id="camera-type">
+                                <option value="rtsp">RTSP</option>
+                                <option value="usb">USB</option>
+                                <option value="file">文件</option>
+                                <option value="mock">Mock</option>
+                            </select>
+                        </div>
+                        <div class="mb-2" id="camera-url-group">
+                            <label class="form-label">RTSP/文件地址</label>
+                            <input type="text" class="form-control form-control-sm" id="camera-url" placeholder="rtsp://...">
+                        </div>
+                        <div class="mb-2 d-none" id="camera-index-group">
+                            <label class="form-label">USB设备索引</label>
+                            <input type="number" class="form-control form-control-sm" id="camera-index" value="0">
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <label class="form-label small text-muted mb-1">宽</label>
+                                <input type="number" class="form-control form-control-sm" id="camera-width" value="1920">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small text-muted mb-1">高</label>
+                                <input type="number" class="form-control form-control-sm" id="camera-height" value="1080">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small text-muted mb-1">FPS</label>
+                                <input type="number" class="form-control form-control-sm" id="camera-fps" value="25">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary w-100 mt-2" id="btn-register-camera">
+                            <i class="bi bi-link-45deg"></i> 接入并连接
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 外观缺陷识别 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> 外观缺陷识别</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="border rounded p-2 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input defect-type" type="checkbox" value="oil_leak" id="check-oil-leak" checked>
+                                <label class="form-check-label" for="check-oil-leak">
+                                    <span class="badge bg-danger">渗漏油</span> 深色区域检测
+                                </label>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">暗区阈值</label>
+                                    <input type="number" class="form-control form-control-sm" id="oil-leak-threshold" value="60">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">最小面积</label>
+                                    <input type="number" class="form-control form-control-sm" id="oil-leak-area" value="500">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border rounded p-2 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input defect-type" type="checkbox" value="damage" id="check-damage" checked>
+                                <label class="form-check-label" for="check-damage">
+                                    <span class="badge bg-danger">破损</span> 边缘密度分析
+                                </label>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">边缘密度阈值</label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="damage-edge-density" value="0.15">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border rounded p-2 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input defect-type" type="checkbox" value="rust" id="check-rust" checked>
+                                <label class="form-check-label" for="check-rust">
+                                    <span class="badge bg-warning text-dark">锈蚀</span> 颜色检测
+                                </label>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">最小面积</label>
+                                    <input type="number" class="form-control form-control-sm" id="rust-area" value="300">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="form-check">
+                                <input class="form-check-input defect-type" type="checkbox" value="foreign_object" id="check-foreign" checked>
+                                <label class="form-check-label" for="check-foreign">
+                                    <span class="badge bg-warning text-dark">异物悬挂</span> 轮廓形状分析
+                                </label>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">最小面积</label>
+                                    <input type="number" class="form-control form-control-sm" id="foreign-area-min" value="200">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">最大面积</label>
+                                    <input type="number" class="form-control form-control-sm" id="foreign-area-max" value="2000">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 状态识别 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-eye text-info"></i> 状态识别</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="border rounded p-2 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input state-type" type="checkbox" value="silica_gel" id="check-silica" checked>
+                                <label class="form-check-label" for="check-silica">
+                                    <span class="badge bg-info">硅胶变色</span> 颜色比例分析
+                                </label>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">蓝色占比</label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="silica-blue-ratio" value="0.1">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">粉红占比</label>
+                                    <input type="number" step="0.01" class="form-control form-control-sm" id="silica-pink-ratio" value="0.1">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="border rounded p-2">
+                            <div class="form-check">
+                                <input class="form-check-input state-type" type="checkbox" value="valve" id="check-valve" checked>
+                                <label class="form-check-label" for="check-valve">
+                                    <span class="badge bg-secondary">阀门开闭</span> 轮廓方向识别
+                                </label>
+                            </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted mb-1">角度阈值</label>
+                                    <input type="number" class="form-control form-control-sm" id="valve-angle" value="30">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 热成像集成 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-thermometer-half text-danger"></i> 热成像集成</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="check-thermal">
+                            <label class="form-check-label" for="check-thermal">启用红外图像温度提取</label>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <label class="form-label small text-muted mb-1">阈值(°C)</label>
+                                <input type="number" class="form-control form-control-sm" id="thermal-threshold" value="80">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small text-muted mb-1">最低(°C)</label>
+                                <input type="number" class="form-control form-control-sm" id="thermal-min" value="20">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small text-muted mb-1">最高(°C)</label>
+                                <input type="number" class="form-control form-control-sm" id="thermal-max" value="120">
+                            </div>
+                        </div>
+                        <div class="border rounded p-2 bg-light">
+                            <div class="d-flex justify-content-between">
+                                <span>最高温度</span>
+                                <strong id="thermal-max-value">--</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>平均温度</span>
+                                <strong id="thermal-avg-value">--</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>最低温度</span>
+                                <strong id="thermal-min-value">--</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>热点占比</span>
+                                <strong id="thermal-hotspot">--</strong>
+                            </div>
+                            <div class="mt-2">
+                                <span id="thermal-status" class="badge bg-secondary">未分析</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 运行控制 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-primary w-100" id="btn-detect" disabled>
+                            <i class="bi bi-play-fill"></i> 开始检测
+                        </button>
+                        <button class="btn btn-outline-secondary w-100 mt-2" id="btn-clear">
+                            <i class="bi bi-trash"></i> 清除结果
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 告警面板 -->
+                <div class="card" id="alarms-card" style="display: none;">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="bi bi-bell-fill"></i> 告警信息</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="alarms-list" class="list-group list-group-flush"></div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- JavaScript -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const cameraStream = document.getElementById('camera-stream');
+            const noSignal = document.getElementById('no-signal');
+            const noSignalText = document.getElementById('no-signal-text');
+            const detectLoading = document.getElementById('detect-loading');
+            const connectionBadge = document.getElementById('camera-connection-badge');
+            const btnDetect = document.getElementById('btn-detect');
+            const btnClear = document.getElementById('btn-clear');
+            const resultsCard = document.getElementById('results-card');
+            const resultsList = document.getElementById('results-list');
+            const noResults = document.getElementById('no-results');
+            const alarmsCard = document.getElementById('alarms-card');
+            const alarmsList = document.getElementById('alarms-list');
+            const snapshotCard = document.getElementById('snapshot-card');
+            const snapshotImage = document.getElementById('snapshot-image');
+
+            const cameraSelect = document.getElementById('camera-select');
+            const cameraStatus = document.getElementById('camera-status');
+            const cameraStatusText = document.getElementById('camera-status-text');
+            const btnRefreshCameras = document.getElementById('btn-refresh-cameras');
+            const btnConnectCamera = document.getElementById('btn-connect-camera');
+            const btnDisconnectCamera = document.getElementById('btn-disconnect-camera');
+            const btnRegisterCamera = document.getElementById('btn-register-camera');
+
+            const cameraType = document.getElementById('camera-type');
+            const cameraUrlGroup = document.getElementById('camera-url-group');
+            const cameraIndexGroup = document.getElementById('camera-index-group');
+
+            const thermalStatus = document.getElementById('thermal-status');
+            const thermalMaxValue = document.getElementById('thermal-max-value');
+            const thermalAvgValue = document.getElementById('thermal-avg-value');
+            const thermalMinValue = document.getElementById('thermal-min-value');
+            const thermalHotspot = document.getElementById('thermal-hotspot');
+
+            let currentCameraId = '';
+            let statusTimer = null;
+
+            function setNoSignal(message) {
+                noSignal.classList.remove('d-none');
+                cameraStream.style.display = 'none';
+                cameraStream.src = '';
+                noSignalText.textContent = message || '请接入激光摄像头';
+                btnDetect.disabled = true;
+                connectionBadge.className = 'badge bg-secondary';
+                connectionBadge.textContent = '未连接';
+            }
+
+            function setSignalReady() {
+                noSignal.classList.add('d-none');
+                cameraStream.style.display = 'block';
+                btnDetect.disabled = false;
+                connectionBadge.className = 'badge bg-success';
+                connectionBadge.textContent = '已连接';
+            }
+
+            function updateThermalDisplay(data) {
+                if (!data) {
+                    thermalStatus.className = 'badge bg-secondary';
+                    thermalStatus.textContent = '未分析';
+                    thermalMaxValue.textContent = '--';
+                    thermalAvgValue.textContent = '--';
+                    thermalMinValue.textContent = '--';
+                    thermalHotspot.textContent = '--';
+                    return;
+                }
+                thermalMaxValue.textContent = data.max_temp.toFixed(1) + '°C';
+                thermalAvgValue.textContent = data.avg_temp.toFixed(1) + '°C';
+                thermalMinValue.textContent = data.min_temp.toFixed(1) + '°C';
+                thermalHotspot.textContent = (data.hotspot_ratio * 100).toFixed(1) + '%';
+                if (data.over_threshold) {
+                    thermalStatus.className = 'badge bg-danger';
+                    thermalStatus.textContent = '超温';
+                } else {
+                    thermalStatus.className = 'badge bg-success';
+                    thermalStatus.textContent = '正常';
+                }
+            }
+
+            function updateCameraBadge(status) {
+                if (status === 'connected') {
+                    setSignalReady();
+                } else if (status === 'connecting') {
+                    connectionBadge.className = 'badge bg-warning';
+                    connectionBadge.textContent = '连接中';
+                } else {
+                    setNoSignal('无信号输入');
+                }
+            }
+
+            function displayResults(results) {
+                resultsCard.style.display = 'block';
+                resultsList.innerHTML = '';
+
+                if (!results || results.length === 0) {
+                    noResults.style.display = 'block';
+                    return;
+                }
+
+                noResults.style.display = 'none';
+
+                results.forEach((result) => {
+                    const levelClass = getLevelClass(result.label);
+                    let valueText = '';
+                    if (result.value !== undefined && result.value !== null) {
+                        valueText = ` | ${result.value}`;
+                    }
+                    const html = `
+                        <div class="d-flex justify-content-between align-items-center p-2 mb-2 rounded ${levelClass}">
+                            <div>
+                                <strong>${result.label_cn || result.label}</strong>
+                                <small class="text-muted ms-2">置信度: ${(result.confidence * 100).toFixed(1)}%${valueText}</small>
+                            </div>
+                            <span class="badge ${getBadgeClass(result.label)}">${result.label}</span>
+                        </div>
+                    `;
+                    resultsList.innerHTML += html;
+                });
+            }
+
+            function displayAlarms(alarms) {
+                if (!alarms || alarms.length === 0) {
+                    alarmsCard.style.display = 'none';
+                    return;
+                }
+
+                alarmsCard.style.display = 'block';
+                alarmsList.innerHTML = '';
+
+                alarms.forEach(alarm => {
+                    const levelIcon = alarm.level === 'error' ? 'exclamation-octagon' : 'exclamation-triangle';
+                    const levelClass = alarm.level === 'error' ? 'list-group-item-danger' : 'list-group-item-warning';
+                    const html = `
+                        <div class="list-group-item ${levelClass}">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-${levelIcon} me-2"></i>
+                                <div>
+                                    <strong>${alarm.title}</strong>
+                                    <p class="mb-0 small">${alarm.message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    alarmsList.innerHTML += html;
+                });
+            }
+
+            function getLevelClass(label) {
+                if (['oil_leak', 'damage'].includes(label)) {
+                    return 'bg-danger bg-opacity-10 border-start border-danger border-4';
+                } else if (['rust', 'foreign_object', 'silica_gel_abnormal'].includes(label)) {
+                    return 'bg-warning bg-opacity-10 border-start border-warning border-4';
+                }
+                return 'bg-success bg-opacity-10 border-start border-success border-4';
+            }
+
+            function getBadgeClass(label) {
+                if (['oil_leak', 'damage'].includes(label)) {
+                    return 'bg-danger';
+                } else if (['rust', 'foreign_object', 'silica_gel_abnormal'].includes(label)) {
+                    return 'bg-warning text-dark';
+                }
+                return 'bg-success';
+            }
+
+            function toggleCameraFields() {
+                const type = cameraType.value;
+                if (type === 'usb') {
+                    cameraUrlGroup.classList.add('d-none');
+                    cameraIndexGroup.classList.remove('d-none');
+                } else {
+                    cameraUrlGroup.classList.remove('d-none');
+                    cameraIndexGroup.classList.add('d-none');
+                }
+            }
+
+            function setStream(cameraId) {
+                if (!cameraId) {
+                    setNoSignal('未选择摄像头');
+                    return;
+                }
+                cameraStream.src = `/api/cameras/${cameraId}/stream?fps=10&ts=${Date.now()}`;
+            }
+
+            async function loadCameras() {
+                try {
+                    const response = await fetch('/api/cameras');
+                    const cameras = await response.json();
+                    cameraSelect.innerHTML = '';
+                    if (!cameras || cameras.length === 0) {
+                        cameraSelect.innerHTML = '<option value="">未发现摄像头</option>';
+                        currentCameraId = '';
+                        setNoSignal('未发现摄像头');
+                        return;
+                    }
+                    cameras.forEach(cam => {
+                        const option = document.createElement('option');
+                        option.value = cam.id;
+                        option.textContent = `${cam.id} (${cam.camera_type})`;
+                        cameraSelect.appendChild(option);
+                    });
+                    if (!currentCameraId) {
+                        currentCameraId = cameras[0].id;
+                    }
+                    cameraSelect.value = currentCameraId;
+                    await refreshCameraStatus();
+                } catch (error) {
+                    setNoSignal('摄像头列表加载失败');
+                }
+            }
+
+            async function refreshCameraStatus() {
+                if (!currentCameraId) {
+                    setNoSignal('未选择摄像头');
+                    return;
+                }
+                try {
+                    const response = await fetch(`/api/cameras/${currentCameraId}/status`);
+                    const data = await response.json();
+                    const status = data.status || 'disconnected';
+                    cameraStatus.textContent = status === 'connected' ? '已连接' : '未连接';
+                    cameraStatus.className = status === 'connected' ? 'badge bg-success' : 'badge bg-secondary';
+                    cameraStatusText.textContent = data.last_error || '';
+                    updateCameraBadge(status);
+                    if (status === 'connected') {
+                        setStream(currentCameraId);
+                    }
+                } catch (error) {
+                    setNoSignal('摄像头状态获取失败');
+                }
+            }
+
+            async function connectSelectedCamera() {
+                if (!currentCameraId) return;
+                await fetch(`/api/cameras/${currentCameraId}/connect`, { method: 'POST' });
+                await refreshCameraStatus();
+            }
+
+            async function disconnectSelectedCamera() {
+                if (!currentCameraId) return;
+                await fetch(`/api/cameras/${currentCameraId}/disconnect`, { method: 'POST' });
+                setNoSignal('摄像头已断开');
+            }
+
+            async function registerCamera() {
+                const cameraId = document.getElementById('camera-id').value.trim();
+                if (!cameraId) {
+                    alert('请填写摄像头ID');
+                    return;
+                }
+                const payload = {
+                    camera_id: cameraId,
+                    camera_type: cameraType.value,
+                    url: document.getElementById('camera-url').value.trim(),
+                    device_index: parseInt(document.getElementById('camera-index').value || '0', 10),
+                    width: parseInt(document.getElementById('camera-width').value || '1920', 10),
+                    height: parseInt(document.getElementById('camera-height').value || '1080', 10),
+                    fps: parseInt(document.getElementById('camera-fps').value || '25', 10),
+                    auto_connect: true
+                };
+                const response = await fetch('/api/cameras/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert(data.detail || '接入失败');
+                    return;
+                }
+                currentCameraId = cameraId;
+                await loadCameras();
+            }
+
+            function readNumber(id, fallback) {
+                const value = parseFloat(document.getElementById(id).value);
+                return Number.isFinite(value) ? value : fallback;
+            }
+
+            function buildAlgorithmConfig() {
+                const algorithms = {};
+
+                const oilLeak = {
+                    gray_threshold: readNumber('oil-leak-threshold', 60),
+                    min_area: readNumber('oil-leak-area', 500),
+                };
+                algorithms.oil_leak = oilLeak;
+
+                const damage = {
+                    edge_density_threshold: readNumber('damage-edge-density', 0.15),
+                };
+                algorithms.damage = damage;
+
+                const rust = {
+                    min_area: readNumber('rust-area', 300),
+                };
+                algorithms.rust = rust;
+
+                const foreignObject = {
+                    min_area: readNumber('foreign-area-min', 200),
+                    max_area: readNumber('foreign-area-max', 2000),
+                };
+                algorithms.foreign_object = foreignObject;
+
+                const silicaGel = {
+                    blue_ratio_threshold: readNumber('silica-blue-ratio', 0.1),
+                    pink_ratio_threshold: readNumber('silica-pink-ratio', 0.1),
+                };
+                algorithms.silica_gel = silicaGel;
+
+                const valve = {
+                    angle_threshold: readNumber('valve-angle', 30),
+                };
+                algorithms.valve = valve;
+
+                return algorithms;
+            }
+
+            btnDetect.addEventListener('click', async function() {
+                if (!currentCameraId) {
+                    alert('请先接入摄像头');
+                    return;
+                }
+
+                const defectTypes = Array.from(document.querySelectorAll('.defect-type:checked')).map(cb => cb.value);
+                const stateTypes = [];
+                if (document.getElementById('check-silica').checked) {
+                    stateTypes.push('silica_gel_normal', 'silica_gel_abnormal');
+                }
+                if (document.getElementById('check-valve').checked) {
+                    stateTypes.push('valve_open', 'valve_closed');
+                }
+
+                const thermalEnabled = document.getElementById('check-thermal').checked;
+
+                if (defectTypes.length === 0 && stateTypes.length === 0 && !thermalEnabled) {
+                    alert('请至少选择一种检测类型');
+                    return;
+                }
+
+                detectLoading.classList.remove('d-none');
+                btnDetect.disabled = true;
+
+                try {
+                    const payload = {
+                        camera_id: currentCameraId,
+                        defect_types: defectTypes,
+                        state_types: stateTypes,
+                        thermal_enabled: thermalEnabled,
+                        thermal_threshold: readNumber('thermal-threshold', 80),
+                        thermal_min_temp: readNumber('thermal-min', 20),
+                        thermal_max_temp: readNumber('thermal-max', 120),
+                        algorithms: buildAlgorithmConfig(),
+                    };
+
+                    const response = await fetch('/api/detect/{{ module_id }}_inspection/camera', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.detail || '检测失败');
+                    }
+
+                    if (data.annotated_image) {
+                        snapshotImage.src = data.annotated_image;
+                        snapshotCard.style.display = 'block';
+                    }
+
+                    displayResults(data.results);
+                    displayAlarms(data.alarms);
+                    updateThermalDisplay(data.thermal);
+                } catch (error) {
+                    alert('检测失败: ' + error.message);
+                } finally {
+                    detectLoading.classList.add('d-none');
+                    btnDetect.disabled = false;
+                }
+            });
+
+            btnClear.addEventListener('click', function() {
+                resultsCard.style.display = 'none';
+                alarmsCard.style.display = 'none';
+                snapshotCard.style.display = 'none';
+                resultsList.innerHTML = '';
+                alarmsList.innerHTML = '';
+                updateThermalDisplay(null);
+            });
+
+            cameraSelect.addEventListener('change', function() {
+                currentCameraId = cameraSelect.value;
+                refreshCameraStatus();
+            });
+
+            btnRefreshCameras.addEventListener('click', loadCameras);
+            btnConnectCamera.addEventListener('click', connectSelectedCamera);
+            btnDisconnectCamera.addEventListener('click', disconnectSelectedCamera);
+            btnRegisterCamera.addEventListener('click', registerCamera);
+            cameraType.addEventListener('change', toggleCameraFields);
+
+            cameraStream.addEventListener('error', function() {
+                setNoSignal('摄像头连接失败');
+            });
+
+            toggleCameraFields();
+            loadCameras();
+            if (statusTimer) clearInterval(statusTimer);
+            statusTimer = setInterval(refreshCameraStatus, 5000);
+        });
+        </script>
+        {% else %}
+        <div class="row">
+            <!-- 左侧预览区 -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-camera-video"></i> 预览</h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" id="btn-clear" title="清除">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="video-container position-relative" style="min-height: 450px; background: #1a1a1a;">
+                            <img id="preview-image" class="w-100" style="display: none; max-height: 450px; object-fit: contain;">
+                            <div id="upload-placeholder" class="d-flex flex-column align-items-center justify-content-center h-100" style="min-height: 450px;">
+                                <i class="bi bi-cloud-upload text-secondary" style="font-size: 4rem;"></i>
+                                <p class="text-secondary mt-3">点击上传图片或拖拽到此区域</p>
+                                <input type="file" id="file-input" accept="image/*" class="d-none">
+                                <button class="btn btn-primary mt-2" onclick="document.getElementById('file-input').click()">
+                                    <i class="bi bi-upload"></i> 选择图片
+                                </button>
+                            </div>
+                            <div id="loading-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.7);">
+                                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div>
+                                    <p class="text-white mt-3">正在检测中...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 检测结果区域 -->
+                <div class="card mt-3" id="results-card" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-list-check"></i> 检测结果</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="results-list"></div>
+                        <div id="no-results" class="text-center text-muted py-4" style="display: none;">
+                            <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                            <p class="mt-2">未检测到异常</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧控制区 -->
+            <div class="col-lg-4">
+                <!-- 检测类型选择 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> 检测设置</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6 class="mb-3">1. 缺陷检测</h6>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input detection-type" type="checkbox" value="defect" id="check-defect" checked>
+                            <label class="form-check-label" for="check-defect">
+                                <i class="bi bi-exclamation-triangle text-danger"></i> 缺陷检测
+                            </label>
+                            <small class="text-muted d-block ms-4">渗漏油、锈蚀、破损、异物</small>
+                        </div>
+
+                        <hr>
+                        <h6 class="mb-3">2. 状态识别</h6>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input detection-type" type="checkbox" value="state" id="check-state" checked>
+                            <label class="form-check-label" for="check-state">
+                                <i class="bi bi-eye text-info"></i> 状态识别
+                            </label>
+                            <small class="text-muted d-block ms-4">硅胶变色、阀门状态</small>
+                        </div>
+
+                        <hr>
+                        <button class="btn btn-primary w-100 mt-2" id="btn-detect" disabled>
+                            <i class="bi bi-play-fill"></i> 开始检测
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 检测能力说明 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> 检测能力</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6><i class="bi bi-exclamation-octagon text-danger"></i> 严重缺陷</h6>
+                            <ul class="list-unstyled ms-3 mb-2">
+                                <li><span class="badge bg-danger">渗漏油</span> 基于深色区域检测</li>
+                                <li><span class="badge bg-danger">破损</span> 基于边缘密度分析</li>
+                            </ul>
+                        </div>
+                        <div class="mb-3">
+                            <h6><i class="bi bi-exclamation-triangle text-warning"></i> 一般缺陷</h6>
+                            <ul class="list-unstyled ms-3 mb-2">
+                                <li><span class="badge bg-warning text-dark">锈蚀</span> 基于HSV颜色检测</li>
+                                <li><span class="badge bg-warning text-dark">异物</span> 基于轮廓形状分析</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h6><i class="bi bi-eye text-info"></i> 状态识别</h6>
+                            <ul class="list-unstyled ms-3 mb-0">
+                                <li><span class="badge bg-info">硅胶</span> 变色检测</li>
+                                <li><span class="badge bg-secondary">阀门</span> 开闭状态</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 告警面板 -->
+                <div class="card" id="alarms-card" style="display: none;">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0"><i class="bi bi-bell-fill"></i> 告警信息</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="alarms-list" class="list-group list-group-flush"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JavaScript -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('file-input');
+            const previewImage = document.getElementById('preview-image');
+            const uploadPlaceholder = document.getElementById('upload-placeholder');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const btnDetect = document.getElementById('btn-detect');
+            const btnClear = document.getElementById('btn-clear');
+            const resultsCard = document.getElementById('results-card');
+            const resultsList = document.getElementById('results-list');
+            const noResults = document.getElementById('no-results');
+            const alarmsCard = document.getElementById('alarms-card');
+            const alarmsList = document.getElementById('alarms-list');
+
+            let currentFile = null;
+
+            // 文件选择
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            });
+
+            // 拖拽上传
+            const container = document.querySelector('.video-container');
+            container.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                container.style.borderColor = '#0d6efd';
+            });
+            container.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                container.style.borderColor = '';
+            });
+            container.addEventListener('drop', function(e) {
+                e.preventDefault();
+                container.style.borderColor = '';
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    handleFile(file);
+                }
+            });
+
+            function handleFile(file) {
+                currentFile = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                    uploadPlaceholder.style.display = 'none';
+                    btnDetect.disabled = false;
+                    // 隐藏之前的结果
+                    resultsCard.style.display = 'none';
+                    alarmsCard.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // 清除
+            btnClear.addEventListener('click', function() {
+                currentFile = null;
+                previewImage.src = '';
+                previewImage.style.display = 'none';
+                uploadPlaceholder.style.display = 'flex';
+                btnDetect.disabled = true;
+                resultsCard.style.display = 'none';
+                alarmsCard.style.display = 'none';
+                fileInput.value = '';
+            });
+
+            // 开始检测
+            btnDetect.addEventListener('click', async function() {
+                if (!currentFile) return;
+
+                // 获取检测类型
+                const types = [];
+                document.querySelectorAll('.detection-type:checked').forEach(cb => {
+                    types.push(cb.value);
+                });
+
+                if (types.length === 0) {
+                    alert('请至少选择一种检测类型');
+                    return;
+                }
+
+                // 显示加载
+                loadingOverlay.classList.remove('d-none');
+                btnDetect.disabled = true;
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', currentFile);
+                    formData.append('detection_types', types.join(','));
+
+                    const response = await fetch('/api/detect/{{ module_id }}_inspection', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || '检测失败');
+                    }
+
+                    // 显示结果图像
+                    if (data.annotated_image) {
+                        previewImage.src = data.annotated_image;
+                    }
+
+                    // 显示结果列表
+                    displayResults(data.results);
+
+                    // 显示告警
+                    displayAlarms(data.alarms);
+
+                } catch (error) {
+                    alert('检测失败: ' + error.message);
+                } finally {
+                    loadingOverlay.classList.add('d-none');
+                    btnDetect.disabled = false;
+                }
+            });
+
+            function displayResults(results) {
+                resultsCard.style.display = 'block';
+                resultsList.innerHTML = '';
+
+                if (!results || results.length === 0) {
+                    noResults.style.display = 'block';
+                    return;
+                }
+
+                noResults.style.display = 'none';
+
+                results.forEach((result, index) => {
+                    const levelClass = getLevelClass(result.label);
+                    const html = `
+                        <div class="d-flex justify-content-between align-items-center p-2 mb-2 rounded ${levelClass}">
+                            <div>
+                                <strong>${result.label_cn || result.label}</strong>
+                                <small class="text-muted ms-2">置信度: ${(result.confidence * 100).toFixed(1)}%</small>
+                            </div>
+                            <span class="badge ${getBadgeClass(result.label)}">${result.label}</span>
+                        </div>
+                    `;
+                    resultsList.innerHTML += html;
+                });
+            }
+
+            function displayAlarms(alarms) {
+                if (!alarms || alarms.length === 0) {
+                    alarmsCard.style.display = 'none';
+                    return;
+                }
+
+                alarmsCard.style.display = 'block';
+                alarmsList.innerHTML = '';
+
+                alarms.forEach(alarm => {
+                    const levelIcon = alarm.level === 'error' ? 'exclamation-octagon' : 'exclamation-triangle';
+                    const levelClass = alarm.level === 'error' ? 'list-group-item-danger' : 'list-group-item-warning';
+                    const html = `
+                        <div class="list-group-item ${levelClass}">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-${levelIcon} me-2"></i>
+                                <div>
+                                    <strong>${alarm.title}</strong>
+                                    <p class="mb-0 small">${alarm.message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    alarmsList.innerHTML += html;
+                });
+            }
+
+            function getLevelClass(label) {
+                if (['oil_leak', 'damage'].includes(label)) {
+                    return 'bg-danger bg-opacity-10 border-start border-danger border-4';
+                } else if (['rust', 'foreign_object', 'silica_gel_abnormal'].includes(label)) {
+                    return 'bg-warning bg-opacity-10 border-start border-warning border-4';
+                }
+                return 'bg-success bg-opacity-10 border-start border-success border-4';
+            }
+
+            function getBadgeClass(label) {
+                if (['oil_leak', 'damage'].includes(label)) {
+                    return 'bg-danger';
+                } else if (['rust', 'foreign_object', 'silica_gel_abnormal'].includes(label)) {
+                    return 'bg-warning text-dark';
+                }
+                return 'bg-success';
+            }
+        });
+        </script>
+        {% endif %}
         {% endif %}
     </div>
 </div>
