@@ -39,6 +39,24 @@ def main():
     logger.info("输变电激光星芒破夜绘明监测平台")
     logger.info("=" * 50)
 
+    # 初始化插件管理器并加载所有插件
+    from platform_core.plugin_manager import PluginManager
+    plugin_manager = PluginManager()
+    plugins = plugin_manager.discover_plugins()
+    logger.info(f"发现 {len(plugins)} 个插件")
+
+    # 加载所有发现的插件
+    loaded_count = 0
+    for manifest in plugins:
+        try:
+            plugin_manager.load_plugin(manifest.id)
+            loaded_count += 1
+            logger.info(f"  ✓ 已加载: {manifest.id}")
+        except Exception as e:
+            logger.error(f"  ✗ 加载失败 [{manifest.id}]: {e}")
+
+    logger.info(f"成功加载 {loaded_count}/{len(plugins)} 个插件")
+
     import uvicorn
 
     if args.api:
