@@ -1,0 +1,52 @@
+# 电容器自主巡视插件配置 (D组)
+
+# 模型配置
+model:
+  path: "models/capacitor_detector.onnx"
+  device: "cpu"  # cpu 或 cuda
+
+# 推理配置
+inference:
+  confidence_threshold: 0.55
+  nms_threshold: 0.4
+  max_detections: 100
+
+# 结构完整性检测
+structural_integrity:
+  # 倾斜检测
+  tilt_detection:
+    enabled: true
+    max_tilt_angle: 5.0  # 度
+  # 倒塌检测
+  collapse_detection:
+    enabled: true
+  # 部件缺失
+  missing_parts:
+    - capacitor_unit
+    - fuse
+    - insulator
+    - connecting_bar
+
+# 区域入侵检测
+intrusion_detection:
+  enabled: true
+  # 监控区域类型
+  zone_types:
+    - restricted      # 禁入区
+    - warning         # 警告区
+    - equipment       # 设备区
+  # 入侵目标
+  intrusion_targets:
+    - person
+    - vehicle
+    - animal
+  # 告警延迟(秒)
+  alert_delay: 2.0
+
+# 电容器组配置
+capacitor_bank:
+  # 标准排列
+  rows: 3
+  columns: 4
+  # 相序
+  phases: ["A", "B", "C"]

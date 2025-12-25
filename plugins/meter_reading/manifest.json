@@ -1,13 +1,63 @@
 {
     "id": "meter_reading",
     "name": "表计无建模增强读数插件",
-    "version": "0.1.0",
-    "description": "站内全类型模拟表计和数字表计的任意角度读数识别",
+    "version": "1.0.0",
+    "description": "任意角度表计读数、关键点检测透视矫正、自动量程识别、失败兜底策略",
     "author": "E组",
     "entrypoint": "plugin.py",
     "plugin_class": "MeterReadingPlugin",
-    "capabilities": ["meter_reading", "focus_suggestion"],
-    "device_types": ["meter"],
-    "roi_types": ["oil_temp_meter", "pressure_meter", "arrester_meter", "digital_meter"],
-    "recognition_types": ["reading_value", "keypoints", "correction_needed"]
+    "capabilities": [
+        "meter_reading"
+    ],
+    "device_types": [
+        "pressure_gauge",
+        "temperature_gauge",
+        "oil_level_gauge",
+        "sf6_density_gauge",
+        "digital_display",
+        "led_indicator"
+    ],
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "keypoint_model": {"type": "string"},
+                    "ocr_model": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "perspective_correction": {"type": "boolean"},
+                    "max_rotation_angle": {"type": "number"}
+                }
+            },
+            "reading": {
+                "type": "object",
+                "properties": {
+                    "auto_range": {"type": "boolean"},
+                    "interpolation": {"type": "string"},
+                    "decimal_places": {"type": "integer"},
+                    "fallback": {"type": "object"}
+                }
+            },
+            "preprocessing": {
+                "type": "object",
+                "properties": {
+                    "enhance_lighting": {"type": "boolean"},
+                    "anti_glare": {"type": "boolean"},
+                    "contrast_enhancement": {"type": "number"}
+                }
+            }
+        }
+    }
 }

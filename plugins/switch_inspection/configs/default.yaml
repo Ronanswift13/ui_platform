@@ -1,0 +1,43 @@
+# 开关间隔自主巡视插件配置 (B组)
+
+# 模型配置
+model:
+  path: "models/switch_detector.onnx"
+  device: "cpu"  # cpu 或 cuda
+
+# 推理配置
+inference:
+  confidence_threshold: 0.6
+  nms_threshold: 0.4
+  max_detections: 50
+
+# 状态识别配置
+state_recognition:
+  # 分合位状态类型
+  switch_states:
+    - closed      # 合位
+    - open        # 分位
+    - intermediate  # 中间态（异常）
+    - unknown     # 无法识别
+
+  # 逻辑校验规则
+  logic_validation:
+    enabled: true
+    # 五防逻辑：断路器-隔离开关-接地开关
+    rules:
+      - name: "防止带负荷拉刀闸"
+        condition: "breaker_open_before_isolator"
+      - name: "防止带电合接地刀"
+        condition: "isolator_open_before_grounding"
+
+# 图像质量评价
+image_quality:
+  enabled: true
+  min_clarity_score: 0.7
+  blur_threshold: 100
+
+# 设备类型
+device_types:
+  - breaker       # 断路器
+  - isolator      # 隔离开关
+  - grounding     # 接地开关

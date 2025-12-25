@@ -1,0 +1,49 @@
+# 母线自主巡视插件配置 (C组)
+
+# 模型配置
+model:
+  path: "models/busbar_detector.onnx"
+  device: "cpu"  # cpu 或 cuda
+  # 4K大视场支持
+  input_size: [3840, 2160]
+
+# 推理配置
+inference:
+  confidence_threshold: 0.5
+  nms_threshold: 0.3
+  max_detections: 200
+  # 小目标检测增强
+  small_object_enhancement: true
+  tile_detection: true
+  tile_size: 640
+  tile_overlap: 0.2
+
+# 检测目标类型
+detection_targets:
+  # 绝缘子串
+  insulator:
+    - normal
+    - cracked
+    - contaminated
+    - missing
+  # 金具
+  hardware:
+    - normal
+    - loose
+    - corroded
+    - missing_pin
+  # 导线连接
+  conductor:
+    - normal
+    - overheated
+    - broken_strand
+
+# 环境干扰过滤
+noise_filtering:
+  enabled: true
+  # 过滤鸟类、飞虫等干扰
+  filter_classes:
+    - bird
+    - insect
+    - debris
+  min_static_frames: 3

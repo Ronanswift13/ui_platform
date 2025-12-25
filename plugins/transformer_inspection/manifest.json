@@ -1,8 +1,8 @@
 {
     "id": "transformer_inspection",
     "name": "主变自主巡视插件",
-    "version": "0.1.0",
-    "description": "主变压器本体及附属设施的外观缺陷识别、状态识别和热成像分析",
+    "version": "1.0.0",
+    "description": "主变外观缺陷识别、状态识别、热成像分析",
     "author": "A组",
     "entrypoint": "plugin.py",
     "plugin_class": "TransformerInspectionPlugin",
@@ -11,33 +11,39 @@
         "state_recognition",
         "thermal_analysis"
     ],
-    "device_types": ["transformer"],
+    "device_types": [
+        "transformer",
+        "thermal_camera"
+    ],
     "dependencies": [
-        "opencv-python>=4.8.0",
-        "numpy>=1.24.0"
+        "numpy",
+        "opencv-python"
     ],
     "min_platform_version": "1.0.0",
     "config_schema": {
         "type": "object",
         "properties": {
-            "model_path": {"type": "string"},
-            "confidence_threshold": {"type": "number", "default": 0.5},
-            "enable_thermal": {"type": "boolean", "default": false}
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1}
+                }
+            },
+            "thermal": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "temperature_threshold": {"type": "number"}
+                }
+            }
         }
-    },
-    "roi_types": [
-        "bushing",
-        "radiator",
-        "oil_level",
-        "breather",
-        "terminal_box"
-    ],
-    "recognition_types": [
-        "damage",
-        "rust",
-        "oil_leak",
-        "foreign_object",
-        "silica_gel_color",
-        "valve_state"
-    ]
+    }
 }

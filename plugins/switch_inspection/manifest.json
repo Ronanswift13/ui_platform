@@ -1,8 +1,8 @@
 {
     "id": "switch_inspection",
     "name": "开关间隔自主巡视插件",
-    "version": "0.1.0",
-    "description": "断路器、隔离开关、接地开关的分合位状态识别和逻辑校验",
+    "version": "1.0.0",
+    "description": "分合位状态识别、五防逻辑校验、图像清晰度评价",
     "author": "B组",
     "entrypoint": "plugin.py",
     "plugin_class": "SwitchInspectionPlugin",
@@ -10,31 +10,47 @@
         "state_recognition",
         "image_quality"
     ],
-    "device_types": ["switch", "breaker", "disconnector"],
+    "device_types": [
+        "breaker",
+        "isolator",
+        "grounding"
+    ],
     "dependencies": [
-        "opencv-python>=4.8.0",
-        "numpy>=1.24.0"
+        "numpy",
+        "opencv-python"
     ],
     "min_platform_version": "1.0.0",
     "config_schema": {
         "type": "object",
         "properties": {
-            "model_path": {"type": "string"},
-            "confidence_threshold": {"type": "number", "default": 0.5},
-            "enable_logic_check": {"type": "boolean", "default": true}
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1}
+                }
+            },
+            "state_recognition": {
+                "type": "object",
+                "properties": {
+                    "switch_states": {"type": "array", "items": {"type": "string"}},
+                    "logic_validation": {"type": "object"}
+                }
+            },
+            "image_quality": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "min_clarity_score": {"type": "number"}
+                }
+            }
         }
-    },
-    "roi_types": [
-        "breaker",
-        "disconnector",
-        "ground_switch",
-        "mechanism_box",
-        "indicator"
-    ],
-    "recognition_types": [
-        "open",
-        "closed",
-        "intermediate",
-        "unclear"
-    ]
+    }
 }

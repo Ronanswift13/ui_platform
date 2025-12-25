@@ -1,0 +1,69 @@
+# 表计无建模增强读数插件配置 (E组)
+
+# 模型配置
+model:
+  # 关键点检测模型
+  keypoint_model: "models/meter_keypoint.onnx"
+  # OCR模型 (数字表计)
+  ocr_model: "models/meter_ocr.onnx"
+  device: "cpu"  # cpu 或 cuda
+
+# 推理配置
+inference:
+  confidence_threshold: 0.6
+  # 透视矫正
+  perspective_correction: true
+  # 角度容忍范围
+  max_rotation_angle: 45.0
+
+# 表计类型配置
+meter_types:
+  # 模拟表计
+  analog:
+    - pressure_gauge      # 压力表
+    - temperature_gauge   # 温度表
+    - oil_level_gauge     # 油位计
+    - sf6_density_gauge   # SF6密度表
+  # 数字表计
+  digital:
+    - digital_display     # 数字显示屏
+    - led_indicator       # LED指示器
+
+# 读数配置
+reading:
+  # 量程自动识别
+  auto_range: true
+  # 刻度插值方式
+  interpolation: "linear"
+  # 读数精度
+  decimal_places: 2
+  # 失败兜底策略
+  fallback:
+    enabled: true
+    # 多次采样
+    retry_count: 3
+    # 人工复核阈值
+    manual_review_threshold: 0.5
+
+# 关键点定义
+keypoints:
+  # 模拟表关键点
+  analog:
+    - center        # 圆心
+    - scale_min     # 最小刻度
+    - scale_max     # 最大刻度
+    - pointer_tip   # 指针尖端
+    - pointer_base  # 指针根部
+  # 数字表关键点
+  digital:
+    - display_tl    # 显示区左上
+    - display_br    # 显示区右下
+
+# 图像预处理
+preprocessing:
+  # 光照增强
+  enhance_lighting: true
+  # 去反光
+  anti_glare: true
+  # 对比度增强
+  contrast_enhancement: 1.2

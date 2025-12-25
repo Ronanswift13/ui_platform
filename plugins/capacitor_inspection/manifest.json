@@ -1,13 +1,60 @@
 {
     "id": "capacitor_inspection",
     "name": "电容器自主巡视插件",
-    "version": "0.1.0",
-    "description": "电容器组的结构完整性检测和区域入侵检测",
+    "version": "1.0.0",
+    "description": "电容器组结构完整性检测、倾斜/倒塌识别、区域入侵检测",
     "author": "D组",
     "entrypoint": "plugin.py",
     "plugin_class": "CapacitorInspectionPlugin",
-    "capabilities": ["defect_detection", "intrusion_detection"],
-    "device_types": ["capacitor"],
-    "roi_types": ["capacitor_bank", "connection", "fence", "warning_sign"],
-    "recognition_types": ["tilt", "collapse", "missing", "intrusion"]
+    "capabilities": [
+        "defect_detection",
+        "intrusion_detection"
+    ],
+    "device_types": [
+        "capacitor_bank",
+        "capacitor_unit",
+        "fuse",
+        "insulator"
+    ],
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1}
+                }
+            },
+            "structural_integrity": {
+                "type": "object",
+                "properties": {
+                    "tilt_detection": {"type": "object"},
+                    "collapse_detection": {"type": "object"},
+                    "missing_parts": {"type": "array", "items": {"type": "string"}}
+                }
+            },
+            "intrusion_detection": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "zone_types": {"type": "array", "items": {"type": "string"}},
+                    "intrusion_targets": {"type": "array", "items": {"type": "string"}},
+                    "alert_delay": {"type": "number"}
+                }
+            }
+        }
+    }
 }

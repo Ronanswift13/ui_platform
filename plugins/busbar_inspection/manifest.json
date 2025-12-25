@@ -1,13 +1,55 @@
 {
     "id": "busbar_inspection",
     "name": "母线自主巡视插件",
-    "version": "0.1.0",
-    "description": "绝缘子串、金具、导线连接点的远距小目标检测",
+    "version": "1.0.0",
+    "description": "远距小目标检测、4K大视场识别、绝缘子/金具/导线缺陷检测、环境干扰过滤",
     "author": "C组",
     "entrypoint": "plugin.py",
     "plugin_class": "BusbarInspectionPlugin",
-    "capabilities": ["defect_detection"],
-    "device_types": ["busbar", "insulator"],
-    "roi_types": ["insulator", "fitting", "connection_point", "foreign_object"],
-    "recognition_types": ["pin_missing", "crack", "pollution", "foreign_object"]
+    "capabilities": [
+        "defect_detection"
+    ],
+    "device_types": [
+        "busbar",
+        "insulator",
+        "hardware",
+        "conductor"
+    ],
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]},
+                    "input_size": {"type": "array", "items": {"type": "integer"}}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "small_object_enhancement": {"type": "boolean"},
+                    "tile_detection": {"type": "boolean"},
+                    "tile_size": {"type": "integer"},
+                    "tile_overlap": {"type": "number"}
+                }
+            },
+            "noise_filtering": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "filter_classes": {"type": "array", "items": {"type": "string"}},
+                    "min_static_frames": {"type": "integer"}
+                }
+            }
+        }
+    }
 }
