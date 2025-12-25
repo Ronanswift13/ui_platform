@@ -19,12 +19,20 @@ thermal:
 # 识别类型配置
 recognition:
   defect_types:
-    - damage
-    - rust
-    - oil_leak
-    - foreign_object
+    - damage        # 破损
+    - rust          # 锈蚀
+    - oil_leak      # 渗漏油
+    - foreign_object # 异物悬挂
   state_types:
-    - silica_gel_normal
-    - silica_gel_abnormal
-    - valve_open
-    - valve_closed
+    - silica_gel_normal     # 呼吸器硅胶正常
+    - silica_gel_abnormal   # 呼吸器硅胶变色
+    - valve_open            # 阀门开启
+    - valve_closed          # 阀门关闭
+
+# ROI类型映射
+roi_types:
+  bushing: "套管"
+  radiator: "散热器"
+  oil_level: "油位计"
+  breather: "呼吸器"
+  terminal_box: "端子箱"

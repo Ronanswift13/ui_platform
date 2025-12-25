@@ -187,6 +187,37 @@ def create_api_app() -> FastAPI:
             "capabilities": [c.value for c in plugin.manifest.capabilities],
         }
 
+    @app.post("/api/plugins/{plugin_id}/load", tags=["插件"])
+    async def load_plugin(plugin_id: str):
+        """加载插件"""
+        from platform_core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+        try:
+            plugin = pm.load_plugin(plugin_id)
+            return {
+                "status": "success",
+                "plugin": {
+                    "id": plugin.id,
+                    "name": plugin.name,
+                    "version": plugin.version,
+                    "status": plugin.status.value,
+                }
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/plugins/{plugin_id}/unload", tags=["插件"])
+    async def unload_plugin(plugin_id: str):
+        """卸载插件"""
+        from platform_core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+        success = pm.unload_plugin(plugin_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="插件不存在或无法卸载")
+        return {"status": "success", "plugin_id": plugin_id}
+
     @app.post("/api/plugins/{plugin_id}/reload", tags=["插件"])
     async def reload_plugin(plugin_id: str):
         """重新加载插件"""
@@ -198,6 +229,56 @@ def create_api_app() -> FastAPI:
             return {"status": "success", "plugin": plugin.id}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/plugins/{plugin_id}/health", tags=["插件"])
+    async def plugin_healthcheck(plugin_id: str):
+        """插件健康检查"""
+        from platform_core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+        plugin = pm.get_plugin(plugin_id)
+
+        if plugin is None:
+            # 尝试加载插件
+            try:
+                plugin = pm.load_plugin(plugin_id)
+            except Exception as e:
+                raise HTTPException(status_code=404, detail=f"插件加载失败: {e}")
+
+        health = plugin.healthcheck()
+        return {
+            "plugin_id": plugin_id,
+            "healthy": health.healthy,
+            "message": health.message,
+            "last_check": health.last_check.isoformat(),
+            "details": health.details,
+        }
+
+    @app.get("/api/plugins/health", tags=["插件"])
+    async def all_plugins_healthcheck():
+        """所有插件健康检查"""
+        from platform_core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+
+        # 先发现并加载所有插件
+        manifests = pm.discover_plugins()
+        for m in manifests:
+            if pm.get_plugin(m.id) is None:
+                try:
+                    pm.load_plugin(m.id)
+                except Exception:
+                    pass
+
+        results = pm.healthcheck_all()
+        return {
+            plugin_id: {
+                "healthy": status.healthy,
+                "message": status.message,
+                "last_check": status.last_check.isoformat(),
+            }
+            for plugin_id, status in results.items()
+        }
 
     @app.get("/api/plugins/{plugin_id}/template", tags=["插件"])
     async def get_plugin_template(plugin_id: str):

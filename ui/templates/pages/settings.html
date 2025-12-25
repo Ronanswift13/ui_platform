@@ -72,12 +72,20 @@
 
             <!-- 插件管理 -->
             <div class="tab-pane fade" id="plugins">
-                <div class="card">
+                <div class="card mb-3">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">插件管理</h5>
-                        <button class="btn btn-sm btn-primary" id="btn-scan-plugins">
-                            <i class="bi bi-arrow-repeat"></i> 扫描插件
-                        </button>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" id="btn-scan-plugins">
+                                <i class="bi bi-arrow-repeat"></i> 扫描
+                            </button>
+                            <button class="btn btn-sm btn-success" id="btn-load-all">
+                                <i class="bi bi-play"></i> 全部加载
+                            </button>
+                            <button class="btn btn-sm btn-info" id="btn-health-all">
+                                <i class="bi bi-heart-pulse"></i> 健康检查
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <table class="table table-hover">
@@ -87,13 +95,27 @@
                                     <th>名称</th>
                                     <th>版本</th>
                                     <th>状态</th>
+                                    <th>能力</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="plugin-table">
-                                <!-- 动态加载 -->
+                                <tr><td colspan="6" class="text-center text-muted">加载中...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                <!-- 健康状态卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-heart-pulse"></i> 插件健康状态</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="health-cards">
+                            <div class="col-12 text-center text-muted py-3">
+                                点击"健康检查"按钮查看各插件健康状态
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -182,4 +204,186 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 页面初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlugins();
+    loadDevices();
+
+    // 绑定按钮事件
+    document.getElementById('btn-scan-plugins').addEventListener('click', loadPlugins);
+    document.getElementById('btn-load-all').addEventListener('click', loadAllPlugins);
+    document.getElementById('btn-health-all').addEventListener('click', checkAllHealth);
+});
+
+// 加载插件列表
+async function loadPlugins() {
+    try {
+        const plugins = await API.getPlugins();
+        renderPluginTable(plugins);
+        updatePluginCount(plugins.length);
+    } catch (error) {
+        console.error('加载插件失败:', error);
+    }
+}
+
+// 渲染插件表格
+function renderPluginTable(plugins) {
+    const table = document.getElementById('plugin-table');
+    if (!plugins || plugins.length === 0) {
+        table.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无插件</td></tr>';
+        return;
+    }
+
+    table.innerHTML = plugins.map(p => {
+        const statusClass = {
+            'ready': 'success', 'running': 'primary', 'loading': 'info',
+            'error': 'danger', 'disabled': 'secondary'
+        }[p.status] || 'warning';
+
+        const caps = p.capabilities.map(c =>
+            '<span class="badge bg-info me-1">' + c + '</span>'
+        ).join('');
+
+        return '<tr>' +
+            '<td><code>' + p.id + '</code></td>' +
+            '<td>' + p.name + '</td>' +
+            '<td><span class="badge bg-secondary">' + p.version + '</span></td>' +
+            '<td><span class="badge bg-' + statusClass + '">' + p.status + '</span></td>' +
+            '<td>' + caps + '</td>' +
+            '<td>' +
+                '<div class="btn-group btn-group-sm">' +
+                    '<button class="btn btn-outline-success" onclick="loadPlugin(\'' + p.id + '\')" title="加载"><i class="bi bi-play"></i></button>' +
+                    '<button class="btn btn-outline-primary" onclick="reloadPlugin(\'' + p.id + '\')" title="重载"><i class="bi bi-arrow-repeat"></i></button>' +
+                    '<button class="btn btn-outline-info" onclick="checkPluginHealth(\'' + p.id + '\')" title="健康检查"><i class="bi bi-heart-pulse"></i></button>' +
+                '</div>' +
+            '</td>' +
+        '</tr>';
+    }).join('');
+}
+
+// 加载单个插件
+async function loadPlugin(id) {
+    try {
+        await API.post('/plugins/' + id + '/load');
+        showToast('插件 ' + id + ' 加载成功', 'success');
+        loadPlugins();
+    } catch (error) {
+        showToast('加载失败: ' + error.message, 'danger');
+    }
+}
+
+// 重载插件
+async function reloadPlugin(id) {
+    try {
+        await API.reloadPlugin(id);
+        showToast('插件 ' + id + ' 重载成功', 'success');
+        loadPlugins();
+    } catch (error) {
+        showToast('重载失败: ' + error.message, 'danger');
+    }
+}
+
+// 加载所有插件
+async function loadAllPlugins() {
+    try {
+        const plugins = await API.getPlugins();
+        for (const p of plugins) {
+            try {
+                await API.post('/plugins/' + p.id + '/load');
+            } catch (e) { console.warn('加载 ' + p.id + ' 失败:', e); }
+        }
+        showToast('所有插件加载完成', 'success');
+        loadPlugins();
+    } catch (error) {
+        showToast('批量加载失败: ' + error.message, 'danger');
+    }
+}
+
+// 检查单个插件健康
+async function checkPluginHealth(id) {
+    try {
+        const health = await API.get('/plugins/' + id + '/health');
+        showToast(id + ': ' + (health.healthy ? '健康' : '异常') + ' - ' + health.message,
+                  health.healthy ? 'success' : 'warning');
+    } catch (error) {
+        showToast('健康检查失败: ' + error.message, 'danger');
+    }
+}
+
+// 检查所有插件健康
+async function checkAllHealth() {
+    try {
+        const results = await API.get('/plugins/health');
+        const container = document.getElementById('health-cards');
+
+        let html = '';
+        for (const [id, status] of Object.entries(results)) {
+            const icon = status.healthy ? 'bi-check-circle-fill text-success' : 'bi-x-circle-fill text-danger';
+            const border = status.healthy ? 'border-success' : 'border-danger';
+            html += '<div class="col-md-6 col-lg-4 mb-3">' +
+                '<div class="card ' + border + '">' +
+                    '<div class="card-body p-2">' +
+                        '<div class="d-flex align-items-center">' +
+                            '<i class="bi ' + icon + ' me-2" style="font-size: 1.5rem;"></i>' +
+                            '<div><strong>' + id + '</strong><br><small class="text-muted">' + status.message + '</small></div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }
+        container.innerHTML = html;
+        showToast('健康检查完成', 'success');
+    } catch (error) {
+        showToast('健康检查失败: ' + error.message, 'danger');
+    }
+}
+
+// 加载设备列表
+async function loadDevices() {
+    try {
+        const devices = await API.get('/devices');
+        renderDeviceTable(devices);
+    } catch (error) {
+        console.error('加载设备失败:', error);
+    }
+}
+
+function renderDeviceTable(devices) {
+    const table = document.getElementById('device-table');
+    if (!devices || devices.length === 0) {
+        table.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无设备</td></tr>';
+        return;
+    }
+
+    table.innerHTML = devices.map(d => {
+        const statusClass = d.is_connected ? 'success' : 'secondary';
+        return '<tr>' +
+            '<td><code>' + d.id + '</code></td>' +
+            '<td>' + d.type + '</td>' +
+            '<td>' + d.name + '</td>' +
+            '<td><span class="badge bg-' + statusClass + '">' + (d.is_connected ? '已连接' : '未连接') + '</span></td>' +
+            '<td>' +
+                '<button class="btn btn-sm btn-outline-primary" onclick="toggleDevice(\'' + d.id + '\', ' + d.is_connected + ')">' +
+                    (d.is_connected ? '<i class="bi bi-stop"></i>' : '<i class="bi bi-play"></i>') +
+                '</button>' +
+            '</td>' +
+        '</tr>';
+    }).join('');
+}
+
+async function toggleDevice(id, connected) {
+    try {
+        const action = connected ? 'disconnect' : 'connect';
+        await API.post('/devices/' + id + '/' + action);
+        showToast('设备' + (connected ? '已断开' : '已连接'), 'success');
+        loadDevices();
+    } catch (error) {
+        showToast('操作失败: ' + error.message, 'danger');
+    }
+}
+</script>
 {% endblock %}
