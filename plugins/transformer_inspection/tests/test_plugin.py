@@ -21,13 +21,13 @@ import pytest
 @pytest.fixture
 def detector():
     """创建检测器实例"""
-    from plugins.transformer_inspection.detector import TransformerDetector
+    from plugins.transformer_inspection.detector_enhanced import TransformerDetectorEnhanced
 
     config_path = PLUGIN_DIR / "configs" / "default.yaml"
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    return TransformerDetector(config)
+    return TransformerDetectorEnhanced(config)
 
 
 @pytest.fixture

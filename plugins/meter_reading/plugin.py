@@ -31,13 +31,21 @@ from platform_core.schema.models import (
 
 
 def _load_detector_class():
-    detector_path = Path(__file__).parent / "detector.py"
+    # 优先加载增强版检测器
+    detector_path = Path(__file__).parent / "detector_enhanced.py"
+    if not detector_path.exists():
+        detector_path = Path(__file__).parent / "detector.py"
+
     spec = importlib.util.spec_from_file_location("meter_detector", detector_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载检测器模块: {detector_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules["meter_detector"] = module
     spec.loader.exec_module(module)
+
+    # 优先返回增强版检测器类
+    if hasattr(module, 'MeterReadingDetectorEnhanced'):
+        return module.MeterReadingDetectorEnhanced
     return module.MeterReadingDetector
 
 
@@ -247,12 +255,12 @@ class MeterReadingPlugin(BasePlugin):
         """健康检查"""
         if not self._initialized:
             return HealthStatus(healthy=False, message="插件未初始化")
-        
+
         if self._detector is None:
             return HealthStatus(healthy=False, message="检测器未就绪")
-        
+
         success_rate = self._success_count / self._inference_count if self._inference_count > 0 else 0
-        
+
         return HealthStatus(
             healthy=True,
             message="插件运行正常",
@@ -265,6 +273,72 @@ class MeterReadingPlugin(BasePlugin):
                 "last_inference": self._last_inference_time.isoformat() if self._last_inference_time else None,
             }
         )
+
+    def get_ui_config(self) -> dict[str, Any]:
+        """获取UI配置"""
+        return {
+            "detection_types": [
+                {
+                    "id": "reading",
+                    "name": "表计读数",
+                    "icon": "speedometer2",
+                    "description": "指针式、数字式表计的任意角度读数识别",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "指针式读数", "tags": ["pointer_reading"]},
+                        {"label": "数字式读数", "tags": ["digital_reading"]},
+                        {"label": "七段码识别", "tags": ["seven_segment"]},
+                        {"label": "LED显示读数", "tags": ["led_reading"]},
+                    ]
+                },
+                {
+                    "id": "quality",
+                    "name": "读数质量评估",
+                    "icon": "image",
+                    "description": "关键点检测、透视矫正、失败兜底",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "关键点检测", "tags": ["keypoint_detection"]},
+                        {"label": "透视矫正", "tags": ["perspective_correction"]},
+                        {"label": "量程识别", "tags": ["range_detection"]},
+                        {"label": "人工复核标记", "tags": ["manual_review"]},
+                    ]
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "confidence_threshold",
+                    "label": "置信度阈值",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "default": self.confidence_threshold,
+                    "description": "读数结果的最小置信度"
+                },
+                {
+                    "name": "retry_count",
+                    "label": "重试次数",
+                    "type": "number",
+                    "min": 1,
+                    "max": 5,
+                    "step": 1,
+                    "default": self.retry_count,
+                    "description": "读数失败时的重试次数"
+                },
+                {
+                    "name": "manual_review_threshold",
+                    "label": "人工复核阈值",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "default": 0.5,
+                    "description": "低于此置信度的结果需要人工复核"
+                }
+            ]
+        }
+
     
     # ==================== 辅助方法 ====================
     

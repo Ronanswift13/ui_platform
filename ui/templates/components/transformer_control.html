@@ -1,0 +1,263 @@
+<!-- 主变自主巡视 - 专属控制面板 -->
+
+<!-- 缺陷检测 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> 缺陷检测</h5>
+    </div>
+    <div class="card-body">
+        <!-- 油泄漏检测 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="oil_leak" id="check-oil-leak" checked>
+                <label class="form-check-label" for="check-oil-leak">
+                    <span class="badge bg-danger">油泄漏</span> 基于灰度和语义分割
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">灰度阈值</label>
+                    <input type="number" step="5" min="0" max="255" class="form-control form-control-sm" id="oil-gray-threshold" value="60">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最小面积(px²)</label>
+                    <input type="number" step="100" min="100" max="5000" class="form-control form-control-sm" id="oil-min-area" value="500">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">暗区占比</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="oil-dark-ratio" value="0.30">
+                </div>
+            </div>
+        </div>
+
+        <!-- 锈蚀检测 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="rust" id="check-rust" checked>
+                <label class="form-check-label" for="check-rust">
+                    <span class="badge bg-warning text-dark">锈蚀</span> 基于HSV颜色检测
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">HSV下限-H</label>
+                    <input type="number" step="5" min="0" max="180" class="form-control form-control-sm" id="rust-hsv-h-low" value="0">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">HSV上限-H</label>
+                    <input type="number" step="5" min="0" max="180" class="form-control form-control-sm" id="rust-hsv-h-high" value="20">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最小面积(px²)</label>
+                    <input type="number" step="50" min="50" max="2000" class="form-control form-control-sm" id="rust-min-area" value="300">
+                </div>
+            </div>
+        </div>
+
+        <!-- 破损检测 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="damage" id="check-damage" checked>
+                <label class="form-check-label" for="check-damage">
+                    <span class="badge bg-danger">破损</span> 基于边缘密度分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">Canny低阈值</label>
+                    <input type="number" step="10" min="10" max="200" class="form-control form-control-sm" id="damage-canny-low" value="50">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">Canny高阈值</label>
+                    <input type="number" step="10" min="50" max="300" class="form-control form-control-sm" id="damage-canny-high" value="150">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">边缘密度</label>
+                    <input type="number" step="0.01" min="0" max="1" class="form-control form-control-sm" id="damage-edge-density" value="0.15">
+                </div>
+            </div>
+        </div>
+
+        <!-- 异物检测 -->
+        <div class="border rounded p-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="foreign_object" id="check-foreign" checked>
+                <label class="form-check-label" for="check-foreign">
+                    <span class="badge bg-warning text-dark">异物</span> 基于背景差分
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最小面积(px²)</label>
+                    <input type="number" step="50" min="50" max="2000" class="form-control form-control-sm" id="foreign-min-area" value="200">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">差分阈值</label>
+                    <input type="number" step="5" min="5" max="100" class="form-control form-control-sm" id="foreign-diff-threshold" value="25">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 状态识别 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-eye text-info"></i> 状态识别</h5>
+    </div>
+    <div class="card-body">
+        <!-- 硅胶状态 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-silica-gel" checked>
+                <label class="form-check-label fw-bold" for="check-silica-gel">
+                    <span class="badge bg-info">硅胶罐</span> 变色状态识别
+                </label>
+            </div>
+            <div class="ms-4 mt-2" id="silica-settings">
+                <small class="text-muted d-block mb-2">正常(蓝色) / 警告(浅粉) / 告警(深粉)</small>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">蓝色HSV-H范围</label>
+                        <input type="text" class="form-control form-control-sm" id="silica-blue-range" value="100-130">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">粉色HSV-H范围</label>
+                        <input type="text" class="form-control form-control-sm" id="silica-pink-range" value="140-170">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 阀门状态 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-valve" checked>
+                <label class="form-check-label fw-bold" for="check-valve">
+                    <span class="badge bg-info">阀门</span> 开合状态识别
+                </label>
+            </div>
+            <div class="ms-4 mt-2" id="valve-settings">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">角度阈值(°)</label>
+                        <input type="number" step="5" min="10" max="90" class="form-control form-control-sm" id="valve-angle-threshold" value="30">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 油位读数 -->
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-oil-level" checked>
+                <label class="form-check-label fw-bold" for="check-oil-level">
+                    <span class="badge bg-primary">油位计</span> 油位读数
+                </label>
+            </div>
+            <div class="ms-4 mt-2" id="oil-level-settings">
+                <small class="text-muted d-block mb-2">基于水平线检测估算油位百分比</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 热成像分析 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-thermometer-high text-danger"></i> 热成像分析</h5>
+    </div>
+    <div class="card-body">
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-thermal">
+                <label class="form-check-label fw-bold" for="check-thermal">
+                    启用热成像分析（需要红外摄像头）
+                </label>
+            </div>
+            <div class="row g-2 d-none" id="thermal-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">温度阈值(°C)</label>
+                    <input type="number" step="5" min="40" max="150" class="form-control form-control-sm" id="thermal-temp-threshold" value="80">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">温度范围(°C)</label>
+                    <input type="text" class="form-control form-control-sm" id="thermal-temp-range" value="20-120">
+                </div>
+            </div>
+            <div id="thermal-settings" class="mt-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check-thermal-align">
+                    <label class="form-check-label small" for="check-thermal-align">
+                        启用可见光-热成像对齐
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 深度学习增强 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cpu text-success"></i> 深度学习增强</h5>
+    </div>
+    <div class="card-body">
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-deep-learning" checked>
+                <label class="form-check-label fw-bold" for="check-deep-learning">
+                    启用深度学习检测（优先使用）
+                </label>
+            </div>
+            <small class="text-muted d-block mb-2">可用模型: YOLOv8缺陷检测、U-Net油泄漏分割、ResNet硅胶分类</small>
+            <div class="row g-2" id="dl-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="dl-confidence" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">NMS阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="dl-nms" value="0.40">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始检测
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>
+
+<script>
+// Transformer Inspection 专属交互逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    // 启用/禁用设置区域
+    function toggleSettings(checkboxId, settingsId) {
+        const checkbox = document.getElementById(checkboxId);
+        const settings = document.getElementById(settingsId);
+        if (checkbox && settings) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    settings.classList.remove('d-none');
+                } else {
+                    settings.classList.add('d-none');
+                }
+            });
+        }
+    }
+
+    toggleSettings('check-thermal', 'thermal-settings');
+});
+</script>

@@ -50,5 +50,6 @@ api:
 # 插件配置
 plugin:
   plugins_dir: "plugins"
+  auto_load: true
   auto_reload: false
   strict_validation: true

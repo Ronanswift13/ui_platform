@@ -40,13 +40,21 @@ from platform_core.schema.models import (
 
 def _load_detector_class():
     """动态加载检测器类，解决相对导入问题"""
-    detector_path = Path(__file__).parent / "detector.py"
+    # 优先加载增强版检测器
+    detector_path = Path(__file__).parent / "detector_enhanced.py"
+    if not detector_path.exists():
+        detector_path = Path(__file__).parent / "detector.py"
+
     spec = importlib.util.spec_from_file_location("transformer_detector", detector_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载检测器模块: {detector_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules["transformer_detector"] = module
     spec.loader.exec_module(module)
+
+    # 优先返回增强版检测器类
+    if hasattr(module, 'TransformerDetectorEnhanced'):
+        return module.TransformerDetectorEnhanced
     return module.TransformerDetector
 
 

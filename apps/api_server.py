@@ -21,6 +21,8 @@ from pydantic import BaseModel
 import base64
 import io
 
+from platform_core.config import get_config
+
 # 添加项目根目录到路径
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -155,6 +157,19 @@ def create_api_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # 自动加载插件
+    config = get_config()
+    if config.plugin.auto_load:
+        from platform_core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+        manifests = pm.discover_plugins()
+        for manifest in manifests:
+            try:
+                pm.load_plugin(manifest.id)
+            except Exception as e:
+                print(f"自动加载插件 {manifest.id} 失败: {e}")
 
     # ============== 健康检查 ==============
 
@@ -974,6 +989,13 @@ def create_api_app() -> FastAPI:
         success = dm.disconnect_device(device_id)
 
         return {"status": "disconnected" if success else "failed", "device_id": device_id}
+
+    # ============== 集成增强路由 ==============
+    try:
+        from platform_core.api_routes import integrate_enhanced_routes
+        integrate_enhanced_routes(app)
+    except ImportError as e:
+        print(f"[Warning] 增强路由模块未加载: {e}")
 
     return app
 

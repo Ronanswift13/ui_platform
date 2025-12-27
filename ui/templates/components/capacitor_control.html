@@ -1,0 +1,152 @@
+<!-- 电容器自主巡视 - 专属控制面板 -->
+
+<!-- 结构完整性检测 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-exclamation-octagon text-danger"></i> 结构完整性检测</h5>
+    </div>
+    <div class="card-body">
+        <!-- 倾斜检测 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="tilt" id="check-tilt" checked>
+                <label class="form-check-label" for="check-tilt">
+                    <span class="badge bg-warning text-dark">倾斜检测</span> 基于角度分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">警告角度阈值(°)</label>
+                    <input type="number" step="1" min="1" max="30" class="form-control form-control-sm" id="tilt-warning-angle" value="5">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">严重角度阈值(°)</label>
+                    <input type="number" step="1" min="5" max="45" class="form-control form-control-sm" id="tilt-error-angle" value="15">
+                </div>
+            </div>
+        </div>
+
+        <!-- 倒塌检测 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="collapse" id="check-collapse" checked>
+                <label class="form-check-label" for="check-collapse">
+                    <span class="badge bg-danger">倒塌检测</span> 基于高度比分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">高度比阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="collapse-height-ratio" value="0.30">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="collapse-confidence" value="0.55">
+                </div>
+            </div>
+        </div>
+
+        <!-- 部件缺失 -->
+        <div class="border rounded p-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="missing_unit" id="check-missing" checked>
+                <label class="form-check-label" for="check-missing">
+                    <span class="badge bg-danger">部件缺失</span> 基于数量统计
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">期望数量</label>
+                    <input type="number" step="1" min="1" max="50" class="form-control form-control-sm" id="missing-expected-count" value="12">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">容差数量</label>
+                    <input type="number" step="1" min="0" max="5" class="form-control form-control-sm" id="missing-tolerance" value="0">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 区域入侵检测 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-shield-exclamation text-warning"></i> 区域入侵检测</h5>
+    </div>
+    <div class="card-body">
+        <!-- 人员入侵 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input intrusion-type" type="checkbox" value="person" id="check-intrusion-person" checked>
+                <label class="form-check-label" for="check-intrusion-person">
+                    <span class="badge bg-danger">人员入侵</span> 基于目标检测
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="intrusion-person-confidence" value="0.60">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">告警延迟(秒)</label>
+                    <input type="number" step="0.5" min="0" max="10" class="form-control form-control-sm" id="intrusion-person-delay" value="2.0">
+                </div>
+            </div>
+        </div>
+
+        <!-- 车辆入侵 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input intrusion-type" type="checkbox" value="vehicle" id="check-intrusion-vehicle" checked>
+                <label class="form-check-label" for="check-intrusion-vehicle">
+                    <span class="badge bg-danger">车辆入侵</span> 基于目标检测
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="intrusion-vehicle-confidence" value="0.60">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">告警延迟(秒)</label>
+                    <input type="number" step="0.5" min="0" max="10" class="form-control form-control-sm" id="intrusion-vehicle-delay" value="2.0">
+                </div>
+            </div>
+        </div>
+
+        <!-- 动物入侵 -->
+        <div class="border rounded p-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input intrusion-type" type="checkbox" value="animal" id="check-intrusion-animal">
+                <label class="form-check-label" for="check-intrusion-animal">
+                    <span class="badge bg-warning text-dark">动物入侵</span> 基于目标检测
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="intrusion-animal-confidence" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">告警延迟(秒)</label>
+                    <input type="number" step="0.5" min="0" max="10" class="form-control form-control-sm" id="intrusion-animal-delay" value="5.0">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始检测
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>

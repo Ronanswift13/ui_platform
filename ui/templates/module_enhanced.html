@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}{{ module_name }} - 增强版{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧: 视频和检测结果 -->
+    <div class="col-lg-8">
+        <!-- 视频预览区 -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-camera-video"></i> 实时预览
+                    <span class="badge bg-success" id="stream-status">在线</span>
+                </h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" id="btn-visible" title="可见光">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" id="btn-thermal" title="热成像">
+                        <i class="bi bi-thermometer-half"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" id="btn-fusion" title="融合显示">
+                        <i class="bi bi-layers"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0 position-relative">
+                <div id="video-container" style="height: 480px; background: #1a1a2e;">
+                    <canvas id="video-canvas" style="width: 100%; height: 100%;"></canvas>
+                    <!-- 自动ROI叠加层 -->
+                    <svg id="roi-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></svg>
+                    <!-- 加载提示 -->
+                    <div id="video-loading" class="position-absolute top-50 start-50 translate-middle text-white">
+                        <div class="spinner-border" role="status"></div>
+                        <p class="mt-2">正在连接视频流...</p>
+                    </div>
+                </div>
+                <!-- 推理状态栏 -->
+                <div class="bg-dark text-white px-3 py-2 d-flex justify-content-between small">
+                    <span><i class="bi bi-gpu-card"></i> 推理延迟: <span id="inference-latency">--</span>ms</span>
+                    <span><i class="bi bi-cpu"></i> GPU: <span id="gpu-usage">--</span>%</span>
+                    <span><i class="bi bi-speedometer"></i> FPS: <span id="fps-counter">--</span></span>
+                    <span><i class="bi bi-box"></i> 检测数: <span id="detection-count">0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 检测结果区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-info text-white d-flex justify-content-between">
+                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> 检测结果</h5>
+                <div>
+                    <button class="btn btn-sm btn-light" id="btn-export-results">
+                        <i class="bi bi-download"></i> 导出
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 结果摘要 -->
+                <div class="row mb-3 text-center">
+                    <div class="col">
+                        <div class="h3 text-success" id="result-normal">0</div>
+                        <small class="text-muted">正常</small>
+                    </div>
+                    <div class="col">
+                        <div class="h3 text-warning" id="result-warning">0</div>
+                        <small class="text-muted">告警</small>
+                    </div>
+                    <div class="col">
+                        <div class="h3 text-danger" id="result-error">0</div>
+                        <small class="text-muted">异常</small>
+                    </div>
+                    <div class="col">
+                        <div class="h3 text-info" id="result-manual">0</div>
+                        <small class="text-muted">待复核</small>
+                    </div>
+                </div>
+
+                <!-- 详细结果列表 -->
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm table-hover" id="results-table">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>目标</th>
+                                <th>类型</th>
+                                <th>置信度</th>
+                                <th>原因码</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">暂无检测结果</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 证据融合面板 -->
+        <div class="card mb-3" id="fusion-panel" style="display: none;">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-diagram-3"></i> 多证据融合</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>证据权重</h6>
+                        <div class="mb-2">
+                            <label class="form-label small">深度学习 (<span id="weight-dl">0.6</span>)</label>
+                            <input type="range" class="form-range" id="slider-weight-dl" min="0" max="1" step="0.1" value="0.6">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">OCR识别 (<span id="weight-ocr">0.3</span>)</label>
+                            <input type="range" class="form-range" id="slider-weight-ocr" min="0" max="1" step="0.1" value="0.3">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">颜色检测 (<span id="weight-color">0.2</span>)</label>
+                            <input type="range" class="form-range" id="slider-weight-color" min="0" max="1" step="0.1" value="0.2">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>融合结果</h6>
+                        <div id="fusion-result" class="p-3 bg-light rounded">
+                            <p class="mb-1">状态: <strong id="fusion-state">--</strong></p>
+                            <p class="mb-1">置信度: <strong id="fusion-confidence">--</strong></p>
+                            <p class="mb-0">冲突: <span id="fusion-conflict" class="badge bg-secondary">无</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧: 控制面板 -->
+    <div class="col-lg-4">
+        <!-- 任务控制区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list-task"></i> 任务控制</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">站点</label>
+                    <select class="form-select" id="select-site">
+                        <option value="">请选择站点...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">点位</label>
+                    <select class="form-select" id="select-position">
+                        <option value="">请选择点位...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">任务模板</label>
+                    <select class="form-select" id="select-task">
+                        <option value="">请选择任务模板...</option>
+                        <option value="full_inspection">完整巡检</option>
+                        <option value="defect_detection">缺陷检测</option>
+                        <option value="state_recognition">状态识别</option>
+                        <option value="meter_reading">表计读数</option>
+                    </select>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="btn-run">
+                        <i class="bi bi-play-fill"></i> 运行任务
+                    </button>
+                    <button class="btn btn-warning" id="btn-stop" disabled>
+                        <i class="bi bi-stop-fill"></i> 停止
+                    </button>
+                </div>
+                <!-- 进度条 -->
+                <div class="progress mt-3" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="task-progress" 
+                         role="progressbar" style="width: 0%;">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 云台控制区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-dark text-white d-flex justify-content-between">
+                <h5 class="mb-0"><i class="bi bi-joystick"></i> 云台控制</h5>
+                <button class="btn btn-sm btn-outline-light" id="btn-ptz-settings">
+                    <i class="bi bi-gear"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <!-- 方向控制 -->
+                <div class="d-flex justify-content-center mb-3">
+                    <div class="btn-group-vertical">
+                        <button class="btn btn-outline-secondary" id="ptz-up"><i class="bi bi-chevron-up"></i></button>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary" id="ptz-left"><i class="bi bi-chevron-left"></i></button>
+                            <button class="btn btn-outline-secondary" id="ptz-home"><i class="bi bi-house"></i></button>
+                            <button class="btn btn-outline-secondary" id="ptz-right"><i class="bi bi-chevron-right"></i></button>
+                        </div>
+                        <button class="btn btn-outline-secondary" id="ptz-down"><i class="bi bi-chevron-down"></i></button>
+                    </div>
+                </div>
+                <!-- 变焦控制 -->
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <label class="form-label small">变焦</label>
+                        <div class="btn-group w-100">
+                            <button class="btn btn-outline-secondary" id="ptz-zoom-out">
+                                <i class="bi bi-zoom-out"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" id="ptz-zoom-in">
+                                <i class="bi bi-zoom-in"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">焦点</label>
+                        <div class="btn-group w-100">
+                            <button class="btn btn-outline-secondary" id="ptz-focus-near">近</button>
+                            <button class="btn btn-outline-secondary" id="ptz-auto-focus">自动</button>
+                            <button class="btn btn-outline-secondary" id="ptz-focus-far">远</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- 预置位 -->
+                <div class="mb-3">
+                    <label class="form-label small">预置位</label>
+                    <div class="input-group">
+                        <select class="form-select" id="preset-select">
+                            <option value="1">预置位 1</option>
+                            <option value="2">预置位 2</option>
+                            <option value="3">预置位 3</option>
+                        </select>
+                        <button class="btn btn-primary" id="btn-goto-preset">转到</button>
+                        <button class="btn btn-outline-secondary" id="btn-set-preset">设置</button>
+                    </div>
+                </div>
+                <!-- 巡航控制 -->
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success flex-fill" id="btn-start-patrol">
+                        <i class="bi bi-arrow-repeat"></i> 开始巡航
+                    </button>
+                    <button class="btn btn-danger flex-fill" id="btn-stop-patrol" disabled>
+                        <i class="bi bi-stop-circle"></i> 停止巡航
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 模型管理区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-purple text-white" style="background-color: #6f42c1;">
+                <h5 class="mb-0"><i class="bi bi-cpu"></i> 模型管理</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush" id="model-list">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>YOLOv8检测</strong>
+                            <br><small class="text-muted">目标检测模型</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-success">已加载</span>
+                            <button class="btn btn-sm btn-outline-danger ms-2" title="卸载">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>HRNet关键点</strong>
+                            <br><small class="text-muted">关键点检测</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">未加载</span>
+                            <button class="btn btn-sm btn-outline-success ms-2" title="加载">
+                                <i class="bi bi-play"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>CRNN OCR</strong>
+                            <br><small class="text-muted">文字识别</small>
+                        </div>
+                        <div>
+                            <span class="badge bg-secondary">未加载</span>
+                            <button class="btn btn-sm btn-outline-success ms-2" title="加载">
+                                <i class="bi bi-play"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 告警面板 -->
+        <div class="card">
+            <div class="card-header bg-danger text-white d-flex justify-content-between">
+                <h5 class="mb-0"><i class="bi bi-bell"></i> 实时告警</h5>
+                <span class="badge bg-light text-danger" id="alarm-count">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="alarm-list" style="max-height: 250px; overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-check-circle"></i>
+                        <p class="mb-0 small">暂无告警</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 复拍建议模态框 -->
+<div class="modal fade" id="reshootModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-camera"></i> 复拍建议</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>检测到图像质量问题</strong>
+                    <p id="reshoot-reason" class="mb-0">清晰度不足，建议复拍</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">建议操作:</label>
+                    <ul id="reshoot-suggestions" class="list-unstyled">
+                        <li><i class="bi bi-check"></i> 增加变焦倍数</li>
+                        <li><i class="bi bi-check"></i> 调整焦点</li>
+                    </ul>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">当前清晰度: <span id="current-clarity">0.45</span></label>
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" style="width: 45%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">忽略</button>
+                <button type="button" class="btn btn-primary" id="btn-auto-reshoot">自动复拍</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/module_enhanced.js"></script>
+<script>
+    // 初始化增强模块
+    const moduleId = '{{ module_id }}';
+    initEnhancedModule(moduleId);
+</script>
+{% endblock %}

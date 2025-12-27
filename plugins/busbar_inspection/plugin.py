@@ -41,13 +41,21 @@ from platform_core.schema.models import (
 
 def _load_detector_class():
     """动态加载检测器类"""
-    detector_path = Path(__file__).parent / "detector.py"
+    # 优先加载增强版检测器
+    detector_path = Path(__file__).parent / "detector_enhanced.py"
+    if not detector_path.exists():
+        detector_path = Path(__file__).parent / "detector.py"
+
     spec = importlib.util.spec_from_file_location("busbar_detector", detector_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载检测器模块: {detector_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules["busbar_detector"] = module
     spec.loader.exec_module(module)
+
+    # 优先返回增强版检测器类
+    if hasattr(module, 'BusbarDetectorEnhanced'):
+        return module.BusbarDetectorEnhanced
     return module.BusbarDetector
 
 
@@ -117,7 +125,11 @@ class BusbarInspectionPlugin(BasePlugin):
             self._config = config
             
             inference_config = config.get("inference", {})
-            self.confidence_threshold = inference_config.get("confidence_threshold", 0.5)
+            thresholds_config = config.get("thresholds", {})
+            self.confidence_threshold = thresholds_config.get(
+                "conf_thr",
+                inference_config.get("confidence_threshold", 0.5),
+            )
             
             # 创建检测器
             BusbarDetector = get_detector_class()
@@ -170,12 +182,20 @@ class BusbarInspectionPlugin(BasePlugin):
                 roi_type = self._get_roi_type(roi)
                 
                 # 执行检测(包含质量门禁)
-                defects, quality_gate = self._detector.detect_defects(roi_image, roi_type)
-                
+                tiling_cfg = self._config.get("tiling") or self._config.get("slicing") or {}
+                use_tiling = bool(tiling_cfg.get("enabled", True)) if isinstance(tiling_cfg, dict) else True
+                det_result = self._detector.detect_roi(roi_image, use_tiling=use_tiling)
+
+                quality = det_result.quality
+                zoom = det_result.zoom_suggestion
+                debug_info = det_result.debug_info or {}
+
                 # 处理质量门禁失败
-                if quality_gate is not None and not quality_gate.passed:
+                if debug_info.get("quality_gate") == "failed":
                     self._quality_fail_count += 1
-                    
+                    reason_code = det_result.reason_code
+                    reason_desc = self.REASON_DESCRIPTIONS.get(reason_code, "未知原因")
+
                     result = RecognitionResult(
                         task_id=context.task_id,
                         site_id=context.site_id,
@@ -187,20 +207,31 @@ class BusbarInspectionPlugin(BasePlugin):
                         confidence=1.0,
                         model_version=self.version,
                         code_version=self.code_hash,
-                        failure_reason=quality_gate.reason_code,
+                        failure_reason=str(reason_code) if reason_code is not None else None,
                         metadata={
-                            "reason": quality_gate.reason,
-                            "suggested_action": quality_gate.suggested_action,
-                            "details": quality_gate.details
+                            "reason": reason_desc,
+                            "suggested_action": zoom.suggested_action,
+                            "details": {
+                                "quality": {
+                                    "clarity_score": quality.clarity_score,
+                                    "is_overexposed": quality.is_overexposed,
+                                    "is_low_contrast": quality.is_low_contrast,
+                                    "is_occluded": quality.is_occluded,
+                                    "edge_energy": quality.edge_energy,
+                                },
+                                "debug": debug_info,
+                            },
                         },
                     )
                     results.append(result)
                     continue
                 
                 # 处理检测结果
-                for defect in defects:
+                for det in det_result.detections:
+                    if det.confidence < self.confidence_threshold:
+                        continue
                     # 转换坐标
-                    abs_bbox = self._convert_bbox_to_absolute(defect["bbox"], roi.bbox)
+                    abs_bbox = self._convert_bbox_to_absolute(det.bbox, roi.bbox)
                     
                     result = RecognitionResult(
                         task_id=context.task_id,
@@ -209,15 +240,24 @@ class BusbarInspectionPlugin(BasePlugin):
                         component_id=context.component_id,
                         roi_id=roi.id,
                         bbox=abs_bbox,
-                        label=defect["label"],
-                        confidence=defect["confidence"],
+                        label=det.label,
+                        confidence=det.confidence,
                         model_version=self.version,
                         code_version=self.code_hash,
-                        failure_reason=defect.get("reason_code"),
+                        failure_reason=str(det_result.reason_code) if det_result.reason_code is not None else None,
                         metadata={
-                            **defect.get("metadata", {}),
-                            "suggested_zoom": defect.get("suggested_zoom"),
-                            "suggested_action": defect.get("suggested_action"),
+                            "suggested_zoom": zoom.suggested_zoom,
+                            "suggested_action": zoom.suggested_action,
+                            "min_object_size_px": zoom.min_object_size_px,
+                            "target_size_px": zoom.target_size_px,
+                            "quality": {
+                                "clarity_score": quality.clarity_score,
+                                "is_overexposed": quality.is_overexposed,
+                                "is_low_contrast": quality.is_low_contrast,
+                                "is_occluded": quality.is_occluded,
+                                "edge_energy": quality.edge_energy,
+                            },
+                            "debug": debug_info,
                         },
                     )
                     results.append(result)
@@ -243,8 +283,9 @@ class BusbarInspectionPlugin(BasePlugin):
         for result in results:
             # 质量门禁告警
             if result.label == "quality_failed":
-                reason_code = result.failure_reason
-                reason_desc = self.REASON_DESCRIPTIONS.get(reason_code, "未知原因")
+                reason_code_str = result.failure_reason
+                reason_code_int = int(reason_code_str) if reason_code_str is not None else None
+                reason_desc = self.REASON_DESCRIPTIONS.get(reason_code_int, "未知原因") if reason_code_int is not None else "未知原因"
                 
                 alarm = Alarm(
                     task_id=result.task_id,
@@ -292,14 +333,14 @@ class BusbarInspectionPlugin(BasePlugin):
                 message="插件未初始化",
                 details={"status": self.status.value}
             )
-        
+
         if self._detector is None:
             return HealthStatus(
                 healthy=False,
                 message="检测器未就绪",
                 details={"status": self.status.value}
             )
-        
+
         return HealthStatus(
             healthy=True,
             message="插件运行正常",
@@ -311,6 +352,56 @@ class BusbarInspectionPlugin(BasePlugin):
                 "last_inference": self._last_inference_time.isoformat() if self._last_inference_time else None,
             }
         )
+
+    def get_ui_config(self) -> dict[str, Any]:
+        """获取UI配置"""
+        return {
+            "detection_types": [
+                {
+                    "id": "defect",
+                    "name": "缺陷检测",
+                    "icon": "exclamation-triangle",
+                    "description": "销钉缺失、裂纹、异物等远距小目标检测",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "销钉缺失", "tags": ["pin_missing"], "level": "error"},
+                        {"label": "裂纹", "tags": ["crack"], "level": "warning"},
+                        {"label": "异物", "tags": ["foreign_object"], "level": "warning"},
+                    ]
+                },
+                {
+                    "id": "quality",
+                    "name": "图像质量评估",
+                    "icon": "image",
+                    "description": "逆光/雨雾/遮挡等环境过滤",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "清晰度评价", "tags": ["clarity_score"]},
+                        {"label": "环境过滤", "tags": ["quality_gate"]},
+                        {"label": "变焦建议", "tags": ["zoom_suggestion"]},
+                    ]
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "confidence_threshold",
+                    "label": "置信度阈值",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "default": self.confidence_threshold,
+                    "description": "检测结果的最小置信度"
+                },
+                {
+                    "name": "use_tiling",
+                    "label": "启用切片检测",
+                    "type": "boolean",
+                    "default": True,
+                    "description": "对大视场图像进行切片检测"
+                }
+            ]
+        }
     
     # ==================== 辅助方法 ====================
     
@@ -340,13 +431,24 @@ class BusbarInspectionPlugin(BasePlugin):
     
     def _convert_bbox_to_absolute(
         self,
-        rel_bbox: dict,
+        rel_bbox: Any,
         roi_bbox: BoundingBox
     ) -> BoundingBox:
         """转换坐标"""
-        abs_x = roi_bbox.x + rel_bbox["x"] * roi_bbox.width
-        abs_y = roi_bbox.y + rel_bbox["y"] * roi_bbox.height
-        abs_w = rel_bbox["width"] * roi_bbox.width
-        abs_h = rel_bbox["height"] * roi_bbox.height
+        if hasattr(rel_bbox, "x") and hasattr(rel_bbox, "width"):
+            rel_x = rel_bbox.x
+            rel_y = rel_bbox.y
+            rel_w = rel_bbox.width
+            rel_h = rel_bbox.height
+        else:
+            rel_x = rel_bbox["x"]
+            rel_y = rel_bbox["y"]
+            rel_w = rel_bbox["width"]
+            rel_h = rel_bbox["height"]
+
+        abs_x = roi_bbox.x + rel_x * roi_bbox.width
+        abs_y = roi_bbox.y + rel_y * roi_bbox.height
+        abs_w = rel_w * roi_bbox.width
+        abs_h = rel_h * roi_bbox.height
         
         return BoundingBox(x=abs_x, y=abs_y, width=abs_w, height=abs_h)

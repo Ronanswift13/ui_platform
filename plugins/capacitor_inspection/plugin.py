@@ -29,13 +29,21 @@ from platform_core.schema.models import (
 
 
 def _load_detector_class():
-    detector_path = Path(__file__).parent / "detector.py"
+    # 优先加载增强版检测器
+    detector_path = Path(__file__).parent / "detector_enhanced.py"
+    if not detector_path.exists():
+        detector_path = Path(__file__).parent / "detector.py"
+
     spec = importlib.util.spec_from_file_location("capacitor_detector", detector_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载检测器模块: {detector_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules["capacitor_detector"] = module
     spec.loader.exec_module(module)
+
+    # 优先返回增强版检测器类
+    if hasattr(module, 'CapacitorDetectorEnhanced'):
+        return module.CapacitorDetectorEnhanced
     return module.CapacitorDetector
 
 
@@ -138,7 +146,60 @@ class CapacitorInspectionPlugin(BasePlugin):
         return HealthStatus(healthy=True, message="插件运行正常", details={
             "inference_count": self._inference_count, "error_count": self._error_count
         })
-    
+
+    def get_ui_config(self) -> dict[str, Any]:
+        """获取UI配置"""
+        return {
+            "detection_types": [
+                {
+                    "id": "structural",
+                    "name": "结构完整性检测",
+                    "icon": "exclamation-octagon",
+                    "description": "电容器倾斜、倒塌、部件缺失检测",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "倾斜检测", "tags": ["tilt_warning", "tilt_error"], "level": "warning"},
+                        {"label": "倒塌检测", "tags": ["collapse"], "level": "error"},
+                        {"label": "部件缺失", "tags": ["missing_unit"], "level": "error"},
+                    ]
+                },
+                {
+                    "id": "intrusion",
+                    "name": "区域入侵检测",
+                    "icon": "shield-exclamation",
+                    "description": "人员、车辆、动物入侵告警",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "人员入侵", "tags": ["intrusion_person"], "level": "error"},
+                        {"label": "车辆入侵", "tags": ["intrusion_vehicle"], "level": "error"},
+                        {"label": "动物入侵", "tags": ["intrusion_animal"], "level": "warning"},
+                    ]
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "confidence_threshold",
+                    "label": "置信度阈值",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "default": self.confidence_threshold,
+                    "description": "检测结果的最小置信度"
+                },
+                {
+                    "name": "tilt_threshold",
+                    "label": "倾斜角度阈值(°)",
+                    "type": "number",
+                    "min": 1.0,
+                    "max": 30.0,
+                    "step": 1.0,
+                    "default": 5.0,
+                    "description": "倾斜检测的最小角度"
+                }
+            ]
+        }
+
     def _extract_roi(self, frame: np.ndarray, bbox: BoundingBox):
         h, w = frame.shape[:2]
         x1, y1 = int(bbox.x * w), int(bbox.y * h)

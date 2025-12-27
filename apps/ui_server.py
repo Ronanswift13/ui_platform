@@ -108,11 +108,28 @@ def create_app() -> FastAPI:
 
         module = MODULES[module_id]
 
-        # 检查插件状态
+        # 检查插件状态并获取UI配置
         from platform_core.plugin_manager import PluginManager
         pm = PluginManager()
+
+        # 尝试获取或加载插件
         plugin = pm.get_plugin(module["plugin_id"])
-        plugin_status = "ready" if plugin else "placeholder"
+        if plugin is None:
+            try:
+                plugin = pm.load_plugin(module["plugin_id"])
+            except Exception as e:
+                print(f"加载插件 {module['plugin_id']} 失败: {e}")
+                plugin = None
+
+        plugin_status = "ready" if (plugin and plugin.status.value == "ready") else "placeholder"
+
+        # 获取插件的UI配置
+        ui_config = None
+        if plugin and hasattr(plugin, 'get_ui_config'):
+            try:
+                ui_config = plugin.get_ui_config()
+            except Exception as e:
+                print(f"获取插件 {module['plugin_id']} 的UI配置失败: {e}")
 
         return templates.TemplateResponse(
             "pages/module.html",
@@ -124,6 +141,7 @@ def create_app() -> FastAPI:
                 "module_icon": module["icon"],
                 "module_description": module["description"],
                 "plugin_status": plugin_status,
+                "ui_config": ui_config,
             },
         )
 

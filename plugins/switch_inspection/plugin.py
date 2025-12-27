@@ -42,13 +42,21 @@ from platform_core.schema.models import (
 
 def _load_detector_class():
     """动态加载检测器类"""
-    detector_path = Path(__file__).parent / "detector.py"
+    # 优先加载增强版检测器
+    detector_path = Path(__file__).parent / "detector_enhanced.py"
+    if not detector_path.exists():
+        detector_path = Path(__file__).parent / "detector.py"
+
     spec = importlib.util.spec_from_file_location("switch_detector", detector_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载检测器模块: {detector_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules["switch_detector"] = module
     spec.loader.exec_module(module)
+
+    # 优先返回增强版检测器类
+    if hasattr(module, 'SwitchDetectorEnhanced'):
+        return module.SwitchDetectorEnhanced
     return module.SwitchDetector
 
 
@@ -209,9 +217,9 @@ class SwitchInspectionPlugin(BasePlugin):
                 
                 # 1. 清晰度评价(对清晰度锚点)
                 if roi_type == "clarity_anchor" or "indicator" in roi_type:
-                    clarity_result = self._detector.evaluate_clarity(roi_image)
-                    
-                    if not clarity_result.get("is_clear", True):
+                    is_clear, clarity_score = self._detector.evaluate_clarity(roi_image)
+
+                    if not is_clear:
                         result = RecognitionResult(
                             task_id=context.task_id,
                             site_id=context.site_id,
@@ -220,13 +228,13 @@ class SwitchInspectionPlugin(BasePlugin):
                             roi_id=roi.id,
                             bbox=roi.bbox,
                             label="clarity_low",
-                            confidence=1.0 - clarity_result["clarity_score"],
+                            confidence=max(0.0, 1.0 - clarity_score),
                             model_version=self.version,
                             code_version=self.code_hash,
-                            failure_reason=clarity_result.get("reason_code"),
+                            failure_reason=str(1001),
                             metadata={
-                                "clarity_score": clarity_result["clarity_score"],
-                                "suggested_action": clarity_result.get("suggested_action")
+                                "clarity_score": clarity_score,
+                                "suggested_action": "REFOCUS_OR_RECAPTURE"
                             },
                         )
                         results.append(result)
@@ -235,12 +243,20 @@ class SwitchInspectionPlugin(BasePlugin):
                 # 2. 状态识别(对指示器和连杆)
                 if "indicator" in roi_type or "linkage" in roi_type or "handle" in roi_type:
                     device_type = self._get_device_type(roi_type)
-                    
-                    state_result = self._detector.recognize_state(
-                        roi_image, roi_type, device_type
-                    )
-                    
-                    if state_result.get("confidence", 0) >= self.confidence_threshold:
+
+                    if "indicator" in roi_type:
+                        state_result = self._detector.recognize_indicator_state(
+                            roi_image, device_type
+                        )
+                    else:
+                        state_result = self._detector.recognize_linkage_state(
+                            roi_image, device_type
+                        )
+
+                    if state_result.confidence >= self.confidence_threshold:
+                        label = self._state_to_label(device_type, state_result.state)
+                        evidence = state_result.evidence
+
                         result = RecognitionResult(
                             task_id=context.task_id,
                             site_id=context.site_id,
@@ -248,21 +264,29 @@ class SwitchInspectionPlugin(BasePlugin):
                             component_id=context.component_id,
                             roi_id=roi.id,
                             bbox=roi.bbox,
-                            label=state_result.get("label", "unknown"),
-                            confidence=state_result["confidence"],
+                            label=label,
+                            confidence=state_result.confidence,
                             model_version=self.version,
                             code_version=self.code_hash,
-                            failure_reason=state_result.get("reason_code"),
+                            failure_reason=state_result.reason_code,
                             metadata={
-                                "state": state_result.get("state"),
-                                "angle_deg": state_result.get("angle_deg"),
-                                "evidences": state_result.get("evidences", [])
+                                "state": state_result.state,
+                                "device_type": device_type,
+                                "evidence": {
+                                    "ocr_text": evidence.ocr_text,
+                                    "ocr_confidence": evidence.ocr_confidence,
+                                    "red_ratio": evidence.red_ratio,
+                                    "green_ratio": evidence.green_ratio,
+                                    "angle_deg": evidence.angle_deg,
+                                    "clarity_score": evidence.clarity_score,
+                                },
+                                "debug": state_result.extra,
                             },
                         )
                         results.append(result)
-                        
+
                         # 更新间隔状态缓存
-                        state = state_result.get("state", "unknown")
+                        state = state_result.state
                         if device_type == "breaker":
                             bay_state.breaker = state
                         elif device_type == "isolator":
@@ -273,8 +297,10 @@ class SwitchInspectionPlugin(BasePlugin):
                 # 3. SF6表计读数
                 if "gauge" in roi_type:
                     gauge_result = self._detector.read_gauge(roi_image)
-                    
-                    if gauge_result.get("success", False):
+                    gauge_reader = getattr(self._detector, "gauge_reader", None)
+                    gauge_enabled = getattr(gauge_reader, "enabled", False)
+
+                    if gauge_result.value is not None:
                         label = "sf6_pressure" if "pressure" in roi_type else "sf6_density"
                         result = RecognitionResult(
                             task_id=context.task_id,
@@ -284,17 +310,16 @@ class SwitchInspectionPlugin(BasePlugin):
                             roi_id=roi.id,
                             bbox=roi.bbox,
                             label=label,
-                            value=gauge_result["value"],
-                            confidence=gauge_result.get("confidence", 0.7),
+                            value=gauge_result.value,
+                            confidence=gauge_result.confidence,
                             model_version=self.version,
                             code_version=self.code_hash,
                             metadata={
-                                "unit": gauge_result.get("unit"),
-                                "pointer_angle": gauge_result.get("pointer_angle_deg")
+                                "unit": gauge_result.unit
                             },
                         )
                         results.append(result)
-                    elif gauge_result.get("enabled", False):
+                    elif gauge_enabled:
                         # 读数失败
                         result = RecognitionResult(
                             task_id=context.task_id,
@@ -307,7 +332,7 @@ class SwitchInspectionPlugin(BasePlugin):
                             confidence=0.0,
                             model_version=self.version,
                             code_version=self.code_hash,
-                            failure_reason=gauge_result.get("reason_code", 1004),
+                            failure_reason=str(gauge_result.reason_code or 1004),
                         )
                         results.append(result)
                         
@@ -317,13 +342,15 @@ class SwitchInspectionPlugin(BasePlugin):
                 continue
         
         # 4. 逻辑校验
-        logic_alarms = self._detector.validate_logic({
+        logic_alarms = self._detector.validate_interlock({
             "breaker": bay_state.breaker,
             "isolator": bay_state.isolator,
             "grounding": bay_state.grounding,
         })
         
         for alarm_info in logic_alarms:
+            rule_name = alarm_info.get("rule_name") or alarm_info.get("rule") or "互锁逻辑异常"
+            description = alarm_info.get("description") or alarm_info.get("message") or "检测到逻辑异常"
             result = RecognitionResult(
                 task_id=context.task_id,
                 site_id=context.site_id,
@@ -337,9 +364,10 @@ class SwitchInspectionPlugin(BasePlugin):
                 code_version=self.code_hash,
                 failure_reason=alarm_info.get("reason_code"),
                 metadata={
-                    "rule": alarm_info["rule"],
-                    "states": alarm_info["states"],
-                    "message": alarm_info["message"]
+                    "rule": rule_name,
+                    "rule_id": alarm_info.get("rule_id"),
+                    "states": alarm_info.get("states", {}),
+                    "message": description
                 },
             )
             results.append(result)
@@ -424,14 +452,14 @@ class SwitchInspectionPlugin(BasePlugin):
                 message="插件未初始化",
                 details={"status": self.status.value}
             )
-        
+
         if self._detector is None:
             return HealthStatus(
                 healthy=False,
                 message="检测器未就绪",
                 details={"status": self.status.value}
             )
-        
+
         return HealthStatus(
             healthy=True,
             message="插件运行正常",
@@ -443,6 +471,70 @@ class SwitchInspectionPlugin(BasePlugin):
                 "bay_states_count": len(self._bay_states),
             }
         )
+
+    def get_ui_config(self) -> dict[str, Any]:
+        """获取UI配置"""
+        return {
+            "detection_types": [
+                {
+                    "id": "state",
+                    "name": "状态识别",
+                    "icon": "eye",
+                    "description": "断路器、隔离开关、接地开关分合位状态识别和五防逻辑校验",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "断路器状态", "tags": ["breaker_open", "breaker_closed", "breaker_intermediate"]},
+                        {"label": "隔离开关状态", "tags": ["isolator_open", "isolator_closed"]},
+                        {"label": "接地开关状态", "tags": ["grounding_open", "grounding_closed"]},
+                        {"label": "五防逻辑校验", "tags": ["interlock_validation"]},
+                    ]
+                },
+                {
+                    "id": "clarity",
+                    "name": "清晰度评价",
+                    "icon": "image",
+                    "description": "图像清晰度评估，用于自动调焦触发",
+                    "enabled": True,
+                    "capabilities": [
+                        {"label": "清晰度评分", "tags": ["clarity_score"]},
+                        {"label": "自动调焦建议", "tags": ["focus_suggestion"]},
+                    ]
+                },
+                {
+                    "id": "gauge_reading",
+                    "name": "SF6表计读数",
+                    "icon": "speedometer2",
+                    "description": "SF6压力表和密度表读数（可选）",
+                    "enabled": False,
+                    "capabilities": [
+                        {"label": "SF6压力读数", "tags": ["sf6_pressure"]},
+                        {"label": "SF6密度读数", "tags": ["sf6_density"]},
+                    ]
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "confidence_threshold",
+                    "label": "置信度阈值",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "default": self.confidence_threshold,
+                    "description": "状态识别的最小置信度"
+                },
+                {
+                    "name": "min_clarity_score",
+                    "label": "最小清晰度",
+                    "type": "number",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "default": self.min_clarity_score,
+                    "description": "清晰度评价的最小阈值"
+                }
+            ]
+        }
     
     # ==================== 辅助方法 ====================
     
@@ -479,3 +571,14 @@ class SwitchInspectionPlugin(BasePlugin):
         elif "grounding" in roi_type:
             return "grounding"
         return "breaker"  # 默认
+
+    def _state_to_label(self, device_type: str, state: str) -> str:
+        """将状态映射到标准标签"""
+        prefix = device_type if device_type in {"breaker", "isolator", "grounding"} else "breaker"
+        if state == "open":
+            return f"{prefix}_open"
+        if state == "closed":
+            return f"{prefix}_closed"
+        if state == "intermediate":
+            return f"{prefix}_intermediate"
+        return "unknown"

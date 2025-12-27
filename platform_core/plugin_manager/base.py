@@ -247,6 +247,16 @@ class BasePlugin(ABC):
         """获取模型版本 (可选实现)"""
         return self.version
 
+    def get_ui_config(self) -> dict[str, Any] | None:
+        """
+        获取插件的UI配置 (可选实现)
+
+        Returns:
+            UI配置字典，包含检测类型、参数设置等信息
+            如果返回None，则使用默认UI
+        """
+        return None
+
     # ============== 辅助方法 ==============
 
     def create_output(

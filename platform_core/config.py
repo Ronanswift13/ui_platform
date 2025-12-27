@@ -74,6 +74,7 @@ class APIConfig(BaseModel):
 class PluginConfig(BaseModel):
     """插件配置"""
     plugins_dir: str = "plugins"
+    auto_load: bool = False
     auto_reload: bool = False
     strict_validation: bool = True
 

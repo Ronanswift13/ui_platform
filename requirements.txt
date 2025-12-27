@@ -30,9 +30,20 @@ pillow>=10.1.0
 opencv-python-headless>=4.8.0
 numpy>=1.24.0
 
-# AI/ML 推理 (可选)
+# AI/ML 推理
 # ONNX Runtime - 用于深度学习模型推理
-onnxruntime>=1.18.0
+onnxruntime>=1.16.0
+
+# 深度学习增强依赖 (全自动AI巡检)
+# ONNX Runtime GPU版本 (可选，需CUDA支持)
+# onnxruntime-gpu>=1.16.0
+
+# TensorRT加速 (可选)
+# tensorrt>=8.6.0
+
+# OCR支持 (可选)
+# paddleocr>=2.7.0
+# easyocr>=1.7.0
 
 # 日志
 loguru>=0.7.2

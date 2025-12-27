@@ -1,124 +1,70 @@
-# ============================================================
 # 母线自主巡视插件配置 (C组)
-# 输变电激光星芒破夜绘明监测平台
-# 版本: 1.0.0
+# 按照 README.md 规范的完整配置
+
 # ============================================================
-
 # 模型配置
+# ============================================================
 model:
-  path: "models/busbar_detector.onnx"
-  device: "cpu"  # cpu/cuda
-  input_size: [640, 640]
+  model_path: "models/busbar_det.onnx"
+  model_version: "busbar-det@1.2.0"
+  input_size: 640
 
-# 推理配置
-inference:
-  confidence_threshold: 0.5
-  nms_threshold: 0.4
-  max_detections: 200
+# ============================================================
+# 运行时配置
+# ============================================================
+runtime:
+  providers: ["CUDAExecutionProvider", "CPUExecutionProvider"]
+  batch_size: 8
 
-# 性能指标 - 按验收标准
-performance:
-  # 正确性指标(验收数据集统计)
-  accuracy:
-    pin_missing:
-      recall: 0.85          # Recall >= 0.85
-      precision: 0.85       # Precision >= 0.85
-    crack:
-      recall: 0.70          # Recall >= 0.70 (裂纹更难)
-      precision: 0.80       # Precision >= 0.80 (先保证低误报)
-    foreign_object:
-      recall: 0.85
-      precision: 0.85
-  
-  # 速度指标(单帧4K,含切片+NMS)
-  speed:
-    gpu_p95_ms: 800         # GPU P95 <= 800ms
-    gpu_target_ms: 400      # GPU建议目标 300~500ms
-    cpu_p95_ms: 5000        # CPU P95 <= 5s (兜底)
-  
-  # 稳定性指标
-  stability:
-    continuous_hours: 24    # 连续运行24h不崩溃
-    memory_leak: false      # 不内存泄漏
+# ============================================================
+# 切片配置（用于远距小目标检测）
+# ============================================================
+tiling:
+  tile_size: 1280
+  overlap: 320
+  roi_margin_px: 10
 
-# 切片检测配置(4K大视场)
-slicing:
-  enabled: true
-  slice_size: [640, 640]    # 切片大小
-  overlap: 0.2              # 切片重叠率
-  scale_factors: [1.0, 0.5] # 多尺度因子
+# ============================================================
+# 检测阈值
+# ============================================================
+thresholds:
+  conf_thr: 0.25      # 置信度阈值
+  nms_iou: 0.50       # NMS IoU阈值
 
-# 缺陷检测配置
-defect_detection:
-  # 销钉缺失检测
-  pin_missing:
-    min_area: 50            # 最小检测面积(像素)
-    max_area: 5000          # 最大检测面积
-    aspect_ratio_range: [0.5, 2.0]  # 宽高比范围
-    
-  # 裂纹检测
-  crack:
-    min_length: 20          # 最小裂纹长度(像素)
-    max_width: 10           # 最大裂纹宽度
-    edge_threshold: 50      # 边缘检测阈值
-    
-  # 异物检测
-  foreign_object:
-    min_area: 100
-    max_area: 10000
-    circularity_range: [0.1, 0.9]
+# ============================================================
+# 质量评估配置
+# ============================================================
+quality:
+  blur_thr: 0.35         # clarity_score < 0.35 => 模糊
+  y_high: 245            # 过曝阈值
+  overexp_ratio: 0.25    # 高亮像素比例阈值
+  dr_min: 35             # 动态范围过低视为低对比/逆光
+  edge_thr: 10           # 边缘能量阈值（用于遮挡检测）
 
-# 环境过滤配置
-environment_filter:
-  # 逆光/过曝检测
-  backlight:
-    brightness_threshold: 200  # 亮度阈值
-    overexpose_ratio: 0.3      # 过曝区域占比
-    
-  # 模糊检测
-  blur:
-    laplacian_threshold: 100   # 拉普拉斯方差阈值
-    
-  # 遮挡检测
-  occlusion:
-    edge_density_min: 0.05     # 最小边缘密度
-    
-  # 雨雾检测
-  weather:
-    contrast_threshold: 0.3    # 对比度阈值
-
+# ============================================================
 # 变焦建议配置
-zoom_suggestion:
-  min_target_size: 32          # 最小目标尺寸(像素)
-  suggested_zoom_factor: 2.0   # 建议变焦倍数
+# ============================================================
+zoom:
+  target_px: 90          # 希望小目标最终达到的像素尺寸
+  min_obj_px: 18         # <18px 直接建议变焦
+  zmin: 1.0              # 最小变焦倍率
+  zmax: 12.0             # 最大变焦倍率
 
-# ROI类型映射
-roi_types:
-  insulator: "绝缘子串"
-  fitting: "金具"
-  conductor_joint: "导线连接点"
-  pin: "销钉"
-  clamp: "线夹"
-  spacer: "间隔棒"
+# ============================================================
+# 检测标签（支持的缺陷类型）
+# ============================================================
+labels:
+  - ok
+  - pin_missing          # 销钉缺失
+  - crack                # 裂纹
+  - loose_fitting        # 金具松动
+  - broken_part          # 部件破损
+  - foreign_object       # 异物悬挂
 
-# 失败原因码定义
-reason_codes:
-  101: "逆光/过曝/低对比"
-  102: "遮挡/不可见"
-  103: "模糊/失焦"
-  104: "雨雾/霾导致低能见度"
-  105: "运动干扰(鸟/树叶/抖动)"
-  201: "目标过小,需要变焦"
-  202: "检测不稳定(需二次抓拍确认)"
-  301: "结果不可信(规则冲突/多解释)"
-
-# 建议动作映射
-suggested_actions:
-  101: "ADJUST_EXPOSURE_OR_CHANGE_VIEW"
-  102: "CHANGE_VIEW_OR_RECAPTURE"
-  103: "REFOCUS_OR_RECAPTURE"
-  104: "RECAPTURE"
-  105: "RECAPTURE"
-  201: "ZOOM_IN"
-  202: "RECAPTURE"
-  301: "MANUAL_REVIEW"
+# ============================================================
+# 告警规则
+# ============================================================
+rules:
+  alarm_thr_high: 0.75   # 高级别告警阈值
+  alarm_thr_mid: 0.60    # 中级别告警阈值
+  low_conf_thr: 0.40     # 低置信度阈值（需复核）
