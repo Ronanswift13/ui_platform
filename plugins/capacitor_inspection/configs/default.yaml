@@ -1,9 +1,13 @@
+# ============================================================
 # 电容器自主巡视插件配置 (D组)
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
 
 # 模型配置
 model:
   path: "models/capacitor_detector.onnx"
-  device: "cpu"  # cpu 或 cuda
+  device: "cpu"  # cpu/cuda
 
 # 推理配置
 inference:
@@ -16,37 +20,76 @@ structural_integrity:
   # 倾斜检测
   tilt_detection:
     enabled: true
-    max_tilt_angle: 5.0  # 度
+    max_tilt_angle: 5.0      # 最大允许倾斜角(度)
+    warning_angle: 3.0       # 警告倾斜角(度)
+    
   # 倒塌检测
   collapse_detection:
     enabled: true
-  # 部件缺失
+    min_height_ratio: 0.3    # 最小高度比(相对于标准高度)
+    
+  # 部件缺失检测
   missing_parts:
-    - capacitor_unit
-    - fuse
-    - insulator
-    - connecting_bar
+    - capacitor_unit         # 电容器单元
+    - fuse                   # 熔断器
+    - insulator              # 绝缘子
+    - connecting_bar         # 连接排
 
 # 区域入侵检测
 intrusion_detection:
   enabled: true
+  
   # 监控区域类型
   zone_types:
-    - restricted      # 禁入区
-    - warning         # 警告区
-    - equipment       # 设备区
+    restricted: "禁入区"     # 严重告警
+    warning: "警告区"        # 警告告警
+    equipment: "设备区"      # 普通告警
+    
   # 入侵目标
   intrusion_targets:
-    - person
-    - vehicle
-    - animal
-  # 告警延迟(秒)
+    - person                 # 人员
+    - vehicle                # 车辆
+    - animal                 # 动物
+    
+  # 告警延迟(秒) - 防止瞬时误报
   alert_delay: 2.0
+  
+  # 检测参数
+  detection:
+    min_area: 1000           # 最小目标面积
+    max_area: 100000         # 最大目标面积
+    movement_threshold: 10   # 运动阈值(像素)
 
 # 电容器组配置
 capacitor_bank:
   # 标准排列
   rows: 3
   columns: 4
+  
   # 相序
   phases: ["A", "B", "C"]
+  
+  # 单元尺寸参考(相对值)
+  unit_size:
+    width: 0.08
+    height: 0.25
+
+# ROI类型映射
+roi_types:
+  capacitor_unit: "电容器单元"
+  capacitor_bank: "电容器组"
+  fuse: "熔断器"
+  connecting_bar: "连接排"
+  fence: "围栏"
+  warning_zone: "警戒区"
+  restricted_zone: "禁入区"
+
+# 告警配置
+alarm:
+  tilt_warning: "warning"
+  tilt_error: "error"
+  collapse: "error"
+  missing_part: "error"
+  intrusion_restricted: "error"
+  intrusion_warning: "warning"
+  intrusion_equipment: "info"

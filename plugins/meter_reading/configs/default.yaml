@@ -1,69 +1,113 @@
+# ============================================================
 # 表计无建模增强读数插件配置 (E组)
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
 
 # 模型配置
 model:
-  # 关键点检测模型
-  keypoint_model: "models/meter_keypoint.onnx"
-  # OCR模型 (数字表计)
-  ocr_model: "models/meter_ocr.onnx"
-  device: "cpu"  # cpu 或 cuda
+  path: "models/meter_reading.onnx"
+  device: "cpu"
 
-# 推理配置
+# 推理配置 - 按性能指标标定
 inference:
   confidence_threshold: 0.6
-  # 透视矫正
-  perspective_correction: true
-  # 角度容忍范围
-  max_rotation_angle: 45.0
+  nms_threshold: 0.4
+  max_detections: 50
 
-# 表计类型配置
+# 支持的表计类型
 meter_types:
-  # 模拟表计
   analog:
-    - pressure_gauge      # 压力表
-    - temperature_gauge   # 温度表
-    - oil_level_gauge     # 油位计
-    - sf6_density_gauge   # SF6密度表
-  # 数字表计
+    - pressure_gauge
+    - temperature_gauge
+    - oil_level_gauge
+    - sf6_density_gauge
+    - ammeter
+    - voltmeter
   digital:
-    - digital_display     # 数字显示屏
-    - led_indicator       # LED指示器
+    - digital_display
+    - LED_indicator
+    - seven_segment
 
-# 读数配置
-reading:
-  # 量程自动识别
-  auto_range: true
-  # 刻度插值方式
-  interpolation: "linear"
-  # 读数精度
-  decimal_places: 2
-  # 失败兜底策略
-  fallback:
+# 关键点检测配置
+keypoint_detection:
+  analog_keypoints:
+    - center
+    - scale_min
+    - scale_max
+    - pointer_tip
+    - pointer_base
+  digital_keypoints:
+    - display_tl
+    - display_br
+
+# 透视矫正配置
+perspective_correction:
+  enabled: true
+  max_rotation: 45
+  min_scale: 0.5
+  max_scale: 2.0
+
+# 读数计算配置
+reading_calculation:
+  auto_range:
     enabled: true
-    # 多次采样
-    retry_count: 3
-    # 人工复核阈值
-    manual_review_threshold: 0.5
+  interpolation: "linear"
+  decimal_places: 2
 
-# 关键点定义
-keypoints:
-  # 模拟表关键点
-  analog:
-    - center        # 圆心
-    - scale_min     # 最小刻度
-    - scale_max     # 最大刻度
-    - pointer_tip   # 指针尖端
-    - pointer_base  # 指针根部
-  # 数字表关键点
-  digital:
-    - display_tl    # 显示区左上
-    - display_br    # 显示区右下
+# 失败兜底配置
+fallback:
+  retry_count: 3
+  manual_review_threshold: 0.5
+  use_history: true
+  history_window: 5
 
-# 图像预处理
+# 图像预处理配置
 preprocessing:
-  # 光照增强
   enhance_lighting: true
-  # 去反光
   anti_glare: true
-  # 对比度增强
   contrast_enhancement: 1.2
+
+# 指针检测算法参数
+pointer_detection:
+  hough_threshold: 50
+  min_line_length: 30
+  max_line_gap: 10
+  angle_range:
+    min: -150
+    max: 150
+
+# 刻度识别配置
+scale_recognition:
+  ocr_enabled: true
+  tick_detection:
+    min_ticks: 5
+    max_ticks: 20
+
+# 数字显示识别配置
+digital_recognition:
+  ocr_engine: "easyocr"
+  char_whitelist: "0123456789.-+eE"
+  seven_segment:
+    enabled: true
+    templates_path: "models/seven_segment_templates"
+
+# ROI类型映射
+roi_types:
+  pressure_gauge: "压强表"
+  temperature_gauge: "温度表"
+  oil_level_gauge: "油位表"
+  sf6_density_gauge: "SF6密度表"
+  digital_display: "数字显示屏"
+  LED_indicator: "LED指示灯"
+
+# 告警配置
+alarm:
+  out_of_range: "warning"
+  reading_failed: "info"
+  manual_review: "info"
+
+# 性能指标
+performance:
+  max_reading_time_ms: 500
+  success_rate: 0.95

@@ -1,49 +1,124 @@
+# ============================================================
 # 母线自主巡视插件配置 (C组)
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
 
 # 模型配置
 model:
   path: "models/busbar_detector.onnx"
-  device: "cpu"  # cpu 或 cuda
-  # 4K大视场支持
-  input_size: [3840, 2160]
+  device: "cpu"  # cpu/cuda
+  input_size: [640, 640]
 
 # 推理配置
 inference:
   confidence_threshold: 0.5
-  nms_threshold: 0.3
+  nms_threshold: 0.4
   max_detections: 200
-  # 小目标检测增强
-  small_object_enhancement: true
-  tile_detection: true
-  tile_size: 640
-  tile_overlap: 0.2
 
-# 检测目标类型
-detection_targets:
-  # 绝缘子串
-  insulator:
-    - normal
-    - cracked
-    - contaminated
-    - missing
-  # 金具
-  hardware:
-    - normal
-    - loose
-    - corroded
-    - missing_pin
-  # 导线连接
-  conductor:
-    - normal
-    - overheated
-    - broken_strand
+# 性能指标 - 按验收标准
+performance:
+  # 正确性指标(验收数据集统计)
+  accuracy:
+    pin_missing:
+      recall: 0.85          # Recall >= 0.85
+      precision: 0.85       # Precision >= 0.85
+    crack:
+      recall: 0.70          # Recall >= 0.70 (裂纹更难)
+      precision: 0.80       # Precision >= 0.80 (先保证低误报)
+    foreign_object:
+      recall: 0.85
+      precision: 0.85
+  
+  # 速度指标(单帧4K,含切片+NMS)
+  speed:
+    gpu_p95_ms: 800         # GPU P95 <= 800ms
+    gpu_target_ms: 400      # GPU建议目标 300~500ms
+    cpu_p95_ms: 5000        # CPU P95 <= 5s (兜底)
+  
+  # 稳定性指标
+  stability:
+    continuous_hours: 24    # 连续运行24h不崩溃
+    memory_leak: false      # 不内存泄漏
 
-# 环境干扰过滤
-noise_filtering:
+# 切片检测配置(4K大视场)
+slicing:
   enabled: true
-  # 过滤鸟类、飞虫等干扰
-  filter_classes:
-    - bird
-    - insect
-    - debris
-  min_static_frames: 3
+  slice_size: [640, 640]    # 切片大小
+  overlap: 0.2              # 切片重叠率
+  scale_factors: [1.0, 0.5] # 多尺度因子
+
+# 缺陷检测配置
+defect_detection:
+  # 销钉缺失检测
+  pin_missing:
+    min_area: 50            # 最小检测面积(像素)
+    max_area: 5000          # 最大检测面积
+    aspect_ratio_range: [0.5, 2.0]  # 宽高比范围
+    
+  # 裂纹检测
+  crack:
+    min_length: 20          # 最小裂纹长度(像素)
+    max_width: 10           # 最大裂纹宽度
+    edge_threshold: 50      # 边缘检测阈值
+    
+  # 异物检测
+  foreign_object:
+    min_area: 100
+    max_area: 10000
+    circularity_range: [0.1, 0.9]
+
+# 环境过滤配置
+environment_filter:
+  # 逆光/过曝检测
+  backlight:
+    brightness_threshold: 200  # 亮度阈值
+    overexpose_ratio: 0.3      # 过曝区域占比
+    
+  # 模糊检测
+  blur:
+    laplacian_threshold: 100   # 拉普拉斯方差阈值
+    
+  # 遮挡检测
+  occlusion:
+    edge_density_min: 0.05     # 最小边缘密度
+    
+  # 雨雾检测
+  weather:
+    contrast_threshold: 0.3    # 对比度阈值
+
+# 变焦建议配置
+zoom_suggestion:
+  min_target_size: 32          # 最小目标尺寸(像素)
+  suggested_zoom_factor: 2.0   # 建议变焦倍数
+
+# ROI类型映射
+roi_types:
+  insulator: "绝缘子串"
+  fitting: "金具"
+  conductor_joint: "导线连接点"
+  pin: "销钉"
+  clamp: "线夹"
+  spacer: "间隔棒"
+
+# 失败原因码定义
+reason_codes:
+  101: "逆光/过曝/低对比"
+  102: "遮挡/不可见"
+  103: "模糊/失焦"
+  104: "雨雾/霾导致低能见度"
+  105: "运动干扰(鸟/树叶/抖动)"
+  201: "目标过小,需要变焦"
+  202: "检测不稳定(需二次抓拍确认)"
+  301: "结果不可信(规则冲突/多解释)"
+
+# 建议动作映射
+suggested_actions:
+  101: "ADJUST_EXPOSURE_OR_CHANGE_VIEW"
+  102: "CHANGE_VIEW_OR_RECAPTURE"
+  103: "REFOCUS_OR_RECAPTURE"
+  104: "RECAPTURE"
+  105: "RECAPTURE"
+  201: "ZOOM_IN"
+  202: "RECAPTURE"
+  301: "MANUAL_REVIEW"

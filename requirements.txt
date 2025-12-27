@@ -30,6 +30,10 @@ pillow>=10.1.0
 opencv-python-headless>=4.8.0
 numpy>=1.24.0
 
+# AI/ML 推理 (可选)
+# ONNX Runtime - 用于深度学习模型推理
+onnxruntime>=1.18.0
+
 # 日志
 loguru>=0.7.2
 

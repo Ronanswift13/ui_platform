@@ -1,129 +1,122 @@
-# 开关间隔自主巡视插件配置
-# Switch Bay Inspection Plugin Configuration
+# ============================================================
+# 开关间隔自主巡视插件配置 (B组)
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
 
 # 模型配置
 model:
   path: "models/switch_detector.onnx"
   device: "cpu"   # cpu/cuda
 
-# 推理配置
+# 推理配置 - 按性能指标标定
 inference:
-  confidence_threshold: 0.6
-  nms_threshold: 0.4
-  max_detections: 50
+  confidence_threshold: 0.6    # 置信度阈值
+  nms_threshold: 0.4           # NMS阈值
+  max_detections: 50           # 最大检测数
 
-# 状态识别配置
+# 状态识别配置 - 按性能指标标定
 state_recognition:
-  # 最小状态得分阈值
-  min_state_score: 0.55
+  min_state_score: 0.55        # 最小状态评分
 
   # 多证据融合权重
   fusion_weights:
-    text: 0.5      # OCR文字权重
-    color: 0.3     # 颜色提示权重
-    angle: 0.2     # 连杆角度权重
+    text: 0.5                  # OCR文字权重
+    color: 0.3                 # 颜色提示权重
+    angle: 0.2                 # 角度检测权重
 
-  # 角度评分的高斯衰减参数
-  angle_sigma_deg: 18
+  angle_sigma_deg: 18          # 角度判定容差(度)
 
-  # 各类开关的标定参考角度（建议按点位标定；无标定时使用经验值）
+  # 每类开关的标定参考角(度) - 需按点位标定
   angle_reference:
     breaker:
-      open_deg: -60
-      closed_deg: 30
+      open_deg: -60            # 断路器分位角度
+      closed_deg: 30           # 断路器合位角度
     isolator:
-      open_deg: -70
-      closed_deg: 20
+      open_deg: -70            # 隔离开关分位角度
+      closed_deg: 20           # 隔离开关合位角度
     grounding:
-      open_deg: -80
-      closed_deg: 10
+      open_deg: -80            # 接地开关分位角度
+      closed_deg: 10           # 接地开关合位角度
 
   # OCR配置
   ocr:
     enabled: true
-    engine: "easyocr"
-    languages: ["ch_sim", "en"]
-    keywords_open: ["分", "OPEN", "OFF", "断开", "拉开"]
-    keywords_closed: ["合", "CLOSE", "ON", "闭合", "合上"]
+    engine: "easyocr"          # 或 paddleocr, tesseract
+    keywords_open: ["分", "OPEN", "OFF", "断开"]
+    keywords_closed: ["合", "CLOSE", "ON", "闭合"]
 
-  # 颜色提示配置（HSV空间）
+  # 颜色提示配置
   color_hint:
     enabled: true
-    # 绿色范围（合闸指示）
-    hsv_green:
-      - [35, 40, 40]
-      - [85, 255, 255]
-    # 红色范围1（分闸指示，低色相端）
-    hsv_red1:
-      - [0, 60, 60]
-      - [10, 255, 255]
-    # 红色范围2（分闸指示，高色相端）
-    hsv_red2:
-      - [170, 60, 60]
-      - [180, 255, 255]
+    # 绿色HSV范围(表示合闸)
+    hsv_green: [[35, 40, 40], [85, 255, 255]]
+    # 红色HSV范围(表示分闸)
+    hsv_red1:  [[0, 60, 60], [10, 255, 255]]
+    hsv_red2:  [[170, 60, 60], [180, 255, 255]]
 
-# 互锁逻辑校验配置
+# 逻辑校验配置 - 五防互锁规则
 logic_validation:
   enabled: true
   rules:
     - name: "防止带电合接地刀"
-      id: "interlock_grounding"
       condition: "isolator_open_before_grounding"
-      description: "隔离开关未断开时，禁止合接地开关"
       severity: "error"
-      reason_code: 2001
+    - name: "防止带接地刀合隔离开关"
+      condition: "grounding_open_before_isolator"
+      severity: "error"
     - name: "异常工况提示：合闸但刀闸断开"
-      id: "breaker_isolator_mismatch"
       condition: "breaker_closed_while_isolator_open"
-      description: "断路器合闸但隔离开关断开，可能为识别错误或异常工况"
       severity: "warning"
-      reason_code: 2002
 
-# 图像清晰度评价配置
+# 图像质量评价配置 - 清晰度评分
 image_quality:
   enabled: true
-  method: "laplacian_var"
-  # Laplacian方差评分参数
-  mu: 120              # 可接受清晰度阈值（经验值）
-  tau: 30              # Sigmoid陡峭度参数
-  min_clarity_score: 0.70   # 最低清晰度分数
+  method: "laplacian_var"      # laplacian_var, sobel, fft
+  mu: 120                      # 拉普拉斯方差期望值
+  tau: 30                      # 置信区间参数
+  min_clarity_score: 0.70      # 最小清晰度分数
 
-# 动态定位 + AI调焦联动参数
+# 调焦联动配置
 focus_link:
-  stable_iou_threshold: 0.70   # 目标框稳定IoU阈值
+  stable_iou_threshold: 0.70   # 稳定IoU阈值
   stable_frames: 3             # 稳定帧数
 
-# SF6表计读数配置（升级功能，演示用）
+# SF6表计读数配置(可选)
 gauge_reading:
-  enabled: false  # 默认关闭，演示时可开启
-  # 指针式表计配置
+  enabled: false
   pointer:
-    theta_min_deg: -120      # 最小刻度对应角度
-    theta_max_deg: 120       # 最大刻度对应角度
-    value_min: 0.0           # 最小刻度值
-    value_max: 1.0           # 最大刻度值（MPa）
-    unit: "MPa"
-    hough_threshold: 50
-    min_line_length: 30
-    max_line_gap: 10
-  # 数字式表计配置
-  digital:
-    enabled: false
-    ocr_engine: "easyocr"
+    theta_min_deg: -120        # 指针最小角度
+    theta_max_deg: 120         # 指针最大角度
+    value_min: 0.0             # 对应最小读数
+    value_max: 1.0             # 对应最大读数
+    unit: "MPa"                # 单位
 
-# 连杆角度检测算法参数
-linkage_detection:
-  canny_low: 80
-  canny_high: 160
-  hough_threshold: 60
-  min_line_length_ratio: 0.25   # 相对于ROI尺寸
-  max_line_gap: 10
+# 设备类型列表
+device_types: ["breaker", "isolator", "grounding"]
 
-# 设备类型
-device_types:
-  - breaker      # 断路器
-  - isolator     # 隔离开关
-  - grounding    # 接地开关
+# ROI类型映射
+roi_types:
+  breaker_indicator: "断路器指示窗"
+  isolator_indicator: "隔离开关指示窗"
+  grounding_indicator: "接地开关指示窗"
+  breaker_linkage: "断路器连杆"
+  isolator_linkage: "隔离刀闸连杆"
+  grounding_handle: "接地柄"
+  gauge_pressure: "SF6压强表"
+  gauge_density: "SF6密度表"
+  mechanism_box: "机构箱"
+  arrester: "避雷器"
+  clarity_anchor: "清晰度锚点"
+
+# 性能指标(验收标准)
+performance:
+  # 单帧单ROI处理时间(1080p ROI裁剪后)
+  max_inference_time_ms: 300
+  # 状态识别准确率(同点位固定ROI)
+  state_accuracy: 0.95
+  # 逻辑校验误报率
+  logic_false_positive: 0.02
 
 # 失败原因码定义
 reason_codes:
@@ -131,20 +124,6 @@ reason_codes:
   1002: "OCR失败或无文本"
   1003: "未检测到有效角度/线段"
   1004: "表盘/指针检测失败"
-  2001: "互锁逻辑异常：带电合接地刀风险"
-  2002: "异常工况提示：断路器合闸但隔离开关断开"
+  2001: "互锁逻辑异常(带电合接地刀风险)"
+  2002: "异常工况提示"
   9000: "未知错误"
-
-# ROI类型映射
-roi_types:
-  breaker_indicator: "断路器分合指示窗"
-  isolator_indicator: "隔离开关指示窗"
-  grounding_indicator: "接地开关指示窗"
-  breaker_linkage: "断路器连杆"
-  isolator_linkage: "隔离刀闸连杆"
-  grounding_handle: "接地柄/连杆"
-  gauge_pressure: "SF6压强表"
-  gauge_density: "密度表"
-  mechanism_box: "机构箱外观"
-  arrester: "避雷器外观"
-  clarity_anchor: "清晰度评估锚点"

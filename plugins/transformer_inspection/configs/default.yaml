@@ -1,57 +1,85 @@
-# 主变自主巡视插件配置
+# ============================================================
+# 主变自主巡视插件配置 (A组)
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
 
 # 模型配置
 model:
   path: "models/transformer_detector.onnx"
   device: "cpu"  # cpu 或 cuda
+  input_size: [640, 640]  # 模型输入尺寸
 
-# 推理配置
+# 推理配置 - 按性能指标标定
 inference:
-  confidence_threshold: 0.5
-  nms_threshold: 0.4
-  max_detections: 100
+  confidence_threshold: 0.5   # 置信度阈值
+  nms_threshold: 0.4          # NMS阈值
+  max_detections: 100         # 最大检测数
+  batch_size: 1               # 批处理大小
 
 # 热成像配置
 thermal:
-  enabled: false
-  temperature_threshold: 80.0  # 摄氏度
-  min_temp: 20.0
-  max_temp: 120.0
+  enabled: false              # 热成像开关
+  temperature_threshold: 80.0 # 温度告警阈值(℃)
+  min_temp: 20.0              # 温度映射最小值
+  max_temp: 120.0             # 温度映射最大值
+  hotspot_threshold: 0.8      # 热点检测阈值(相对)
 
-# 算法参数配置
+# 算法参数配置 - 按性能指标标定
 algorithms:
+  # 渗漏油检测参数
   oil_leak:
-    gray_threshold: 60
-    min_area: 500
+    gray_threshold: 60        # 灰度阈值(深色区域)
+    min_area: 500             # 最小检测面积(像素)
+    max_area: 50000           # 最大检测面积(像素)
+    morphology_kernel: 5      # 形态学操作核大小
+    
+  # 锈蚀检测参数
   rust:
-    min_area: 300
+    min_area: 300             # 最小检测面积(像素)
+    max_area: 30000           # 最大检测面积
+    hsv_lower: [5, 50, 50]    # HSV下限(橙红色)
+    hsv_upper: [25, 255, 255] # HSV上限
+    
+  # 破损检测参数
   damage:
-    canny_low: 50
-    canny_high: 150
-    edge_density_threshold: 0.15
+    canny_low: 50             # Canny边缘检测低阈值
+    canny_high: 150           # Canny边缘检测高阈值
+    edge_density_threshold: 0.15  # 边缘密度阈值
+    block_size: 32            # 分析块大小
+    
+  # 异物检测参数
   foreign_object:
-    canny_low: 30
-    canny_high: 100
-    min_area: 200
-    max_area: 2000
-    circularity_min: 0.2
-    circularity_max: 0.7
+    canny_low: 30             # Canny边缘检测低阈值
+    canny_high: 100           # Canny边缘检测高阈值
+    min_area: 200             # 最小面积(像素)
+    max_area: 2000            # 最大面积(像素)
+    circularity_min: 0.2      # 圆形度最小值
+    circularity_max: 0.7      # 圆形度最大值
+    
+  # 硅胶变色检测参数
   silica_gel:
-    blue_ratio_threshold: 0.1
-    pink_ratio_threshold: 0.1
+    blue_ratio_threshold: 0.1       # 蓝色占比阈值(正常)
+    pink_ratio_threshold: 0.1       # 粉红色占比阈值(异常)
+    hsv_blue_lower: [100, 50, 50]   # 蓝色HSV下限
+    hsv_blue_upper: [130, 255, 255] # 蓝色HSV上限
+    hsv_pink_lower: [140, 30, 100]  # 粉红色HSV下限
+    hsv_pink_upper: [170, 255, 255] # 粉红色HSV上限
+    
+  # 阀门状态检测参数
   valve:
-    angle_threshold: 30
-    hough_threshold: 50
-    min_line_length: 30
-    max_line_gap: 10
+    angle_threshold: 30       # 角度判定阈值(度)
+    hough_threshold: 50       # 霍夫变换阈值
+    min_line_length: 30       # 最小线段长度
+    max_line_gap: 10          # 最大线段间隔
 
 # 识别类型配置
 recognition:
   defect_types:
-    - damage        # 破损
-    - rust          # 锈蚀
-    - oil_leak      # 渗漏油
-    - foreign_object # 异物悬挂
+    - damage          # 破损
+    - rust            # 锈蚀
+    - oil_leak        # 渗漏油
+    - foreign_object  # 异物悬挂
   state_types:
     - silica_gel_normal     # 呼吸器硅胶正常
     - silica_gel_abnormal   # 呼吸器硅胶变色
@@ -66,9 +94,34 @@ roi_types:
   oil_level: "油位计"
   breather: "呼吸器"
   terminal_box: "端子箱"
+  valve: "阀门"
+  body: "本体"
 
 # 油位计读数配置
 oil_level:
   min_line_length_ratio: 0.33  # 最小线段长度比例
   hough_threshold: 30          # 霍夫变换阈值
-  angle_tolerance: 15          # 水平线角度容差（度）
+  angle_tolerance: 15          # 水平线角度容差(度)
+
+# 告警配置
+alarm:
+  # 缺陷严重级别映射
+  severity_mapping:
+    oil_leak: "error"           # 渗漏油 - 严重
+    damage: "error"             # 破损 - 严重
+    rust: "warning"             # 锈蚀 - 警告
+    foreign_object: "warning"   # 异物 - 警告
+    silica_gel_abnormal: "warning"  # 硅胶变色 - 警告
+  # 告警抑制时间(秒)
+  suppression_time: 300
+
+# 性能指标(验收标准)
+performance:
+  # 处理速度要求
+  max_inference_time_ms: 500   # 单帧最大处理时间
+  # 置信度范围
+  confidence_range: [0.4, 0.95]
+  # 支持分辨率
+  supported_resolutions:
+    min: [640, 480]
+    max: [3840, 2160]
