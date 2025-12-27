@@ -378,9 +378,11 @@ class MeterReadingPlugin(BasePlugin):
             return False
         
         # 简化的规则检查
-        if hasattr(rule, 'min_value') and result.value < rule.min_value:
+        min_value = getattr(rule, "min_value", None)
+        if min_value is not None and result.value < min_value:
             return True
-        if hasattr(rule, 'max_value') and result.value > rule.max_value:
+        max_value = getattr(rule, "max_value", None)
+        if max_value is not None and result.value > max_value:
             return True
         
         return False

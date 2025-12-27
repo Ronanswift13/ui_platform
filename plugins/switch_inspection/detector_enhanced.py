@@ -11,7 +11,7 @@
 """
 
 from __future__ import annotations
-from typing import Any, Optional, List, Dict, Tuple
+from typing import Any, Optional, List, Dict
 from dataclasses import dataclass, field
 from enum import Enum
 import numpy as np
@@ -255,7 +255,7 @@ class SwitchDetectorEnhanced:
         green_lower = np.array(config.get("green_lower", [35, 100, 100]))
         green_upper = np.array(config.get("green_upper", [85, 255, 255]))
         green_mask = cv2.inRange(hsv, green_lower, green_upper)
-        green_ratio = np.sum(green_mask > 0) / green_mask.size
+        green_ratio = float(np.sum(green_mask > 0) / green_mask.size)
         
         # 红色(分位)
         red_lower1 = np.array(config.get("red_lower1", [0, 100, 100]))
@@ -266,7 +266,7 @@ class SwitchDetectorEnhanced:
         red_mask1 = cv2.inRange(hsv, red_lower1, red_upper1)
         red_mask2 = cv2.inRange(hsv, red_lower2, red_upper2)
         red_mask = cv2.bitwise_or(red_mask1, red_mask2)
-        red_ratio = np.sum(red_mask > 0) / red_mask.size
+        red_ratio = float(np.sum(red_mask > 0) / red_mask.size)
         
         min_ratio = config.get("min_color_ratio", 0.01)
         
@@ -316,7 +316,7 @@ class SwitchDetectorEnhanced:
         if not angles:
             return None
         
-        avg_angle = np.mean(angles)
+        avg_angle = float(np.mean(angles))
         
         # 与参考角度比较
         ref = self.ANGLE_REFERENCES.get(switch_type, self.ANGLE_REFERENCES[SwitchType.BREAKER])
@@ -367,8 +367,7 @@ class SwitchDetectorEnhanced:
             scores = {k: v / total for k, v in scores.items()}
         
         # 选择最高得分
-        best_state = max(scores, key=scores.get)
-        best_score = scores[best_state]
+        best_state, best_score = max(scores.items(), key=lambda item: item[1])
         
         # 检查是否满足最小阈值
         if best_score < self.min_state_score:
@@ -448,7 +447,8 @@ class SwitchDetectorEnhanced:
         Returns:
             校验结果
         """
-        rules = self.logic_config.get("interlock_rules", {})
+        # 预留规则配置入口
+        _ = self.logic_config.get("interlock_rules", {})
         violations = []
         
         # 规则1: 断路器合闸时，两侧隔离开关必须在合位
@@ -597,7 +597,7 @@ class SwitchDetectorEnhanced:
             return {"value": None, "confidence": 0.3, "reason": "no_dial_detected"}
         
         # 取最大的圆
-        circles = np.uint16(np.around(circles))
+        circles = np.around(circles).astype(np.uint16)
         best = max(circles[0], key=lambda c: c[2])
         cx, cy, r = int(best[0]), int(best[1]), int(best[2])
         

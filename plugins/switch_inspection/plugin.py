@@ -435,7 +435,7 @@ class SwitchInspectionPlugin(BasePlugin):
                     result_id=None,
                     level=AlarmLevel.INFO,
                     title=f"检测到{label_name}",
-                    message=f"设备处于中间态，请确认状态",
+                    message="设备处于中间态，请确认状态",
                     site_id=result.site_id,
                     device_id=result.device_id,
                     component_id=result.component_id,

@@ -259,8 +259,9 @@ class TransformerInspectionPlugin(BasePlugin):
                 continue
         
         # 热成像分析(如果启用)
-        if self._thermal_enabled and hasattr(context, 'thermal_frame'):
-            thermal_result = self._detector.analyze_thermal(context.thermal_frame)
+        thermal_frame = getattr(context, "thermal_frame", None)
+        if self._thermal_enabled and thermal_frame is not None:
+            thermal_result = self._detector.analyze_thermal(thermal_frame)
             if thermal_result.get("is_overtemp", False):
                 # 添加超温告警结果
                 for hotspot in thermal_result.get("hotspots", []):

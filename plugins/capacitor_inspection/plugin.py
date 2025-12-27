@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from datetime import datetime
 import importlib.util
 import sys
@@ -75,7 +75,7 @@ class CapacitorInspectionPlugin(BasePlugin):
     
     def __init__(self, manifest: PluginManifest, plugin_dir: Path):
         super().__init__(manifest, plugin_dir)
-        self._detector = None
+        self._detector: Any | None = None
         self._initialized = False
         self._last_inference_time = None
         self._inference_count = 0
@@ -104,6 +104,10 @@ class CapacitorInspectionPlugin(BasePlugin):
         self._last_inference_time = datetime.now()
         self._inference_count += 1
         results = []
+
+        detector = self._detector
+        if detector is None:
+            return results
         
         for roi in rois:
             try:
@@ -114,14 +118,14 @@ class CapacitorInspectionPlugin(BasePlugin):
                 roi_type = self._get_roi_type(roi)
                 
                 if roi_type in ["capacitor_bank", "capacitor_unit", "fuse", "connecting_bar"]:
-                    for defect in self._detector.detect_structural_defects(roi_image, roi_type):
+                    for defect in detector.detect_structural_defects(roi_image, roi_type):
                         results.append(self._create_result(context, roi, defect))
                 
                 if roi_type in ["fence", "warning_zone", "restricted_zone"]:
                     zone_type = "restricted" if "restricted" in roi_type else "warning"
-                    for intrusion in self._detector.detect_intrusion(roi_image, zone_type):
+                    for intrusion in detector.detect_intrusion(roi_image, zone_type):
                         results.append(self._create_result(context, roi, intrusion))
-            except Exception as e:
+            except Exception:
                 self._error_count += 1
         
         self.status = PluginStatus.READY

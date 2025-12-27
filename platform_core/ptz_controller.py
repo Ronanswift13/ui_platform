@@ -188,7 +188,7 @@ class ONVIFPTZAdapter(BasePTZAdapter):
     
     async def connect(self) -> bool:
         try:
-            from onvif import ONVIFCamera
+            from onvif import ONVIFCamera  # type: ignore[import-not-found]
             self._client = ONVIFCamera(self.host, self.port, self.username, self.password)
             print(f"[ONVIF] 连接成功: {self.host}:{self.port}")
             return True

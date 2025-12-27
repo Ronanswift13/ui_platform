@@ -25,9 +25,9 @@ except ImportError:
     ort = None
 
 try:
-    import tensorrt as trt
-    import pycuda.driver as cuda
-    import pycuda.autoinit
+    import tensorrt as trt  # type: ignore[import-not-found]
+    import pycuda.driver as cuda  # type: ignore[import-not-found]
+    import pycuda.autoinit  # type: ignore[import-not-found] # noqa: F401
 except ImportError:
     trt = None
     cuda = None

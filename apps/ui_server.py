@@ -63,7 +63,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="输变电监测平台",
         description="输变电激光星芒破夜绘明监测平台 Web UI",
-        version="1.0.0",
+        version="2.0.0",
     )
 
     # 挂载静态文件

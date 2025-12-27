@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Optional, List
+from typing import Any, Optional
 from datetime import datetime
 import importlib.util
 import sys
@@ -179,7 +179,8 @@ class BusbarInspectionPlugin(BasePlugin):
                 if roi_image is None or roi_image.size == 0:
                     continue
                 
-                roi_type = self._get_roi_type(roi)
+                # 预留ROI类型用于后续扩展
+                _ = self._get_roi_type(roi)
                 
                 # 执行检测(包含质量门禁)
                 tiling_cfg = self._config.get("tiling") or self._config.get("slicing") or {}

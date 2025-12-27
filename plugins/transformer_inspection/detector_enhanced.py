@@ -527,7 +527,8 @@ class TransformerDetectorEnhanced:
         if cv2 is None:
             return {"value": None, "confidence": 0}
         
-        config = self.config.get("oil_level", {})
+        # 预留配置扩展入口
+        _ = self.config.get("oil_level", {})
         
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         h, w = gray.shape

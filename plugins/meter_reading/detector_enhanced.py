@@ -11,7 +11,7 @@
 """
 
 from __future__ import annotations
-from typing import Any, Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import numpy as np
@@ -161,7 +161,7 @@ class MeterReadingDetectorEnhanced:
         if circles is None:
             return None
         
-        circles = np.uint16(np.around(circles))
+        circles = np.around(circles).astype(np.uint16)
         best = max(circles[0], key=lambda c: c[2])
         cx, cy, r = int(best[0]), int(best[1]), int(best[2])
         

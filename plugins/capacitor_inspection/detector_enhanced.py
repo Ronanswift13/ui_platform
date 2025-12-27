@@ -9,10 +9,10 @@
 """
 
 from __future__ import annotations
-from typing import Any, Optional, List, Dict, Tuple
-from dataclasses import dataclass, field
+from typing import Optional, List, Dict
+from dataclasses import dataclass
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
 import threading
 
@@ -110,12 +110,12 @@ class CapacitorDetectorEnhanced:
         if not vertical_angles:
             return TiltAnalysis(is_tilted=False, angle=0, direction="none", severity="normal", confidence=0.3)
         
-        avg_angle = np.mean(vertical_angles)
+        avg_angle = float(np.mean(vertical_angles))
         is_tilted = abs(avg_angle) > self.warning_angle
         direction = "left" if avg_angle < 0 else "right"
         severity = "error" if abs(avg_angle) > self.max_tilt_angle else "warning" if is_tilted else "normal"
         
-        return TiltAnalysis(is_tilted=is_tilted, angle=abs(avg_angle), direction=direction, 
+        return TiltAnalysis(is_tilted=is_tilted, angle=float(abs(avg_angle)), direction=direction, 
                           severity=severity, confidence=min(0.9, 0.5 + len(vertical_angles) * 0.05))
     
     def detect_intrusion(self, image: np.ndarray, timestamp: Optional[datetime] = None) -> Dict:
