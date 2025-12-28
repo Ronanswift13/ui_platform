@@ -1,0 +1,291 @@
+# ==============================================================================
+# AI巡检模型配置文件
+# 输变电站全自动AI巡检方案 - 模型注册中心配置
+# ==============================================================================
+
+# 全局配置
+global:
+  models_base_path: "models"  # 模型根目录
+  default_backend: "onnx_cuda"  # 默认推理后端: onnx_cpu, onnx_cuda, tensorrt
+  cuda_device_id: 0
+  enable_fp16: true
+  warmup_iterations: 3  # 预热推理次数
+
+# ==============================================================================
+# A组 - 主变巡视模型
+# ==============================================================================
+transformer_inspection:
+  # YOLOv8 缺陷检测模型
+  defect_detector:
+    model_id: "transformer_defect_yolov8n"
+    model_path: "models/transformer/defect_yolov8n.onnx"
+    model_type: "yolov8"
+    input_size: [640, 640]
+    input_format: "NCHW"  # [batch, channel, height, width]
+    output_format: "yolov8_detect"
+    classes:
+      - "oil_leak"        # 油泄漏
+      - "rust"            # 锈蚀
+      - "damage"          # 破损
+      - "foreign_object"  # 异物
+      - "crack"           # 裂纹
+      - "discoloration"   # 变色
+    confidence_threshold: 0.5
+    nms_threshold: 0.45
+    description: "主变外观缺陷检测模型"
+
+  # U-Net 油位分割模型
+  oil_level_segmentation:
+    model_id: "transformer_oil_unet"
+    model_path: "models/transformer/oil_segmentation_unet.onnx"
+    model_type: "segmentation"
+    input_size: [512, 512]
+    input_format: "NCHW"
+    output_format: "binary_mask"
+    classes:
+      - "background"
+      - "oil"
+    threshold: 0.5
+    description: "油枕油位分割模型"
+
+  # CNN 硅胶颜色分类模型
+  silica_classifier:
+    model_id: "transformer_silica_cnn"
+    model_path: "models/transformer/silica_classifier.onnx"
+    model_type: "classification"
+    input_size: [224, 224]
+    input_format: "NCHW"
+    output_format: "softmax"
+    classes:
+      - "blue"       # 正常-蓝色
+      - "pink"       # 轻度受潮-粉红
+      - "white"      # 严重受潮-白色
+      - "unknown"    # 无法识别
+    description: "呼吸器硅胶颜色分类模型"
+
+  # 热成像异常检测模型
+  thermal_anomaly:
+    model_id: "transformer_thermal"
+    model_path: "models/transformer/thermal_anomaly.onnx"
+    model_type: "anomaly_detection"
+    input_size: [224, 224]
+    input_format: "NCHW"
+    output_format: "heatmap"
+    temperature_range: [-20, 150]  # 摄氏度
+    anomaly_threshold: 0.7
+    description: "热成像异常检测模型"
+
+# ==============================================================================
+# B组 - 开关间隔模型
+# ==============================================================================
+switch_inspection:
+  # YOLOv8 开关状态检测模型
+  switch_detector:
+    model_id: "switch_state_yolov8s"
+    model_path: "models/switch/switch_yolov8s.onnx"
+    model_type: "yolov8"
+    input_size: [640, 640]
+    input_format: "NCHW"
+    output_format: "yolov8_detect"
+    classes:
+      - "breaker_open"      # 断路器分
+      - "breaker_closed"    # 断路器合
+      - "isolator_open"     # 隔离开关分
+      - "isolator_closed"   # 隔离开关合
+      - "grounding_open"    # 接地开关分
+      - "grounding_closed"  # 接地开关合
+      - "indicator_red"     # 红色指示灯
+      - "indicator_green"   # 绿色指示灯
+    confidence_threshold: 0.6
+    nms_threshold: 0.45
+    description: "开关分合状态检测模型"
+
+  # OCR 指示牌文字识别
+  indicator_ocr:
+    model_id: "switch_ocr_crnn"
+    model_path: "models/switch/indicator_ocr.onnx"
+    model_type: "ocr"
+    input_size: [32, 128]
+    input_format: "NCHW"
+    output_format: "ctc"
+    charset: "分合开关ONOFF断路器隔离接地0123456789"
+    description: "指示牌OCR识别模型"
+
+# ==============================================================================
+# C组 - 母线巡视模型
+# ==============================================================================
+busbar_inspection:
+  # YOLOv8m 母线小目标检测模型 (高分辨率)
+  busbar_detector:
+    model_id: "busbar_defect_yolov8m"
+    model_path: "models/busbar/busbar_yolov8m.onnx"
+    model_type: "yolov8"
+    input_size: [1280, 1280]  # 高分辨率用于小目标
+    input_format: "NCHW"
+    output_format: "yolov8_detect"
+    classes:
+      - "insulator_crack"     # 绝缘子裂纹
+      - "insulator_dirty"     # 绝缘子污损
+      - "fitting_loose"       # 金具松动
+      - "fitting_rust"        # 金具锈蚀
+      - "wire_damage"         # 导线破损
+      - "foreign_object"      # 异物悬挂
+      - "bird"                # 鸟类(干扰)
+      - "insect"              # 飞虫(干扰)
+    confidence_threshold: 0.4  # 小目标降低阈值
+    nms_threshold: 0.5
+    # 切片推理配置
+    slicing:
+      enabled: true
+      tile_size: 1280
+      overlap: 128
+      merge_nms_threshold: 0.5
+    description: "母线小目标缺陷检测模型"
+
+  # 环境干扰过滤模型
+  noise_filter:
+    model_id: "busbar_noise_classifier"
+    model_path: "models/busbar/noise_classifier.onnx"
+    model_type: "classification"
+    input_size: [128, 128]
+    input_format: "NCHW"
+    output_format: "softmax"
+    classes:
+      - "real_defect"     # 真实缺陷
+      - "bird"            # 鸟类
+      - "insect"          # 飞虫
+      - "shadow"          # 阴影
+      - "reflection"      # 反光
+    description: "环境干扰过滤分类模型"
+
+# ==============================================================================
+# D组 - 电容器巡视模型
+# ==============================================================================
+capacitor_inspection:
+  # YOLOv8 电容器检测模型
+  capacitor_detector:
+    model_id: "capacitor_unit_yolov8"
+    model_path: "models/capacitor/capacitor_yolov8.onnx"
+    model_type: "yolov8"
+    input_size: [640, 640]
+    input_format: "NCHW"
+    output_format: "yolov8_detect"
+    classes:
+      - "capacitor_unit"      # 电容器单元
+      - "capacitor_tilted"    # 倾斜电容器
+      - "capacitor_fallen"    # 倒塌电容器
+      - "capacitor_missing"   # 缺失位置
+      - "connection_wire"     # 连接线
+      - "fence"               # 围栏
+    confidence_threshold: 0.5
+    nms_threshold: 0.45
+    description: "电容器组结构检测模型"
+
+  # RT-DETR 入侵检测模型
+  intrusion_detector:
+    model_id: "capacitor_intrusion_rtdetr"
+    model_path: "models/capacitor/rtdetr_intrusion.onnx"
+    model_type: "rtdetr"
+    input_size: [640, 640]
+    input_format: "NCHW"
+    output_format: "rtdetr_detect"
+    classes:
+      - "person"        # 人员
+      - "vehicle"       # 车辆
+      - "animal"        # 动物
+      - "unknown"       # 未知物体
+    confidence_threshold: 0.6
+    # 时序跟踪配置
+    tracking:
+      enabled: true
+      confirm_frames: 3        # 连续N帧确认
+      max_disappeared: 5       # 最大消失帧数
+      iou_threshold: 0.3
+    description: "区域入侵检测模型"
+
+# ==============================================================================
+# E组 - 表计读数模型
+# ==============================================================================
+meter_reading:
+  # HRNet 关键点检测模型
+  keypoint_detector:
+    model_id: "meter_keypoint_hrnet"
+    model_path: "models/meter/hrnet_keypoint.onnx"
+    model_type: "keypoint"
+    input_size: [256, 256]
+    input_format: "NCHW"
+    output_format: "heatmap"
+    keypoints:
+      - "center"          # 表盘圆心
+      - "pointer_tip"     # 指针尖端
+      - "pointer_base"    # 指针根部
+      - "scale_start"     # 刻度起点
+      - "scale_end"       # 刻度终点
+      - "corner_tl"       # 左上角
+      - "corner_tr"       # 右上角
+      - "corner_bl"       # 左下角
+      - "corner_br"       # 右下角
+    confidence_threshold: 0.3
+    description: "表计关键点检测模型"
+
+  # CRNN 数字OCR模型
+  digit_ocr:
+    model_id: "meter_digit_crnn"
+    model_path: "models/meter/crnn_ocr.onnx"
+    model_type: "ocr"
+    input_size: [32, 128]
+    input_format: "NCHW"
+    output_format: "ctc"
+    charset: "0123456789.-MPakvAVW℃%"
+    description: "数字表计OCR模型"
+
+  # 表计类型分类模型
+  meter_classifier:
+    model_id: "meter_type_classifier"
+    model_path: "models/meter/meter_classifier.onnx"
+    model_type: "classification"
+    input_size: [224, 224]
+    input_format: "NCHW"
+    output_format: "softmax"
+    classes:
+      - "sf6_pressure"       # SF6压力表
+      - "sf6_density"        # SF6密度表
+      - "oil_level"          # 油位计
+      - "oil_temperature"    # 油温表
+      - "winding_temperature" # 绕组温度表
+      - "counter"            # 动作次数计数器
+      - "ammeter"            # 电流表
+      - "voltmeter"          # 电压表
+      - "led_indicator"      # LED指示灯
+    description: "表计类型分类模型"
+
+# ==============================================================================
+# 通用模型 - 可被多个插件复用
+# ==============================================================================
+common:
+  # 图像质量评估模型
+  quality_assessor:
+    model_id: "common_quality_assessor"
+    model_path: "models/common/quality_assessor.onnx"
+    model_type: "regression"
+    input_size: [224, 224]
+    input_format: "NCHW"
+    output_format: "scalar"
+    outputs:
+      - "clarity"       # 清晰度 0-1
+      - "brightness"    # 亮度 0-1
+      - "contrast"      # 对比度 0-1
+    description: "图像质量评估模型"
+
+  # 通用目标检测模型 (COCO预训练)
+  general_detector:
+    model_id: "common_yolov8n_coco"
+    model_path: "models/common/yolov8n_coco.onnx"
+    model_type: "yolov8"
+    input_size: [640, 640]
+    input_format: "NCHW"
+    output_format: "yolov8_detect"
+    classes: "coco80"  # 使用COCO 80类
+    confidence_threshold: 0.5
+    nms_threshold: 0.45
+    description: "通用目标检测模型(COCO预训练)"

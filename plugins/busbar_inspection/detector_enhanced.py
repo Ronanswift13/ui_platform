@@ -3,17 +3,19 @@
 输变电激光监测平台 (C组) - 全自动AI巡检改造
 
 增强功能:
-- 4K图像切片+多尺度检测
-- YOLOv8m/PP-YOLOE小目标检测
-- 增强质量门禁
-- 线缆弧垂检测(激光测距辅助)
-- 智能变焦建议
+- 4K图像切片处理: 重叠瓦片分解
+- YOLOv8m小目标检测: 高精度远距检测
+- 多尺度特征融合: 大小目标兼顾
+- 质量门禁增强: 模糊/过曝/遮挡检测
+- 智能变焦建议: 自动计算推荐倍数
 """
 
 from __future__ import annotations
-from typing import Any, Optional, List, Dict, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+import hashlib
+import time
 import numpy as np
 
 try:
@@ -22,402 +24,559 @@ except ImportError:
     cv2 = None
 
 
-class DefectCategory(Enum):
-    """缺陷类别"""
-    PIN_MISSING = "pin_missing"           # 销钉缺失
-    CRACK = "crack"                       # 裂纹
-    FOREIGN_OBJECT = "foreign_object"     # 异物
-    CORROSION = "corrosion"               # 腐蚀
-    FLASHOVER = "flashover"               # 闪络痕迹
-    BROKEN_STRAND = "broken_strand"       # 断股
+class BusbarDefectType(Enum):
+    """母线缺陷类型"""
+    PIN_MISSING = "pin_missing"         # 销钉缺失
+    CRACK = "crack"                     # 裂纹
+    FOREIGN_OBJECT = "foreign_object"   # 异物悬挂
+    CORROSION = "corrosion"             # 腐蚀
+    FLASHOVER = "flashover"             # 闪络痕迹
+    BROKEN_STRAND = "broken_strand"     # 断股
+    INSULATOR_DAMAGE = "insulator_damage"  # 绝缘子损坏
+    FITTING_LOOSE = "fitting_loose"     # 金具松动
 
 
-class QualityIssue(Enum):
-    """质量问题"""
-    BACKLIGHT = "backlight"               # 逆光
-    BLUR = "blur"                         # 模糊
-    OCCLUSION = "occlusion"               # 遮挡
-    LOW_CONTRAST = "low_contrast"         # 低对比度
-    OVEREXPOSURE = "overexposure"         # 过曝
-    UNDEREXPOSURE = "underexposure"       # 欠曝
+class QualityGateStatus(Enum):
+    """质量门禁状态"""
+    PASS = "pass"
+    FAIL_BLUR = "fail_blur"
+    FAIL_OVEREXPOSED = "fail_overexposed"
+    FAIL_UNDEREXPOSED = "fail_underexposed"
+    FAIL_OCCLUDED = "fail_occluded"
+    FAIL_LOW_CONTRAST = "fail_low_contrast"
 
 
 @dataclass
-class QualityGate:
+class BusbarDetection:
+    """母线检测结果"""
+    defect_type: BusbarDefectType
+    bbox: Dict[str, float]          # 归一化坐标
+    confidence: float
+    class_name: str
+    reason_code: str = ""           # 失败原因码
+    tile_info: Optional[Dict] = None  # 切片信息
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class QualityGateResult:
     """质量门禁结果"""
-    passed: bool
-    issues: List[QualityIssue] = field(default_factory=list)
-    metrics: Dict[str, float] = field(default_factory=dict)
-    reason_code: Optional[int] = None
-    suggestions: List[str] = field(default_factory=list)
-
-
-@dataclass
-class SliceResult:
-    """切片检测结果"""
-    slice_id: str
-    detections: List[Dict]
-    slice_bbox: Dict[str, int]           # 切片在原图中的位置
-    scale_factor: float
+    status: QualityGateStatus
+    clarity_score: float            # 清晰度评分 0-1
+    brightness_score: float         # 亮度评分 0-1
+    contrast_score: float           # 对比度评分 0-1
+    occlusion_ratio: float          # 遮挡比例 0-1
+    reason_code: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ZoomSuggestion:
     """变焦建议"""
-    should_zoom: bool
-    current_target_size: int
-    suggested_zoom_factor: float
-    target_bbox: Optional[Dict] = None
-    reason: str = ""
+    current_zoom: float
+    recommended_zoom: float
+    reason: str
+    target_area: Optional[Dict[str, float]] = None
+    priority: int = 0               # 优先级 0-10
+
+
+@dataclass
+class BusbarInspectionResult:
+    """母线巡视综合结果"""
+    detections: List[BusbarDetection] = field(default_factory=list)
+    quality_gate: Optional[QualityGateResult] = None
+    zoom_suggestions: List[ZoomSuggestion] = field(default_factory=list)
+    total_tiles: int = 0
+    processed_tiles: int = 0
+    processing_time_ms: float = 0.0
+    model_version: str = ""
+    code_hash: str = ""
 
 
 class BusbarDetectorEnhanced:
     """
     母线巡视增强检测器
     
-    专为远距离小目标检测优化
+    支持4K大视场图像的切片处理和小目标检测
     """
     
     # 模型ID映射
     MODEL_IDS = {
-        "small_object": "busbar_yolov8m_small",
-        "defect_detector": "busbar_defect_ppyoloe",
-        "insulator": "insulator_detector_yolov8",
+        "detector": "busbar_yolov8m_small",     # YOLOv8m小目标检测
+        "classifier": "busbar_defect_classifier",  # 缺陷分类器
     }
     
     # 缺陷类别映射
     DEFECT_CLASSES = {
-        "pin_missing": DefectCategory.PIN_MISSING,
-        "crack": DefectCategory.CRACK,
-        "foreign": DefectCategory.FOREIGN_OBJECT,
-        "corrosion": DefectCategory.CORROSION,
-        "flashover": DefectCategory.FLASHOVER,
-        "broken": DefectCategory.BROKEN_STRAND,
+        0: BusbarDefectType.PIN_MISSING,
+        1: BusbarDefectType.CRACK,
+        2: BusbarDefectType.FOREIGN_OBJECT,
+        3: BusbarDefectType.CORROSION,
+        4: BusbarDefectType.FLASHOVER,
+        5: BusbarDefectType.BROKEN_STRAND,
+        6: BusbarDefectType.INSULATOR_DAMAGE,
+        7: BusbarDefectType.FITTING_LOOSE,
     }
     
     # 原因码定义
     REASON_CODES = {
-        101: "逆光/过曝/低对比",
-        102: "遮挡/目标不可见",
-        103: "模糊/失焦",
-        104: "欠曝/过暗",
-        105: "天气干扰",
-        201: "目标过小需变焦",
-        202: "无有效目标",
-        301: "检测结果不可靠",
+        "1001": "图像模糊",
+        "1002": "过度曝光",
+        "1003": "曝光不足",
+        "1004": "目标遮挡",
+        "1005": "对比度过低",
+        "2001": "目标过小需放大",
+        "2002": "检测置信度过低",
+        "2003": "多目标重叠",
+        "3001": "环境干扰(鸟类)",
+        "3002": "环境干扰(飞虫)",
+        "3003": "环境干扰(水滴)",
     }
     
-    def __init__(self, config: dict[str, Any], model_registry=None, ptz_controller=None):
-        """初始化增强检测器"""
+    # 默认切片参数
+    DEFAULT_TILE_SIZE = 1280
+    DEFAULT_OVERLAP = 128
+    MIN_TARGET_SIZE = 32  # 最小目标像素
+    
+    def __init__(
+        self,
+        config: Dict[str, Any],
+        model_registry=None,
+    ):
+        """
+        初始化增强检测器
+        
+        Args:
+            config: 配置字典
+            model_registry: 模型注册表实例
+        """
         self.config = config
         self._model_registry = model_registry
-        self._ptz_controller = ptz_controller
+        self._initialized = False
         
-        # 切片配置
-        self.slicing_config = config.get("slicing", {})
-        self.slice_enabled = self.slicing_config.get("enabled", True)
-        self.slice_size = tuple(self.slicing_config.get("slice_size", [640, 640]))
-        self.overlap = self.slicing_config.get("overlap", 0.2)
-        self.scale_factors = self.slicing_config.get("scale_factors", [1.0, 0.5])
+        # 配置参数
+        self._confidence_threshold = config.get("confidence_threshold", 0.4)
+        self._nms_threshold = config.get("nms_threshold", 0.4)
+        self._tile_size = config.get("tile_size", self.DEFAULT_TILE_SIZE)
+        self._tile_overlap = config.get("tile_overlap", self.DEFAULT_OVERLAP)
+        self._use_slicing = config.get("use_slicing", True)
+        self._use_deep_learning = config.get("use_deep_learning", True)
         
-        # 质量门禁配置
-        self.quality_config = config.get("quality_gate", {})
+        # 质量门禁阈值
+        self._clarity_threshold = config.get("clarity_threshold", 0.5)
+        self._brightness_range = config.get("brightness_range", (0.2, 0.8))
+        self._contrast_threshold = config.get("contrast_threshold", 0.3)
         
-        # 变焦配置
-        self.zoom_config = config.get("zoom_suggestion", {})
-        self.min_target_size = self.zoom_config.get("min_target_size", 32)
-        
-        self.use_deep_learning = config.get("use_deep_learning", True)
+        # 版本信息
+        self._model_version = "busbar_enhanced_v1.0"
+        self._code_hash = self._calculate_code_hash()
     
-    # ==================== 主检测入口 ====================
+    def _calculate_code_hash(self) -> str:
+        """计算代码版本hash"""
+        import inspect
+        source = inspect.getsource(self.__class__)
+        return f"sha256:{hashlib.sha256(source.encode()).hexdigest()[:12]}"
+    
+    def initialize(self) -> bool:
+        """初始化检测器"""
+        try:
+            if self._model_registry and self._use_deep_learning:
+                for model_key, model_id in self.MODEL_IDS.items():
+                    try:
+                        self._model_registry.load(model_id)
+                    except Exception as e:
+                        print(f"[BusbarDetector] 模型 {model_id} 加载失败: {e}")
+            
+            self._initialized = True
+            return True
+        except Exception as e:
+            print(f"[BusbarDetector] 初始化失败: {e}")
+            return False
     
     def detect_defects(
         self,
         image: np.ndarray,
-        roi_type: str = "busbar",
-        use_slicing: bool = True,
-    ) -> Dict:
+        use_slicing: Optional[bool] = None,
+        roi_bbox: Optional[Dict[str, float]] = None,
+    ) -> List[BusbarDetection]:
         """
-        检测母线缺陷
+        缺陷检测
         
-        流程:
-        1. 质量门禁检查
-        2. 多尺度切片检测
-        3. 结果合并和NMS
-        4. 变焦建议生成
+        Args:
+            image: BGR图像(支持4K)
+            use_slicing: 是否使用切片(默认根据图像大小自动决定)
+            roi_bbox: 可选的ROI区域
+            
+        Returns:
+            检测结果列表
         """
+        start_time = time.perf_counter()
+        
+        # 裁剪ROI
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
+        
         h, w = image.shape[:2]
         
-        # 1. 质量门禁
-        quality = self.check_quality_gate(image)
-        if not quality.passed:
-            return {
-                "detections": [],
-                "quality_gate": quality,
-                "reason_code": quality.reason_code,
-                "suggestions": quality.suggestions,
-            }
-        
-        # 2. 执行检测
-        if use_slicing and self.slice_enabled and max(h, w) > 1920:
-            detections = self._detect_with_slicing(image)
-        else:
-            detections = self._detect_single(image)
-        
-        # 3. NMS去重
-        detections = self._apply_nms(detections, iou_threshold=0.4)
-        
-        # 4. 添加变焦建议
-        zoom_suggestion = self._generate_zoom_suggestion(detections, (h, w))
-        
-        # 5. 添加原因码
-        for det in detections:
-            if det["confidence"] < 0.5:
-                det["reason_code"] = 301
-        
-        return {
-            "detections": detections,
-            "quality_gate": quality,
-            "zoom_suggestion": zoom_suggestion,
-            "image_size": {"width": w, "height": h},
-            "slicing_used": use_slicing and self.slice_enabled,
-        }
-    
-    # ==================== 质量门禁 ====================
-    
-    def check_quality_gate(self, image: np.ndarray) -> QualityGate:
-        """
-        质量门禁检查
-        
-        检查:
-        - 逆光/过曝
-        - 模糊
-        - 遮挡
-        - 天气干扰
-        """
-        if cv2 is None:
-            return QualityGate(passed=True)
-        
-        issues = []
-        metrics = {}
-        suggestions = []
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # 1. 亮度检查
-        mean_brightness = np.mean(gray)
-        metrics["brightness"] = mean_brightness
-        
-        brightness_high = self.quality_config.get("brightness_threshold_high", 200)
-        brightness_low = self.quality_config.get("brightness_threshold_low", 50)
-        
-        if mean_brightness > brightness_high:
-            issues.append(QualityIssue.OVEREXPOSURE)
-            suggestions.append("减少曝光或等待光线变化")
-        elif mean_brightness < brightness_low:
-            issues.append(QualityIssue.UNDEREXPOSURE)
-            suggestions.append("增加曝光或启用补光")
-        
-        # 2. 模糊检查
-        lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-        metrics["laplacian_var"] = lap_var
-        
-        blur_threshold = self.quality_config.get("laplacian_threshold", 100)
-        if lap_var < blur_threshold:
-            issues.append(QualityIssue.BLUR)
-            suggestions.append("调整焦距或稳定相机")
-        
-        # 3. 对比度检查
-        contrast = np.std(gray)
-        metrics["contrast"] = contrast
-        
-        contrast_threshold = self.quality_config.get("contrast_threshold", 30)
-        if contrast < contrast_threshold:
-            issues.append(QualityIssue.LOW_CONTRAST)
-            suggestions.append("调整图像增强参数")
-        
-        # 4. 边缘密度检查(遮挡检测)
-        edges = cv2.Canny(gray, 50, 150)
-        edge_density = np.sum(edges > 0) / edges.size
-        metrics["edge_density"] = edge_density
-        
-        edge_min = self.quality_config.get("edge_density_min", 0.05)
-        if edge_density < edge_min:
-            issues.append(QualityIssue.OCCLUSION)
-            suggestions.append("检查是否有遮挡物")
-        
-        # 判断是否通过
-        passed = len(issues) == 0
-        reason_code = None
-        
-        if not passed:
-            if QualityIssue.OVEREXPOSURE in issues or QualityIssue.LOW_CONTRAST in issues:
-                reason_code = 101
-            elif QualityIssue.OCCLUSION in issues:
-                reason_code = 102
-            elif QualityIssue.BLUR in issues:
-                reason_code = 103
-            elif QualityIssue.UNDEREXPOSURE in issues:
-                reason_code = 104
-        
-        return QualityGate(
-            passed=passed,
-            issues=issues,
-            metrics=metrics,
-            reason_code=reason_code,
-            suggestions=suggestions,
-        )
-    
-    # ==================== 切片检测 ====================
-    
-    def _detect_with_slicing(self, image: np.ndarray) -> List[Dict]:
-        """
-        4K图像切片检测
-        
-        将大图分割为重叠的小块分别检测，然后合并结果
-        """
-        if cv2 is None:
-            return self._detect_single(image)
-
-        h, w = image.shape[:2]
-        all_detections = []
-        
-        for scale in self.scale_factors:
-            # 缩放
-            if scale != 1.0:
-                scaled = cv2.resize(image, None, fx=scale, fy=scale)
-            else:
-                scaled = image
-            
-            sh, sw = scaled.shape[:2]
-            slice_h, slice_w = self.slice_size
-            
-            # 计算步长
-            step_h = int(slice_h * (1 - self.overlap))
-            step_w = int(slice_w * (1 - self.overlap))
-            
-            slice_idx = 0
-            for y in range(0, sh, step_h):
-                for x in range(0, sw, step_w):
-                    # 提取切片
-                    y2 = min(y + slice_h, sh)
-                    x2 = min(x + slice_w, sw)
-                    slice_img = scaled[y:y2, x:x2]
-                    
-                    # 检测
-                    slice_dets = self._detect_single(slice_img)
-                    
-                    # 转换坐标到原图
-                    for det in slice_dets:
-                        bbox = det["bbox"]
-                        
-                        # 切片坐标 -> 缩放图坐标 -> 原图坐标
-                        det["bbox"] = {
-                            "x": (x + bbox["x"] * (x2 - x)) / sw / scale,
-                            "y": (y + bbox["y"] * (y2 - y)) / sh / scale,
-                            "width": bbox["width"] * (x2 - x) / sw / scale,
-                            "height": bbox["height"] * (y2 - y) / sh / scale,
-                        }
-                        det["slice_info"] = {
-                            "slice_id": f"s{slice_idx}_scale{scale}",
-                            "scale": scale,
-                            "slice_bbox": {"x": x, "y": y, "width": x2-x, "height": y2-y},
-                        }
-                        all_detections.append(det)
-                    
-                    slice_idx += 1
-        
-        return all_detections
-    
-    def _detect_single(self, image: np.ndarray) -> List[Dict]:
-        """单图检测"""
-        if self.use_deep_learning and self._model_registry:
-            try:
-                return self._detect_with_model(image)
-            except Exception as e:
-                print(f"[BusbarDetector] DL检测失败: {e}")
-        
-        return self._detect_traditional(image)
-    
-    def _detect_with_model(self, image: np.ndarray) -> List[Dict]:
-        """使用深度学习模型检测"""
-        assert self._model_registry is not None
-        model_id = self.MODEL_IDS["small_object"]
-        result = self._model_registry.infer(model_id, image)
+        # 自动决定是否切片
+        if use_slicing is None:
+            use_slicing = self._use_slicing and (w > 2000 or h > 2000)
         
         detections = []
-        for det in result.detections:
-            defect_type = self.DEFECT_CLASSES.get(det["class_name"], DefectCategory.FOREIGN_OBJECT)
-            
-            detections.append({
-                "label": defect_type.value,
-                "bbox": det["bbox"],
-                "confidence": det["confidence"],
-                "method": "deep_learning",
-                "model_id": model_id,
-            })
+        
+        if use_slicing:
+            # 切片检测
+            detections = self._detect_with_slicing(image)
+        else:
+            # 整图检测
+            detections = self._detect_single(image)
+        
+        # 过滤环境干扰
+        detections = self._filter_environmental_noise(detections)
+        
+        # NMS合并
+        detections = self._apply_global_nms(detections)
+        
+        processing_time = (time.perf_counter() - start_time) * 1000
+        for det in detections:
+            det.metadata["processing_time_ms"] = processing_time
         
         return detections
     
-    def _detect_traditional(self, image: np.ndarray) -> List[Dict]:
-        """传统方法检测"""
+    def _detect_with_slicing(self, image: np.ndarray) -> List[BusbarDetection]:
+        """切片检测"""
+        h, w = image.shape[:2]
+        detections = []
+        
+        # 生成切片
+        tiles = self._generate_tiles(w, h)
+        
+        for tile_idx, (x1, y1, x2, y2) in enumerate(tiles):
+            # 裁剪切片
+            tile_image = image[y1:y2, x1:x2]
+            
+            # 检测当前切片
+            tile_detections = self._detect_single(tile_image)
+            
+            # 映射回原图坐标
+            for det in tile_detections:
+                det.bbox = self._remap_bbox(det.bbox, x1, y1, x2-x1, y2-y1, w, h)
+                det.tile_info = {
+                    "tile_idx": tile_idx,
+                    "tile_bbox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
+                }
+            
+            detections.extend(tile_detections)
+        
+        return detections
+    
+    def _generate_tiles(self, width: int, height: int) -> List[Tuple[int, int, int, int]]:
+        """生成切片坐标"""
+        tiles = []
+        stride = self._tile_size - self._tile_overlap
+        
+        for y in range(0, height, stride):
+            for x in range(0, width, stride):
+                x1, y1 = x, y
+                x2 = min(x + self._tile_size, width)
+                y2 = min(y + self._tile_size, height)
+                
+                # 确保切片不太小
+                if (x2 - x1) >= self._tile_size // 2 and (y2 - y1) >= self._tile_size // 2:
+                    tiles.append((x1, y1, x2, y2))
+        
+        return tiles
+    
+    def _detect_single(self, image: np.ndarray) -> List[BusbarDetection]:
+        """单图检测"""
+        # 优先使用深度学习
+        if self._use_deep_learning and self._model_registry:
+            detections = self._detect_by_deep_learning(image)
+            if detections:
+                return detections
+        
+        # 回退到传统方法
+        return self._detect_by_traditional(image)
+    
+    def _detect_by_deep_learning(self, image: np.ndarray) -> List[BusbarDetection]:
+        """深度学习检测"""
+        detections = []
+        
+        try:
+            model_id = self.MODEL_IDS["detector"]
+            result = self._model_registry.infer(model_id, image)  # type: ignore[union-attr]
+            
+            for det in result.detections:
+                if det["confidence"] >= self._confidence_threshold:
+                    class_id = det.get("class_id", 0)
+                    defect_type = self.DEFECT_CLASSES.get(class_id, BusbarDefectType.CRACK)
+                    
+                    detections.append(BusbarDetection(
+                        defect_type=defect_type,
+                        bbox=det["bbox"],
+                        confidence=det["confidence"],
+                        class_name=det.get("class_name", defect_type.value),
+                        metadata={"source": "deep_learning", "model_id": model_id}
+                    ))
+        except Exception as e:
+            print(f"[BusbarDetector] 深度学习检测失败: {e}")
+        
+        return detections
+    
+    def _detect_by_traditional(self, image: np.ndarray) -> List[BusbarDetection]:
+        """传统方法检测(回退方案)"""
         if cv2 is None:
             return []
         
         detections = []
         h, w = image.shape[:2]
         
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # 1. 销钉缺失检测 - 圆形缺失
+        pin_detections = self._detect_missing_pins(image)
+        detections.extend(pin_detections)
         
-        # 边缘检测
-        edges = cv2.Canny(gray, 50, 150)
+        # 2. 裂纹检测 - 细长线条
+        crack_detections = self._detect_cracks(image)
+        detections.extend(crack_detections)
         
-        # 形态学操作
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-        
-        # 轮廓检测
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        config = self.config.get("defect_detection", {})
-        min_area = config.get("min_area", 50)
-        max_area = config.get("max_area", 10000)
-        
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if min_area < area < max_area:
-                x, y, cw, ch = cv2.boundingRect(contour)
-                
-                # 简单分类
-                aspect_ratio = cw / ch if ch > 0 else 1
-                circularity = 4 * np.pi * area / (cv2.arcLength(contour, True) ** 2 + 1e-6)
-                
-                if circularity > 0.7:
-                    label = "foreign_object"
-                elif aspect_ratio > 3:
-                    label = "crack"
-                else:
-                    label = "pin_missing"
-                
-                detections.append({
-                    "label": label,
-                    "bbox": {"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
-                    "confidence": 0.5,
-                    "method": "traditional",
-                    "metadata": {"area": area, "circularity": circularity},
-                })
+        # 3. 异物检测 - 悬挂物
+        foreign_detections = self._detect_foreign_objects(image)
+        detections.extend(foreign_detections)
         
         return detections
     
-    # ==================== NMS去重 ====================
+    def _detect_missing_pins(self, image: np.ndarray) -> List[BusbarDetection]:
+        """销钉缺失检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 转换为灰度
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # 霍夫圆检测
+        circles = cv2.HoughCircles(
+            gray, cv2.HOUGH_GRADIENT, 1, 20,
+            param1=50, param2=30, minRadius=5, maxRadius=30
+        )
+        
+        if circles is not None:
+            circles_rounded = np.uint16(np.around(circles))
+            circles_array = circles_rounded[0, :]  # type: ignore[index]
+
+            # 分析圆形分布，检测缺失
+            for i in circles_array:
+                x, y, r = int(i[0]), int(i[1]), int(i[2])
+                
+                # 检查是否为空洞(销钉缺失位置)
+                roi = gray[max(0,y-r):min(h,y+r), max(0,x-r):min(w,x+r)]
+                if roi.size > 0:
+                    mean_val = np.mean(roi)
+                    if mean_val < 50:  # 暗区域表示缺失
+                        confidence = float(0.6 + (50 - mean_val) / 100)
+                        
+                        detections.append(BusbarDetection(
+                            defect_type=BusbarDefectType.PIN_MISSING,
+                            bbox={
+                                "x": (x - r) / w,
+                                "y": (y - r) / h,
+                                "width": 2 * r / w,
+                                "height": 2 * r / h
+                            },
+                            confidence=min(0.85, confidence),
+                            class_name="销钉缺失",
+                            metadata={"source": "traditional", "radius": int(r)}
+                        ))
+        
+        return detections
     
-    def _apply_nms(self, detections: List[Dict], iou_threshold: float = 0.4) -> List[Dict]:
+    def _detect_cracks(self, image: np.ndarray) -> List[BusbarDetection]:
+        """裂纹检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 转换为灰度
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # 边缘增强
+        edges = cv2.Canny(gray, 30, 100)
+        
+        # 形态学处理 - 连接断开的边缘
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+        edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+        
+        # 霍夫线检测
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, minLineLength=30, maxLineGap=10)
+        
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                length = np.sqrt((x2-x1)**2 + (y2-y1)**2)
+                
+                # 过滤短线
+                if length > 50:
+                    # 计算线条方向
+                    angle = np.abs(np.arctan2(y2-y1, x2-x1) * 180 / np.pi)
+                    
+                    # 裂纹通常是细长的
+                    aspect = length / max(abs(x2-x1), abs(y2-y1), 1)
+                    
+                    if aspect > 3:  # 细长线条
+                        confidence = min(0.7, 0.4 + length / 200)
+                        
+                        detections.append(BusbarDetection(
+                            defect_type=BusbarDefectType.CRACK,
+                            bbox={
+                                "x": min(x1, x2) / w,
+                                "y": min(y1, y2) / h,
+                                "width": abs(x2 - x1) / w + 0.01,
+                                "height": abs(y2 - y1) / h + 0.01
+                            },
+                            confidence=confidence,
+                            class_name="裂纹",
+                            metadata={"source": "traditional", "length": length, "angle": angle}
+                        ))
+        
+        return detections
+    
+    def _detect_foreign_objects(self, image: np.ndarray) -> List[BusbarDetection]:
+        """异物检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 转换为灰度
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # 背景减除
+        blur = cv2.GaussianBlur(gray, (21, 21), 0)
+        diff = cv2.absdiff(gray, blur)
+        
+        # 阈值化
+        _, binary = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
+        
+        # 形态学处理
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        
+        # 找轮廓
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if 100 < area < 10000:
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                aspect_ratio = cw / (ch + 1e-6)
+                
+                # 悬挂物通常是垂直的
+                if aspect_ratio < 0.5 or aspect_ratio > 2:
+                    confidence = min(0.65, 0.35 + area / 5000)
+                    
+                    detections.append(BusbarDetection(
+                        defect_type=BusbarDefectType.FOREIGN_OBJECT,
+                        bbox={
+                            "x": x / w,
+                            "y": y / h,
+                            "width": cw / w,
+                            "height": ch / h
+                        },
+                        confidence=confidence,
+                        class_name="异物",
+                        metadata={"source": "traditional", "area": area}
+                    ))
+        
+        return detections
+    
+    def _filter_environmental_noise(self, detections: List[BusbarDetection]) -> List[BusbarDetection]:
+        """过滤环境干扰"""
+        filtered = []
+        
+        for det in detections:
+            # 检查是否为环境干扰
+            if self._is_environmental_noise(det):
+                det.reason_code = self._get_noise_reason_code(det)
+                det.metadata["filtered"] = True
+                continue
+            
+            filtered.append(det)
+        
+        return filtered
+    
+    def _is_environmental_noise(self, detection: BusbarDetection) -> bool:
+        """判断是否为环境干扰"""
+        # 根据检测框特征判断
+        bbox = detection.bbox
+        area = bbox["width"] * bbox["height"]
+        aspect = bbox["width"] / (bbox["height"] + 1e-6)
+        
+        # 非常小的检测可能是飞虫
+        if area < 0.001 and detection.confidence < 0.5:
+            return True
+        
+        # 非常细长的可能是飞行轨迹
+        if aspect > 10 or aspect < 0.1:
+            return True
+        
+        return False
+    
+    def _get_noise_reason_code(self, detection: BusbarDetection) -> str:
+        """获取干扰原因码"""
+        bbox = detection.bbox
+        area = bbox["width"] * bbox["height"]
+        
+        if area < 0.001:
+            return "3002"  # 飞虫
+        
+        return "3001"  # 鸟类
+    
+    def _remap_bbox(
+        self,
+        bbox: Dict[str, float],
+        tile_x: int, tile_y: int,
+        tile_w: int, tile_h: int,
+        img_w: int, img_h: int
+    ) -> Dict[str, float]:
+        """将切片坐标映射回原图"""
+        return {
+            "x": (tile_x + bbox["x"] * tile_w) / img_w,
+            "y": (tile_y + bbox["y"] * tile_h) / img_h,
+            "width": bbox["width"] * tile_w / img_w,
+            "height": bbox["height"] * tile_h / img_h,
+        }
+    
+    def _apply_global_nms(self, detections: List[BusbarDetection]) -> List[BusbarDetection]:
+        """全局NMS合并"""
+        if not detections:
+            return []
+        
+        # 按类别分组
+        by_class: Dict[BusbarDefectType, List[BusbarDetection]] = {}
+        for det in detections:
+            if det.defect_type not in by_class:
+                by_class[det.defect_type] = []
+            by_class[det.defect_type].append(det)
+        
+        # 对每个类别执行NMS
+        result = []
+        for defect_type, class_detections in by_class.items():
+            nms_result = self._nms(class_detections)
+            result.extend(nms_result)
+        
+        return result
+    
+    def _nms(self, detections: List[BusbarDetection]) -> List[BusbarDetection]:
         """非极大值抑制"""
         if not detections:
             return []
         
-        # 按置信度排序
-        detections = sorted(detections, key=lambda x: x["confidence"], reverse=True)
+        detections = sorted(detections, key=lambda d: d.confidence, reverse=True)
         
         keep = []
         while detections:
@@ -426,12 +585,12 @@ class BusbarDetectorEnhanced:
             
             detections = [
                 d for d in detections
-                if self._iou(best["bbox"], d["bbox"]) < iou_threshold
+                if self._iou(best.bbox, d.bbox) < self._nms_threshold
             ]
         
         return keep
     
-    def _iou(self, box1: Dict, box2: Dict) -> float:
+    def _iou(self, box1: Dict[str, float], box2: Dict[str, float]) -> float:
         """计算IoU"""
         x1 = max(box1["x"], box2["x"])
         y1 = max(box1["y"], box2["y"])
@@ -445,127 +604,213 @@ class BusbarDetectorEnhanced:
         
         return inter / union if union > 0 else 0
     
-    # ==================== 变焦建议 ====================
-    
-    def _generate_zoom_suggestion(
-        self,
-        detections: List[Dict],
-        image_shape: Tuple[int, int],
-    ) -> ZoomSuggestion:
-        """生成变焦建议"""
-        if not detections:
-            return ZoomSuggestion(
-                should_zoom=False,
-                current_target_size=0,
-                suggested_zoom_factor=1.0,
-                reason="no_targets",
-            )
-        
-        h, w = image_shape
-        
-        # 找最小的目标
-        min_size = float('inf')
-        smallest_det = None
-        
-        for det in detections:
-            bbox = det["bbox"]
-            size = min(bbox["width"] * w, bbox["height"] * h)
-            if size < min_size:
-                min_size = size
-                smallest_det = det
-        
-        # 判断是否需要变焦
-        should_zoom = min_size < self.min_target_size
-        
-        if should_zoom:
-            # 计算建议变焦倍数
-            suggested_zoom = self.min_target_size / min_size * self.zoom_config.get("suggested_zoom_factor", 2.0)
-            suggested_zoom = min(suggested_zoom, self.zoom_config.get("max_zoom", 10.0))
-            
-            return ZoomSuggestion(
-                should_zoom=True,
-                current_target_size=int(min_size),
-                suggested_zoom_factor=suggested_zoom,
-                target_bbox=smallest_det["bbox"] if smallest_det else None,
-                reason="target_too_small",
-            )
-        
-        return ZoomSuggestion(
-            should_zoom=False,
-            current_target_size=int(min_size),
-            suggested_zoom_factor=1.0,
-            reason="size_acceptable",
-        )
-    
-    # ==================== 线缆弧垂检测 ====================
-    
-    def detect_cable_sag(
-        self,
-        image: np.ndarray,
-        distance_mm: Optional[float] = None,
-    ) -> Dict:
+    def check_quality_gate(self, image: np.ndarray) -> QualityGateResult:
         """
-        检测线缆弧垂
+        质量门禁检查
         
         Args:
-            image: 图像
-            distance_mm: 激光测距结果(mm)
+            image: BGR图像
             
         Returns:
-            弧垂检测结果
+            质量门禁结果
         """
         if cv2 is None:
-            return {"sag_detected": False}
+            return QualityGateResult(
+                status=QualityGateStatus.PASS,
+                clarity_score=1.0,
+                brightness_score=0.5,
+                contrast_score=0.5,
+                occlusion_ratio=0.0
+            )
         
+        # 转换为灰度
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape
         
-        # 边缘检测
-        edges = cv2.Canny(gray, 30, 100)
+        # 1. 清晰度评分 - 拉普拉斯方差
+        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+        clarity_score = min(1.0, laplacian.var() / 1500)
         
-        # 霍夫直线检测
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 100,
-                                minLineLength=w//4, maxLineGap=20)
+        # 2. 亮度评分
+        mean_brightness = float(np.mean(gray) / 255.0)
+        brightness_score = float(1.0 - 2 * abs(mean_brightness - 0.5))
         
-        if lines is None:
-            return {"sag_detected": False, "reason": "no_lines"}
+        # 3. 对比度评分
+        p5, p95 = np.percentile(gray, [5, 95])
+        contrast_score = (p95 - p5) / 255.0
         
-        # 分析线条
-        horizontal_lines = []
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+        # 4. 遮挡检测
+        occlusion_ratio = self._detect_occlusion(gray)
+        
+        # 判断状态
+        status = QualityGateStatus.PASS
+        reason_code = ""
+        
+        if clarity_score < self._clarity_threshold:
+            status = QualityGateStatus.FAIL_BLUR
+            reason_code = "1001"
+        elif mean_brightness > self._brightness_range[1]:
+            status = QualityGateStatus.FAIL_OVEREXPOSED
+            reason_code = "1002"
+        elif mean_brightness < self._brightness_range[0]:
+            status = QualityGateStatus.FAIL_UNDEREXPOSED
+            reason_code = "1003"
+        elif contrast_score < self._contrast_threshold:
+            status = QualityGateStatus.FAIL_LOW_CONTRAST
+            reason_code = "1005"
+        elif occlusion_ratio > 0.3:
+            status = QualityGateStatus.FAIL_OCCLUDED
+            reason_code = "1004"
+        
+        return QualityGateResult(
+            status=status,
+            clarity_score=clarity_score,
+            brightness_score=brightness_score,
+            contrast_score=contrast_score,
+            occlusion_ratio=occlusion_ratio,
+            reason_code=reason_code,
+            metadata={
+                "mean_brightness": mean_brightness,
+                "laplacian_var": laplacian.var(),
+            }
+        )
+    
+    def _detect_occlusion(self, gray: np.ndarray) -> float:
+        """检测遮挡比例"""
+        if cv2 is None:
+            return 0.0
+        
+        # 使用边缘密度检测
+        edges = cv2.Canny(gray, 50, 150)
+        edge_density = np.sum(edges > 0) / edges.size
+        
+        # 低边缘密度的大块区域可能是遮挡
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 50))
+        local_density = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+        
+        low_density_ratio = np.sum(local_density == 0) / local_density.size
+        
+        return low_density_ratio
+    
+    def compute_zoom_suggestion(
+        self,
+        image: np.ndarray,
+        detections: List[BusbarDetection],
+        current_zoom: float = 1.0,
+    ) -> List[ZoomSuggestion]:
+        """
+        计算变焦建议
+        
+        Args:
+            image: 当前图像
+            detections: 检测结果
+            current_zoom: 当前变焦倍数
             
-            # 近水平的线
-            if abs(angle) < 15 or abs(angle) > 165:
-                horizontal_lines.append({
-                    "points": (x1, y1, x2, y2),
-                    "center_y": (y1 + y2) / 2,
-                    "length": np.sqrt((x2-x1)**2 + (y2-y1)**2),
-                })
+        Returns:
+            变焦建议列表
+        """
+        suggestions = []
+        h, w = image.shape[:2]
         
-        if not horizontal_lines:
-            return {"sag_detected": False, "reason": "no_horizontal_lines"}
+        for det in detections:
+            bbox = det.bbox
+            det_w = bbox["width"] * w
+            det_h = bbox["height"] * h
+            det_size = max(det_w, det_h)
+            
+            # 如果目标太小，建议放大
+            if det_size < self.MIN_TARGET_SIZE * 2:
+                target_size = self.MIN_TARGET_SIZE * 4
+                recommended_zoom = current_zoom * (target_size / det_size)
+                
+                suggestions.append(ZoomSuggestion(
+                    current_zoom=current_zoom,
+                    recommended_zoom=min(30.0, recommended_zoom),  # 最大30倍
+                    reason=f"目标过小({det_size:.0f}px)，建议放大",
+                    target_area=bbox,
+                    priority=10 - int(det.confidence * 10)
+                ))
         
-        # 计算弧垂(简化: 取y坐标的标准差)
-        y_values = [l["center_y"] for l in horizontal_lines]
-        sag_std = np.std(y_values)
+        # 按优先级排序
+        suggestions.sort(key=lambda s: s.priority)
         
-        # 判断是否异常
-        sag_threshold = self.config.get("cable_sag", {}).get("threshold_px", 20)
-        sag_detected = sag_std > sag_threshold
+        return suggestions
+    
+    def inspect(
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None,
+        current_zoom: float = 1.0,
+    ) -> BusbarInspectionResult:
+        """
+        综合巡视
         
-        # 如果有距离信息,转换为实际尺寸
-        sag_mm = None
-        if distance_mm and sag_detected:
-            # 简化计算: 假设像素到mm的转换
-            pixel_size_mm = distance_mm / 1000 / w * 35  # 假设35mm焦距
-            sag_mm = sag_std * pixel_size_mm
+        Args:
+            image: BGR图像(支持4K)
+            roi_bbox: ROI区域
+            current_zoom: 当前变焦倍数
+            
+        Returns:
+            综合巡视结果
+        """
+        start_time = time.perf_counter()
         
-        return {
-            "sag_detected": sag_detected,
-            "sag_pixels": sag_std,
-            "sag_mm": sag_mm,
-            "line_count": len(horizontal_lines),
-            "severity": "warning" if sag_detected else "normal",
-        }
+        # 质量门禁
+        quality_gate = self.check_quality_gate(image)
+        
+        # 如果质量不通过，跳过检测
+        if quality_gate.status != QualityGateStatus.PASS:
+            return BusbarInspectionResult(
+                detections=[],
+                quality_gate=quality_gate,
+                zoom_suggestions=[],
+                processing_time_ms=(time.perf_counter() - start_time) * 1000,
+                model_version=self._model_version,
+                code_hash=self._code_hash,
+            )
+        
+        # 缺陷检测
+        detections = self.detect_defects(image, roi_bbox=roi_bbox)
+        
+        # 变焦建议
+        zoom_suggestions = self.compute_zoom_suggestion(image, detections, current_zoom)
+        
+        # 计算切片信息
+        h, w = image.shape[:2]
+        use_slicing = self._use_slicing and (w > 2000 or h > 2000)
+        total_tiles = len(self._generate_tiles(w, h)) if use_slicing else 1
+        
+        processing_time = (time.perf_counter() - start_time) * 1000
+        
+        return BusbarInspectionResult(
+            detections=detections,
+            quality_gate=quality_gate,
+            zoom_suggestions=zoom_suggestions,
+            total_tiles=total_tiles,
+            processed_tiles=total_tiles,
+            processing_time_ms=processing_time,
+            model_version=self._model_version,
+            code_hash=self._code_hash,
+        )
+    
+    def _crop_roi(self, image: np.ndarray, bbox: Dict[str, float]) -> np.ndarray:
+        """裁剪ROI区域"""
+        h, w = image.shape[:2]
+        x = int(bbox.get("x", 0) * w)
+        y = int(bbox.get("y", 0) * h)
+        bw = int(bbox.get("width", 1) * w)
+        bh = int(bbox.get("height", 1) * h)
+        
+        x = max(0, min(x, w - 1))
+        y = max(0, min(y, h - 1))
+        bw = max(1, min(bw, w - x))
+        bh = max(1, min(bh, h - y))
+        
+        return image[y:y+bh, x:x+bw]
+
+
+# 便捷函数
+def create_detector(config: Dict[str, Any], model_registry=None) -> BusbarDetectorEnhanced:
+    """创建检测器实例"""
+    detector = BusbarDetectorEnhanced(config, model_registry)
+    detector.initialize()
+    return detector

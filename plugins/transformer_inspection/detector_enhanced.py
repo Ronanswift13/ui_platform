@@ -3,17 +3,19 @@
 输变电激光监测平台 (A组) - 全自动AI巡检改造
 
 增强功能:
-- YOLOv8目标检测集成
-- U-Net语义分割(油泄漏)
-- CNN分类器(硅胶变色)
-- 可见光-热成像对齐
-- 自动ROI检测
+- YOLOv8缺陷检测: 破损/锈蚀/油泄漏/异物
+- U-Net油位分割: 精确油位标记检测
+- CNN硅胶分类: 变色状态识别
+- 热成像对齐: 可见光与热成像配准
+- 多模型融合: 综合决策输出
 """
 
 from __future__ import annotations
-from typing import Any, Optional, List, Dict, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+import hashlib
+import time
 import numpy as np
 
 try:
@@ -24,563 +26,823 @@ except ImportError:
 
 class DefectType(Enum):
     """缺陷类型"""
-    OIL_LEAK = "oil_leak"
-    RUST = "rust"
-    DAMAGE = "damage"
-    FOREIGN_OBJECT = "foreign_object"
-    OVERHEATING = "overheating"
+    OIL_LEAK = "oil_leak"           # 油泄漏
+    RUST = "rust"                   # 锈蚀
+    DAMAGE = "damage"               # 破损
+    FOREIGN_OBJECT = "foreign"      # 异物
+    CRACK = "crack"                 # 裂纹
+    DEFORMATION = "deformation"     # 变形
+    DISCOLORATION = "discoloration" # 变色
 
 
-class StateType(Enum):
-    """状态类型"""
-    SILICA_GEL_NORMAL = "silica_gel_normal"
-    SILICA_GEL_WARNING = "silica_gel_warning"
-    SILICA_GEL_ALARM = "silica_gel_alarm"
-    VALVE_OPEN = "valve_open"
-    VALVE_CLOSED = "valve_closed"
+class SilicaGelState(Enum):
+    """硅胶状态"""
+    NORMAL = "normal"               # 正常(蓝色)
+    WARNING = "warning"             # 警告(淡蓝/粉红)
+    ALARM = "alarm"                 # 告警(粉红/白色)
+    UNKNOWN = "unknown"
+
+
+class ThermalLevel(Enum):
+    """热成像级别"""
+    NORMAL = "normal"               # 正常
+    ATTENTION = "attention"         # 注意
+    WARNING = "warning"             # 警告
+    ALARM = "alarm"                 # 告警
+    CRITICAL = "critical"           # 危急
 
 
 @dataclass
-class ThermalAnalysisResult:
+class Detection:
+    """检测结果"""
+    defect_type: DefectType
+    bbox: Dict[str, float]          # {x, y, width, height} 归一化坐标
+    confidence: float
+    class_name: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class OilLevelResult:
+    """油位检测结果"""
+    level_ratio: float              # 油位比例 0-1
+    level_status: str               # 正常/偏低/偏高/严重
+    mask: Optional[np.ndarray] = None
+    confidence: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SilicaGelResult:
+    """硅胶检测结果"""
+    state: SilicaGelState
+    confidence: float
+    color_rgb: Optional[Tuple[int, int, int]] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ThermalResult:
     """热成像分析结果"""
     max_temperature: float
-    min_temperature: float
     avg_temperature: float
-    hotspots: List[Dict]
-    aligned: bool = False
-    alignment_params: Optional[Dict] = None
+    hotspot_count: int
+    level: ThermalLevel
+    hotspots: List[Dict[str, Any]] = field(default_factory=list)
+    aligned_image: Optional[np.ndarray] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class TransformerInspectionResult:
+    """主变巡视综合结果"""
+    defects: List[Detection] = field(default_factory=list)
+    oil_level: Optional[OilLevelResult] = None
+    silica_gel: Optional[SilicaGelResult] = None
+    thermal: Optional[ThermalResult] = None
+    confidence: float = 0.0
+    processing_time_ms: float = 0.0
+    model_version: str = ""
+    code_hash: str = ""
 
 
 class TransformerDetectorEnhanced:
     """
     主变巡视增强检测器
     
-    集成深度学习模型，提升检测精度
+    集成深度学习模型进行缺陷检测、状态识别和热成像分析
     """
     
     # 模型ID映射
     MODEL_IDS = {
-        "defect_detector": "transformer_defect_yolov8",
-        "oil_segmentation": "oil_leak_unet",
-        "silica_classifier": "silica_gel_resnet",
-        "thermal_detector": "thermal_anomaly_cnn",
+        "defect": "transformer_defect_yolov8",      # YOLOv8缺陷检测
+        "oil_seg": "transformer_oil_unet",          # U-Net油位分割
+        "silica": "transformer_silica_classifier",  # 硅胶分类器
+        "thermal": "transformer_thermal_cnn",       # 热成像异常检测
     }
     
-    def __init__(self, config: dict[str, Any], model_registry=None):
-        """初始化增强检测器"""
+    # 缺陷类别映射
+    DEFECT_CLASSES = {
+        0: DefectType.OIL_LEAK,
+        1: DefectType.RUST,
+        2: DefectType.DAMAGE,
+        3: DefectType.FOREIGN_OBJECT,
+        4: DefectType.CRACK,
+        5: DefectType.DEFORMATION,
+    }
+    
+    # 硅胶颜色范围(HSV)
+    SILICA_COLOR_RANGES: Dict[SilicaGelState, Dict[str, np.ndarray]] = {
+        SilicaGelState.NORMAL: {
+            "lower": np.array([100, 100, 50]),   # 蓝色
+            "upper": np.array([130, 255, 255]),
+        },
+        SilicaGelState.WARNING: {
+            "lower": np.array([140, 50, 100]),   # 粉红
+            "upper": np.array([170, 150, 255]),
+        },
+        SilicaGelState.ALARM: {
+            "lower": np.array([0, 0, 200]),      # 白色
+            "upper": np.array([180, 30, 255]),
+        },
+    }
+    
+    # 温度阈值
+    THERMAL_THRESHOLDS = {
+        ThermalLevel.NORMAL: (0, 60),
+        ThermalLevel.ATTENTION: (60, 80),
+        ThermalLevel.WARNING: (80, 100),
+        ThermalLevel.ALARM: (100, 130),
+        ThermalLevel.CRITICAL: (130, float('inf')),
+    }
+    
+    def __init__(
+        self, 
+        config: Dict[str, Any],
+        model_registry=None,
+    ):
+        """
+        初始化增强检测器
+        
+        Args:
+            config: 配置字典
+            model_registry: 模型注册表实例
+        """
         self.config = config
         self._model_registry = model_registry
+        self._initialized = False
         
         # 配置参数
-        self.inference_config = config.get("inference", {})
-        self.thermal_config = config.get("thermal", {})
-        self.defect_config = config.get("defect_detection", {})
+        self._confidence_threshold = config.get("confidence_threshold", 0.5)
+        self._nms_threshold = config.get("nms_threshold", 0.4)
+        self._use_deep_learning = config.get("use_deep_learning", True)
         
-        self.confidence_threshold = self.inference_config.get("confidence_threshold", 0.5)
-        self.use_deep_learning = config.get("use_deep_learning", True)
-        
-        # 热成像参数
-        self.thermal_enabled = self.thermal_config.get("enabled", False)
-        self.temperature_threshold = self.thermal_config.get("temperature_threshold", 80.0)
+        # 版本信息
+        self._model_version = "transformer_enhanced_v1.0"
+        self._code_hash = self._calculate_code_hash()
     
-    # ==================== 缺陷检测(深度学习增强) ====================
+    def _calculate_code_hash(self) -> str:
+        """计算代码版本hash"""
+        import inspect
+        source = inspect.getsource(self.__class__)
+        return f"sha256:{hashlib.sha256(source.encode()).hexdigest()[:12]}"
+    
+    def initialize(self) -> bool:
+        """初始化检测器"""
+        try:
+            # 如果有模型注册表，预加载模型
+            if self._model_registry and self._use_deep_learning:
+                for model_key, model_id in self.MODEL_IDS.items():
+                    try:
+                        self._model_registry.load(model_id)
+                    except Exception as e:
+                        print(f"[TransformerDetector] 模型 {model_id} 加载失败: {e}")
+            
+            self._initialized = True
+            return True
+        except Exception as e:
+            print(f"[TransformerDetector] 初始化失败: {e}")
+            return False
     
     def detect_defects(
-        self, 
-        image: np.ndarray, 
-        roi_type: str = "transformer_body"
-    ) -> List[Dict]:
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None,
+    ) -> List[Detection]:
         """
-        检测外观缺陷
+        缺陷检测
         
-        优先使用深度学习模型，失败时回退到传统方法
+        Args:
+            image: BGR图像
+            roi_bbox: 可选的ROI区域
+            
+        Returns:
+            检测结果列表
         """
-        if self.use_deep_learning and self._model_registry:
-            try:
-                return self._detect_defects_dl(image, roi_type)
-            except Exception as e:
-                print(f"[TransformerDetector] 深度学习检测失败，回退到传统方法: {e}")
+        start_time = time.perf_counter()
         
-        return self._detect_defects_traditional(image, roi_type)
+        # 裁剪ROI
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
+        
+        detections = []
+        
+        # 优先使用深度学习
+        if self._use_deep_learning and self._model_registry:
+            dl_detections = self._detect_by_deep_learning(image)
+            if dl_detections:
+                detections.extend(dl_detections)
+        
+        # 深度学习失败或未启用时，回退到传统方法
+        if not detections:
+            traditional_detections = self._detect_by_traditional(image)
+            detections.extend(traditional_detections)
+        
+        # NMS去重
+        detections = self._apply_nms(detections)
+        
+        processing_time = (time.perf_counter() - start_time) * 1000
+        for det in detections:
+            det.metadata["processing_time_ms"] = processing_time
+        
+        return detections
     
-    def _detect_defects_dl(self, image: np.ndarray, roi_type: str) -> List[Dict]:
-        """使用深度学习检测缺陷"""
-        assert self._model_registry is not None
-        results = []
+    def _detect_by_deep_learning(self, image: np.ndarray) -> List[Detection]:
+        """深度学习缺陷检测"""
+        detections = []
         
-        # 使用YOLOv8检测
-        model_id = self.MODEL_IDS["defect_detector"]
-        inference_result = self._model_registry.infer(model_id, image)
+        try:
+            model_id = self.MODEL_IDS["defect"]
+            result = self._model_registry.infer(model_id, image)  # type: ignore[union-attr]
+            
+            for det in result.detections:
+                class_id = det.get("class_id", 0)
+                defect_type = self.DEFECT_CLASSES.get(class_id, DefectType.DAMAGE)
+                
+                detections.append(Detection(
+                    defect_type=defect_type,
+                    bbox=det["bbox"],
+                    confidence=det["confidence"],
+                    class_name=det.get("class_name", defect_type.value),
+                    metadata={
+                        "source": "deep_learning",
+                        "model_id": model_id,
+                    }
+                ))
+        except Exception as e:
+            print(f"[TransformerDetector] 深度学习检测失败: {e}")
         
-        for det in inference_result.detections:
-            results.append({
-                "label": det["class_name"],
-                "bbox": det["bbox"],
-                "confidence": det["confidence"],
-                "method": "deep_learning",
-                "model_id": model_id,
-            })
-        
-        return results
+        return detections
     
-    def _detect_defects_traditional(self, image: np.ndarray, roi_type: str) -> List[Dict]:
-        """使用传统方法检测缺陷"""
+    def _detect_by_traditional(self, image: np.ndarray) -> List[Detection]:
+        """传统方法缺陷检测(回退方案)"""
         if cv2 is None:
             return []
         
-        results = []
-        
-        # 油泄漏检测
-        oil_leaks = self._detect_oil_leak(image)
-        results.extend(oil_leaks)
-        
-        # 锈蚀检测
-        rust = self._detect_rust(image)
-        results.extend(rust)
-        
-        # 破损检测
-        damage = self._detect_damage(image)
-        results.extend(damage)
-        
-        # 异物检测
-        foreign = self._detect_foreign_object(image)
-        results.extend(foreign)
-        
-        return results
-    
-    def _detect_oil_leak(self, image: np.ndarray) -> List[Dict]:
-        """检测油泄漏"""
-        if cv2 is None:
-            return []
-
-        config = self.defect_config.get("oil_leak", {})
-        gray_threshold = config.get("gray_threshold", 60)
-        min_area = config.get("min_area", 500)
-        
-        results = []
+        detections = []
         h, w = image.shape[:2]
         
-        # 灰度处理
+        # 1. 油泄漏检测 - 深色区域
+        oil_detections = self._detect_oil_leak(image)
+        detections.extend(oil_detections)
+        
+        # 2. 锈蚀检测 - 棕红色区域
+        rust_detections = self._detect_rust(image)
+        detections.extend(rust_detections)
+        
+        # 3. 破损检测 - 边缘异常
+        damage_detections = self._detect_damage(image)
+        detections.extend(damage_detections)
+        
+        # 4. 异物检测 - 轮廓分析
+        foreign_detections = self._detect_foreign_object(image)
+        detections.extend(foreign_detections)
+        
+        return detections
+    
+    def _detect_oil_leak(self, image: np.ndarray) -> List[Detection]:
+        """油泄漏检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 转换到HSV
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # 深色区域(油渍)
+        lower = np.array([0, 0, 0])
+        upper = np.array([180, 255, 80])
+        mask = cv2.inRange(hsv, lower, upper)
+        
+        # 形态学处理
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        
+        # 找轮廓
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > 500:  # 最小面积阈值
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                confidence = min(0.9, 0.5 + area / (w * h) * 10)
+                
+                detections.append(Detection(
+                    defect_type=DefectType.OIL_LEAK,
+                    bbox={"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
+                    confidence=confidence,
+                    class_name="油泄漏",
+                    metadata={"source": "traditional", "area": area}
+                ))
+        
+        return detections
+    
+    def _detect_rust(self, image: np.ndarray) -> List[Detection]:
+        """锈蚀检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 转换到HSV
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # 棕红色区域(锈蚀)
+        lower = np.array([0, 100, 50])
+        upper = np.array([20, 255, 200])
+        mask = cv2.inRange(hsv, lower, upper)
+        
+        # 形态学处理
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        
+        # 找轮廓
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > 300:
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                confidence = min(0.85, 0.4 + area / (w * h) * 8)
+                
+                detections.append(Detection(
+                    defect_type=DefectType.RUST,
+                    bbox={"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
+                    confidence=confidence,
+                    class_name="锈蚀",
+                    metadata={"source": "traditional", "area": area}
+                ))
+        
+        return detections
+    
+    def _detect_damage(self, image: np.ndarray) -> List[Detection]:
+        """破损检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 边缘检测
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 50, 150)
+        
+        # 膨胀边缘
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        edges = cv2.dilate(edges, kernel)
+        
+        # 找轮廓
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > 1000:
+                # 检查轮廓形状不规则性
+                perimeter = cv2.arcLength(cnt, True)
+                circularity = 4 * np.pi * area / (perimeter * perimeter + 1e-6)
+                
+                if circularity < 0.3:  # 不规则形状
+                    x, y, cw, ch = cv2.boundingRect(cnt)
+                    confidence = min(0.7, 0.3 + (1 - circularity) * 0.5)
+                    
+                    detections.append(Detection(
+                        defect_type=DefectType.DAMAGE,
+                        bbox={"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
+                        confidence=confidence,
+                        class_name="破损",
+                        metadata={"source": "traditional", "circularity": circularity}
+                    ))
+        
+        return detections
+    
+    def _detect_foreign_object(self, image: np.ndarray) -> List[Detection]:
+        """异物检测"""
+        if cv2 is None:
+            return []
+        
+        detections = []
+        h, w = image.shape[:2]
+        
+        # 转换到灰度
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
         # 自适应阈值
-        binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                        cv2.THRESH_BINARY_INV, 11, 2)
+        binary = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY_INV, 11, 2
+        )
         
-        # 形态学操作
+        # 形态学处理
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
         
-        # 查找轮廓
+        # 找轮廓
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > min_area:
-                x, y, cw, ch = cv2.boundingRect(contour)
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if 200 < area < 5000:
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                aspect_ratio = cw / (ch + 1e-6)
                 
-                # 计算暗区占比
-                roi = gray[y:y+ch, x:x+cw]
-                dark_ratio = np.sum(roi < gray_threshold) / roi.size
-                
-                if dark_ratio > 0.3:
-                    results.append({
-                        "label": "oil_leak",
-                        "bbox": {"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
-                        "confidence": min(0.9, 0.5 + dark_ratio),
-                        "metadata": {"dark_ratio": dark_ratio, "area": area},
-                        "method": "traditional",
-                    })
+                # 排除太细长的对象
+                if 0.3 < aspect_ratio < 3.0:
+                    confidence = min(0.6, 0.3 + area / 2000)
+                    
+                    detections.append(Detection(
+                        defect_type=DefectType.FOREIGN_OBJECT,
+                        bbox={"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
+                        confidence=confidence,
+                        class_name="异物",
+                        metadata={"source": "traditional", "aspect_ratio": aspect_ratio}
+                    ))
         
-        return results
+        return detections
     
-    def _detect_rust(self, image: np.ndarray) -> List[Dict]:
-        """检测锈蚀"""
+    def detect_oil_level(
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None,
+    ) -> OilLevelResult:
+        """
+        油位检测
+        
+        Args:
+            image: BGR图像
+            roi_bbox: 油位计ROI区域
+            
+        Returns:
+            油位检测结果
+        """
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
+        
+        # 优先使用深度学习分割
+        if self._use_deep_learning and self._model_registry:
+            result = self._detect_oil_level_dl(image)
+            if result:
+                return result
+        
+        # 回退到传统方法
+        return self._detect_oil_level_traditional(image)
+    
+    def _detect_oil_level_dl(self, image: np.ndarray) -> Optional[OilLevelResult]:
+        """深度学习油位分割"""
+        try:
+            model_id = self.MODEL_IDS["oil_seg"]
+            result = self._model_registry.infer(model_id, image)  # type: ignore[union-attr]
+            
+            if result.raw_outputs:
+                mask = result.raw_outputs.get("mask", None)
+                if mask is not None:
+                    # 计算油位比例
+                    h = mask.shape[0]
+                    oil_pixels = np.sum(mask > 0.5, axis=1)
+                    total_pixels = mask.shape[1]
+                    
+                    # 找到油位线
+                    oil_ratio = oil_pixels / total_pixels
+                    level_line = np.argmax(oil_ratio > 0.5) / h if np.any(oil_ratio > 0.5) else 0.5
+                    
+                    return OilLevelResult(
+                        level_ratio=1 - level_line,
+                        level_status=self._get_level_status(1 - level_line),
+                        mask=mask,
+                        confidence=0.9,
+                        metadata={"source": "deep_learning"}
+                    )
+        except Exception as e:
+            print(f"[TransformerDetector] 深度学习油位检测失败: {e}")
+        
+        return None
+    
+    def _detect_oil_level_traditional(self, image: np.ndarray) -> OilLevelResult:
+        """传统方法油位检测"""
         if cv2 is None:
-            return []
-
-        config = self.defect_config.get("rust", {})
-        results = []
+            return OilLevelResult(level_ratio=0.5, level_status="未知", confidence=0.0)
+        
         h, w = image.shape[:2]
         
-        # HSV颜色空间
+        # 转换到HSV
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # 锈蚀颜色范围(橙红色)
-        lower = np.array(config.get("hsv_lower", [0, 100, 100]))
-        upper = np.array(config.get("hsv_upper", [20, 255, 255]))
-        
+        # 检测油的颜色(通常为黄色/琥珀色)
+        lower = np.array([15, 50, 50])
+        upper = np.array([35, 255, 255])
         mask = cv2.inRange(hsv, lower, upper)
         
-        # 形态学操作
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        # 计算每行的油像素比例
+        row_ratio = np.sum(mask > 0, axis=1) / w
         
-        # 查找轮廓
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 找到油位线
+        threshold = 0.3
+        oil_rows = np.where(row_ratio > threshold)[0]
         
-        min_area = config.get("min_area", 300)
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > min_area:
-                x, y, cw, ch = cv2.boundingRect(contour)
-                results.append({
-                    "label": "rust",
-                    "bbox": {"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
-                    "confidence": min(0.85, 0.5 + area / 5000),
-                    "metadata": {"area": area},
-                    "method": "traditional",
-                })
+        if len(oil_rows) > 0:
+            level_line = oil_rows[0] / h
+            level_ratio = 1 - level_line
+        else:
+            level_ratio = 0.5
         
-        return results
+        return OilLevelResult(
+            level_ratio=level_ratio,
+            level_status=self._get_level_status(level_ratio),
+            mask=mask,
+            confidence=0.7,
+            metadata={"source": "traditional"}
+        )
     
-    def _detect_damage(self, image: np.ndarray) -> List[Dict]:
-        """检测破损"""
-        if cv2 is None:
-            return []
-
-        config = self.defect_config.get("damage", {})
-        results = []
-        h, w = image.shape[:2]
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # Canny边缘检测
-        edges = cv2.Canny(gray, 
-                          config.get("canny_low", 50), 
-                          config.get("canny_high", 150))
-        
-        # 计算局部边缘密度
-        kernel_size = 32
-        for y in range(0, h - kernel_size, kernel_size // 2):
-            for x in range(0, w - kernel_size, kernel_size // 2):
-                patch = edges[y:y+kernel_size, x:x+kernel_size]
-                density = np.sum(patch > 0) / patch.size
-                
-                if density > config.get("edge_density", 0.15):
-                    results.append({
-                        "label": "damage",
-                        "bbox": {"x": x/w, "y": y/h, 
-                                "width": kernel_size/w, "height": kernel_size/h},
-                        "confidence": min(0.8, density * 2),
-                        "metadata": {"edge_density": density},
-                        "method": "traditional",
-                    })
-        
-        # NMS去重
-        results = self._nms(results, 0.3)
-        
-        return results
+    def _get_level_status(self, ratio: float) -> str:
+        """获取油位状态"""
+        if ratio < 0.2:
+            return "严重偏低"
+        elif ratio < 0.4:
+            return "偏低"
+        elif ratio <= 0.7:
+            return "正常"
+        elif ratio <= 0.85:
+            return "偏高"
+        else:
+            return "严重偏高"
     
-    def _detect_foreign_object(self, image: np.ndarray) -> List[Dict]:
-        """检测异物"""
-        if cv2 is None:
-            return []
-
-        config = self.defect_config.get("foreign_object", {})
-        results = []
-        h, w = image.shape[:2]
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # 背景建模(简化)
-        blur = cv2.GaussianBlur(gray, (21, 21), 0)
-        diff = cv2.absdiff(gray, blur)
-        
-        _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
-        
-        # 形态学操作
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-        
-        # 查找轮廓
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        min_area = config.get("min_area", 200)
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if area > min_area:
-                x, y, cw, ch = cv2.boundingRect(contour)
-                
-                # 计算圆度
-                perimeter = cv2.arcLength(contour, True)
-                circularity = 4 * np.pi * area / (perimeter ** 2 + 1e-6)
-                
-                results.append({
-                    "label": "foreign_object",
-                    "bbox": {"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
-                    "confidence": 0.6,
-                    "metadata": {"area": area, "circularity": circularity},
-                    "method": "traditional",
-                })
-        
-        return results
-    
-    # ==================== 状态识别(深度学习增强) ====================
-    
-    def recognize_silica_gel(self, image: np.ndarray) -> Dict:
+    def recognize_silica_gel(
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None,
+    ) -> SilicaGelResult:
         """
-        识别硅胶罐状态
+        硅胶状态识别
         
-        使用CNN分类器提升准确率
+        Args:
+            image: BGR图像
+            roi_bbox: 硅胶罐ROI区域
+            
+        Returns:
+            硅胶状态结果
         """
-        if self.use_deep_learning and self._model_registry:
-            try:
-                return self._recognize_silica_gel_dl(image)
-            except Exception as e:
-                print(f"[TransformerDetector] 硅胶识别DL失败: {e}")
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
         
-        return self._recognize_silica_gel_traditional(image)
+        # 优先使用深度学习分类
+        if self._use_deep_learning and self._model_registry:
+            result = self._recognize_silica_dl(image)
+            if result:
+                return result
+        
+        # 回退到颜色分析
+        return self._recognize_silica_by_color(image)
     
-    def _recognize_silica_gel_dl(self, image: np.ndarray) -> Dict:
-        """深度学习硅胶识别"""
-        assert self._model_registry is not None
-        model_id = self.MODEL_IDS["silica_classifier"]
-        result = self._model_registry.infer(model_id, image)
+    def _recognize_silica_dl(self, image: np.ndarray) -> Optional[SilicaGelResult]:
+        """深度学习硅胶分类"""
+        try:
+            model_id = self.MODEL_IDS["silica"]
+            result = self._model_registry.infer(model_id, image)  # type: ignore[union-attr]
+            
+            if result.detections:
+                det = result.detections[0]
+                class_name = det.get("class_name", "unknown")
+                
+                state_map = {
+                    "normal": SilicaGelState.NORMAL,
+                    "warning": SilicaGelState.WARNING,
+                    "alarm": SilicaGelState.ALARM,
+                }
+                state = state_map.get(class_name, SilicaGelState.UNKNOWN)
+                
+                return SilicaGelResult(
+                    state=state,
+                    confidence=det["confidence"],
+                    metadata={"source": "deep_learning"}
+                )
+        except Exception as e:
+            print(f"[TransformerDetector] 深度学习硅胶识别失败: {e}")
         
-        if result.detections:
-            det = result.detections[0]
-            return {
-                "label": det["class_name"],
-                "state": det["class_name"],
-                "confidence": det["confidence"],
-                "method": "deep_learning",
-            }
-        
-        return {"label": "unknown", "state": "unknown", "confidence": 0}
+        return None
     
-    def _recognize_silica_gel_traditional(self, image: np.ndarray) -> Dict:
-        """传统方法硅胶识别"""
+    def _recognize_silica_by_color(self, image: np.ndarray) -> SilicaGelResult:
+        """颜色分析硅胶状态"""
         if cv2 is None:
-            return {"label": "unknown", "state": "unknown", "confidence": 0}
+            return SilicaGelResult(state=SilicaGelState.UNKNOWN, confidence=0.0)
         
-        config = self.config.get("silica_gel", {})
-        
+        # 转换到HSV
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         
-        # 蓝色掩码(正常)
-        blue_lower = np.array(config.get("blue_lower", [100, 100, 100]))
-        blue_upper = np.array(config.get("blue_upper", [130, 255, 255]))
-        blue_mask = cv2.inRange(hsv, blue_lower, blue_upper)
+        best_state = SilicaGelState.UNKNOWN
+        best_ratio = 0.0
         
-        # 粉色掩码(变色)
-        pink_lower = np.array(config.get("pink_lower", [140, 50, 100]))
-        pink_upper = np.array(config.get("pink_upper", [170, 255, 255]))
-        pink_mask = cv2.inRange(hsv, pink_lower, pink_upper)
+        for state, color_range in self.SILICA_COLOR_RANGES.items():
+            mask = cv2.inRange(hsv, color_range["lower"], color_range["upper"])  # type: ignore[arg-type]
+            ratio = np.sum(mask > 0) / mask.size
+            
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_state = state
         
-        blue_ratio = np.sum(blue_mask > 0) / blue_mask.size
-        pink_ratio = np.sum(pink_mask > 0) / pink_mask.size
+        # 计算平均颜色
+        avg_color = cv2.mean(image)[:3]  # type: ignore[index]
         
-        # 判断状态
-        if blue_ratio > 0.3 and pink_ratio < 0.1:
-            state = "silica_gel_normal"
-            confidence = 0.8
-        elif pink_ratio > 0.3:
-            state = "silica_gel_alarm"
-            confidence = 0.85
-        elif pink_ratio > 0.1:
-            state = "silica_gel_warning"
-            confidence = 0.7
-        else:
-            state = "silica_gel_unknown"
-            confidence = 0.4
-        
-        return {
-            "label": state,
-            "state": state,
-            "confidence": confidence,
-            "metadata": {"blue_ratio": blue_ratio, "pink_ratio": pink_ratio},
-            "method": "traditional",
-        }
-    
-    def recognize_valve_state(self, image: np.ndarray) -> Dict:
-        """识别阀门状态"""
-        if cv2 is None:
-            return {"label": "unknown", "state": "unknown", "confidence": 0}
-        
-        config = self.config.get("valve", {})
-        angle_threshold = config.get("angle_threshold", 30)
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        
-        # 霍夫直线检测
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, 
-                                minLineLength=30, maxLineGap=10)
-        
-        if lines is None:
-            return {"label": "valve_unknown", "state": "unknown", "confidence": 0.3}
-        
-        # 计算主方向角度
-        angles = []
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
-            angles.append(angle)
-        
-        if not angles:
-            return {"label": "valve_unknown", "state": "unknown", "confidence": 0.3}
-        
-        avg_angle = np.mean(angles)
-        
-        if abs(avg_angle) < angle_threshold:
-            state = "valve_closed"
-            confidence = 0.8
-        else:
-            state = "valve_open"
-            confidence = 0.8
-        
-        return {
-            "label": state,
-            "state": state,
-            "confidence": confidence,
-            "metadata": {"avg_angle": avg_angle},
-            "method": "traditional",
-        }
-    
-    # ==================== 热成像分析(增强) ====================
+        return SilicaGelResult(
+            state=best_state,
+            confidence=float(min(0.9, best_ratio * 2)),
+            color_rgb=(int(avg_color[2]), int(avg_color[1]), int(avg_color[0])),
+            metadata={"source": "color_analysis", "color_ratio": best_ratio}
+        )
     
     def analyze_thermal(
-        self, 
+        self,
         thermal_image: np.ndarray,
         visible_image: Optional[np.ndarray] = None,
-    ) -> ThermalAnalysisResult:
+        temperature_range: Tuple[float, float] = (-20, 150),
+    ) -> ThermalResult:
         """
         热成像分析
         
-        增强功能:
-        - 可见光-热成像对齐
-        - 深度学习热点检测
+        Args:
+            thermal_image: 热成像图像(灰度或伪彩色)
+            visible_image: 可见光图像(用于对齐)
+            temperature_range: 温度范围
+            
+        Returns:
+            热成像分析结果
         """
         if cv2 is None:
-            return ThermalAnalysisResult(0, 0, 0, [])
+            return ThermalResult(
+                max_temperature=0, avg_temperature=0,
+                hotspot_count=0, level=ThermalLevel.NORMAL
+            )
         
-        config = self.thermal_config
-        temp_range = config.get("temp_range", [20, 120])
-        
-        # 灰度转温度映射
+        # 转换为灰度(如果是彩色)
         if len(thermal_image.shape) == 3:
             gray = cv2.cvtColor(thermal_image, cv2.COLOR_BGR2GRAY)
         else:
-            gray = thermal_image
+            gray = thermal_image.copy()
         
-        temp_map = gray.astype(np.float32) / 255.0 * (temp_range[1] - temp_range[0]) + temp_range[0]
+        # 灰度到温度映射
+        min_temp, max_temp = temperature_range
+        temp_map = gray.astype(np.float32) / 255.0 * (max_temp - min_temp) + min_temp
         
-        max_temp = float(np.max(temp_map))
-        min_temp = float(np.min(temp_map))
-        avg_temp = float(np.mean(temp_map))
+        # 统计温度
+        max_temperature = float(np.max(temp_map))
+        avg_temperature = float(np.mean(temp_map))
         
-        # 热点检测
-        threshold = config.get("temperature_threshold", 80.0)
+        # 检测热点
         hotspots = []
+        hot_threshold = avg_temperature + 20  # 高于平均20度为热点
+        hot_mask = (temp_map > hot_threshold).astype(np.uint8) * 255
         
-        hot_mask = (temp_map > threshold).astype(np.uint8) * 255
         contours, _ = cv2.findContours(hot_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         h, w = gray.shape
-        for i, contour in enumerate(contours):
-            if cv2.contourArea(contour) > 50:
-                x, y, cw, ch = cv2.boundingRect(contour)
-                roi_temp = temp_map[y:y+ch, x:x+cw]
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > 50:
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                region_temp = temp_map[y:y+ch, x:x+cw]
                 
                 hotspots.append({
-                    "id": f"hotspot_{i}",
                     "bbox": {"x": x/w, "y": y/h, "width": cw/w, "height": ch/h},
-                    "max_temp": float(np.max(roi_temp)),
-                    "avg_temp": float(np.mean(roi_temp)),
+                    "max_temp": float(np.max(region_temp)),
+                    "avg_temp": float(np.mean(region_temp)),
+                    "area": area,
                 })
         
-        # 图像对齐
-        aligned = False
-        alignment_params = None
+        # 确定告警级别
+        level = ThermalLevel.NORMAL
+        for lvl, (low, high) in self.THERMAL_THRESHOLDS.items():
+            if low <= max_temperature < high:
+                level = lvl
+                break
         
+        # 图像对齐(如果提供了可见光图像)
+        aligned_image = None
         if visible_image is not None:
-            aligned, alignment_params = self._align_thermal_visible(thermal_image, visible_image)
+            aligned_image = self._align_thermal_visible(thermal_image, visible_image)
         
-        return ThermalAnalysisResult(
-            max_temperature=max_temp,
-            min_temperature=min_temp,
-            avg_temperature=avg_temp,
+        return ThermalResult(
+            max_temperature=max_temperature,
+            avg_temperature=avg_temperature,
+            hotspot_count=len(hotspots),
+            level=level,
             hotspots=hotspots,
-            aligned=aligned,
-            alignment_params=alignment_params,
+            aligned_image=aligned_image,
+            metadata={"temperature_range": temperature_range}
         )
     
     def _align_thermal_visible(
-        self, 
-        thermal: np.ndarray, 
-        visible: np.ndarray
-    ) -> Tuple[bool, Optional[Dict]]:
+        self,
+        thermal: np.ndarray,
+        visible: np.ndarray,
+    ) -> Optional[np.ndarray]:
         """热成像与可见光对齐"""
-        try:
-            # 使用特征匹配进行对齐
-            # 简化实现
-            return True, {"offset_x": 0, "offset_y": 0, "scale": 1.0}
-        except Exception:
-            return False, None
-    
-    # ==================== 油位读数 ====================
-    
-    def read_oil_level(self, image: np.ndarray) -> Dict:
-        """读取油位"""
         if cv2 is None:
-            return {"value": None, "confidence": 0}
+            return None
         
-        # 预留配置扩展入口
-        _ = self.config.get("oil_level", {})
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape
-        
-        # 边缘检测
-        edges = cv2.Canny(gray, 50, 150)
-        
-        # 检测水平线(油位线)
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, 
-                                minLineLength=w//4, maxLineGap=20)
-        
-        if lines is None:
-            return {"value": None, "confidence": 0.3, "reason": "no_lines_detected"}
-        
-        # 找最长的近水平线
-        best_line = None
-        best_length = 0
-        
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            angle = abs(np.degrees(np.arctan2(y2 - y1, x2 - x1)))
+        try:
+            # 调整尺寸
+            if thermal.shape[:2] != visible.shape[:2]:
+                thermal = cv2.resize(thermal, (visible.shape[1], visible.shape[0]))
             
-            if angle < 10 or angle > 170:  # 近水平
-                length = np.sqrt((x2-x1)**2 + (y2-y1)**2)
-                if length > best_length:
-                    best_length = length
-                    best_line = line[0]
-        
-        if best_line is None:
-            return {"value": None, "confidence": 0.4, "reason": "no_horizontal_line"}
-        
-        _, y1, _, y2 = best_line
-        oil_y = (y1 + y2) / 2
-        
-        # 转换为百分比(假设图像顶部为100%，底部为0%)
-        oil_level = (1 - oil_y / h) * 100
-        
-        return {
-            "value": round(oil_level, 1),
-            "unit": "%",
-            "confidence": 0.75,
-            "method": "line_detection",
-        }
+            # 简单融合(实际应用中可使用特征点匹配)
+            if len(thermal.shape) == 2:
+                thermal_color = cv2.applyColorMap(thermal, cv2.COLORMAP_JET)
+            else:
+                thermal_color = thermal
+            
+            aligned = cv2.addWeighted(visible, 0.6, thermal_color, 0.4, 0)
+            return aligned
+        except Exception as e:
+            print(f"[TransformerDetector] 图像对齐失败: {e}")
+            return None
     
-    # ==================== 辅助函数 ====================
+    def inspect(
+        self,
+        image: np.ndarray,
+        thermal_image: Optional[np.ndarray] = None,
+        rois: Optional[List[Dict[str, Any]]] = None,
+    ) -> TransformerInspectionResult:
+        """
+        综合巡视
+        
+        Args:
+            image: 可见光图像
+            thermal_image: 热成像图像(可选)
+            rois: ROI列表
+            
+        Returns:
+            综合巡视结果
+        """
+        start_time = time.perf_counter()
+        
+        # 缺陷检测
+        defects = self.detect_defects(image)
+        
+        # 处理ROI
+        oil_level = None
+        silica_gel = None
+        
+        if rois:
+            for roi in rois:
+                roi_type = roi.get("type", "")
+                roi_bbox = roi.get("bbox", None)
+                
+                if roi_type == "oil_level" and roi_bbox:
+                    oil_level = self.detect_oil_level(image, roi_bbox)
+                elif roi_type == "silica_gel" and roi_bbox:
+                    silica_gel = self.recognize_silica_gel(image, roi_bbox)
+        
+        # 热成像分析
+        thermal = None
+        if thermal_image is not None:
+            thermal = self.analyze_thermal(thermal_image, image)
+        
+        processing_time = (time.perf_counter() - start_time) * 1000
+        
+        # 计算综合置信度
+        confidences = [d.confidence for d in defects]
+        if oil_level:
+            confidences.append(oil_level.confidence)
+        if silica_gel:
+            confidences.append(silica_gel.confidence)
+        
+        avg_confidence = float(np.mean(confidences)) if confidences else 0.0
+        
+        return TransformerInspectionResult(
+            defects=defects,
+            oil_level=oil_level,
+            silica_gel=silica_gel,
+            thermal=thermal,
+            confidence=avg_confidence,
+            processing_time_ms=processing_time,
+            model_version=self._model_version,
+            code_hash=self._code_hash,
+        )
     
-    def _nms(self, detections: List[Dict], iou_threshold: float = 0.4) -> List[Dict]:
+    def _crop_roi(self, image: np.ndarray, bbox: Dict[str, float]) -> np.ndarray:
+        """裁剪ROI区域"""
+        h, w = image.shape[:2]
+        x = int(bbox.get("x", 0) * w)
+        y = int(bbox.get("y", 0) * h)
+        bw = int(bbox.get("width", 1) * w)
+        bh = int(bbox.get("height", 1) * h)
+        
+        x = max(0, min(x, w - 1))
+        y = max(0, min(y, h - 1))
+        bw = max(1, min(bw, w - x))
+        bh = max(1, min(bh, h - y))
+        
+        return image[y:y+bh, x:x+bw]
+    
+    def _apply_nms(self, detections: List[Detection]) -> List[Detection]:
         """非极大值抑制"""
         if not detections:
             return []
         
-        detections = sorted(detections, key=lambda x: x["confidence"], reverse=True)
+        # 按置信度排序
+        detections = sorted(detections, key=lambda d: d.confidence, reverse=True)
         
         keep = []
         while detections:
@@ -589,12 +851,12 @@ class TransformerDetectorEnhanced:
             
             detections = [
                 d for d in detections
-                if self._iou(best["bbox"], d["bbox"]) < iou_threshold
+                if self._iou(best.bbox, d.bbox) < self._nms_threshold
             ]
         
         return keep
     
-    def _iou(self, box1: Dict, box2: Dict) -> float:
+    def _iou(self, box1: Dict[str, float], box2: Dict[str, float]) -> float:
         """计算IoU"""
         x1 = max(box1["x"], box2["x"])
         y1 = max(box1["y"], box2["y"])
@@ -607,3 +869,11 @@ class TransformerDetectorEnhanced:
         union = area1 + area2 - inter
         
         return inter / union if union > 0 else 0
+
+
+# 便捷函数
+def create_detector(config: Dict[str, Any], model_registry=None) -> TransformerDetectorEnhanced:
+    """创建检测器实例"""
+    detector = TransformerDetectorEnhanced(config, model_registry)
+    detector.initialize()
+    return detector
