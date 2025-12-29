@@ -40,6 +40,8 @@ import numpy as np
 # 配置日志
 logger = logging.getLogger(__name__)
 
+ProviderSpec = Union[str, Tuple[str, Dict[str, Any]]]
+
 
 class InferenceBackend(Enum):
     """推理后端类型"""
@@ -189,7 +191,7 @@ class ONNXInferenceEngine(BaseInferenceEngine):
             logger.error(f"模型加载失败: {e}")
             return False
     
-    def _get_providers(self) -> List[str]:
+    def _get_providers(self) -> List[ProviderSpec]:
         """获取执行提供者列表"""
         if self._backend == InferenceBackend.ONNX_CUDA:
             return [
@@ -574,6 +576,11 @@ class ModelRegistryManager:
     
     def _register_all_models(self):
         """注册所有模型"""
+        registry = self._registry
+        if registry is None:
+            logger.error("模型注册中心未初始化，无法注册模型")
+            return
+
         # 遍历各插件配置
         plugin_sections = [
             "transformer_inspection",
@@ -592,19 +599,24 @@ class ModelRegistryManager:
             for model_name, model_config in section_config.items():
                 if isinstance(model_config, dict) and "model_path" in model_config:
                     model_id = model_config.get("model_id", f"{section}_{model_name}")
-                    self._registry.register_from_dict(model_id, model_config)
+                    registry.register_from_dict(model_id, model_config)
     
     def _warmup(self, model_ids: List[str], iterations: int):
         """模型预热"""
+        registry = self._registry
+        if registry is None:
+            logger.error("模型注册中心未初始化，无法预热")
+            return
+
         logger.info(f"开始模型预热 ({iterations}次)...")
         
         # 创建虚拟输入
         dummy_image = np.random.randint(0, 255, (640, 640, 3), dtype=np.uint8)
         
         for model_id in model_ids:
-            if self._registry.is_loaded(model_id):
-                for i in range(iterations):
-                    self._registry.infer(model_id, dummy_image)
+            if registry.is_loaded(model_id):
+                for _ in range(iterations):
+                    registry.infer(model_id, dummy_image)
                 logger.info(f"  {model_id}: 预热完成")
     
     def get_registry(self) -> Optional[ModelRegistry]:
@@ -629,7 +641,7 @@ class ModelRegistryManager:
             return {"error": "模型注册中心未初始化"}
         return self._registry.get_stats()
     
-    def check_models(self) -> Dict[str, Dict[str, Any]]:
+    def check_models(self) -> Dict[str, Any]:
         """
         检查模型文件状态
         
