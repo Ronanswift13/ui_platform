@@ -142,7 +142,7 @@ class AsyncInferenceQueue:
                 if task.task_id in self._pending_tasks:
                     del self._pending_tasks[task.task_id]
     
-    def get_result(self, task_id: str, timeout: float = None) -> Optional[ExtendedInferenceResult]:
+    def get_result(self, task_id: str, timeout: Optional[float] = None) -> Optional[ExtendedInferenceResult]:
         """获取任务结果"""
         with self._lock:
             task = self._pending_tasks.get(task_id)
@@ -329,8 +329,8 @@ class ExtendedModelRegistry:
             callback=callback
         )
     
-    def get_async_result(self, task_id: str, 
-                         timeout: float = None) -> Optional[ExtendedInferenceResult]:
+    def get_async_result(self, task_id: str,
+                         timeout: Optional[float] = None) -> Optional[ExtendedInferenceResult]:
         """获取异步推理结果"""
         return self._async_queue.get_result(task_id, timeout)
     
@@ -414,14 +414,14 @@ class ExtendedModelRegistryManager:
     _instance: Optional['ExtendedModelRegistryManager'] = None
     _lock = threading.Lock()
     
-    def __new__(cls, config_path: str = None):
+    def __new__(cls, config_path: Optional[str] = None):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance._initialized = False
             return cls._instance
-    
-    def __init__(self, config_path: str = None):
+
+    def __init__(self, config_path: Optional[str] = None):
         if self._initialized:
             return
         
@@ -493,15 +493,19 @@ class ExtendedModelRegistryManager:
     def _register_all_models(self) -> None:
         """注册配置中的所有模型"""
         models_config = self._raw_config.get("models", {})
-        
+
+        if self._registry is None:
+            logger.warning("模型注册中心未初始化，跳过模型注册")
+            return
+
         for category, models in models_config.items():
             if not isinstance(models, dict):
                 continue
-            
+
             for model_id, config in models.items():
                 if not isinstance(config, dict):
                     continue
-                
+
                 full_model_id = f"{category}_{model_id}" if category else model_id
                 self._registry.register_from_dict(full_model_id, config)
     

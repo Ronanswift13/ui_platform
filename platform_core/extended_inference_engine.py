@@ -406,8 +406,15 @@ class PointCloudInferenceEngine(ExtendedBaseInferenceEngine):
         input_data = {
             self._input_names[0]: processed_points[np.newaxis, ...].astype(np.float32)
         }
-        
+
         # 执行推理
+        if self._session is None:
+            return ExtendedInferenceResult(
+                success=False,
+                model_id=self.config.model_id,
+                inference_time_ms=0,
+                error_message="ONNX会话未初始化"
+            )
         outputs = self._session.run(self._output_names, input_data)
         
         # 解析输出
@@ -612,8 +619,15 @@ class AudioInferenceEngine(ExtendedBaseInferenceEngine):
         
         # 准备输入
         input_data = {self._input_names[0]: processed_audio}
-        
+
         # 执行推理
+        if self._session is None:
+            return ExtendedInferenceResult(
+                success=False,
+                model_id=self.config.model_id,
+                inference_time_ms=0,
+                error_message="ONNX会话未初始化"
+            )
         outputs = self._session.run(self._output_names, input_data)
         
         # 解析输出
@@ -760,8 +774,15 @@ class TimeSeriesInferenceEngine(ExtendedBaseInferenceEngine):
         
         # 准备输入
         input_data = {self._input_names[0]: processed_data}
-        
+
         # 执行推理
+        if self._session is None:
+            return ExtendedInferenceResult(
+                success=False,
+                model_id=self.config.model_id,
+                inference_time_ms=0,
+                error_message="ONNX会话未初始化"
+            )
         outputs = self._session.run(self._output_names, input_data)
         
         # 解析输出
@@ -928,12 +949,12 @@ class MultimodalFusionEngine(ExtendedBaseInferenceEngine):
         
         if not predictions:
             return np.array([])
-        
+
         # 加权平均
         total_weight = sum(weights)
-        fused = sum(predictions) / total_weight
-        
-        return fused
+        fused = np.sum(predictions, axis=0) / total_weight
+
+        return np.asarray(fused)
     
     def _attention_fusion(self, features: Dict[str, np.ndarray]) -> np.ndarray:
         """注意力融合 - 学习自适应权重"""
