@@ -167,6 +167,22 @@ def create_app() -> FastAPI:
             },
         )
 
+    # ============== 电压等级设置页面 ==============
+    @app.get("/settings/voltage", response_class=HTMLResponse)
+    async def settings_voltage_page(request: Request):
+        """电压等级设置页面"""
+        from platform_core.voltage_api import voltage_manager
+
+        current_level = voltage_manager.get_current_level()
+        return templates.TemplateResponse(
+            "pages/settings_voltage.html",
+            {
+                "request": request,
+                "active_tab": "settings",
+                "current_voltage_level": current_level,
+            },
+        )
+
     return app
 
 

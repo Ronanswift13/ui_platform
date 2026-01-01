@@ -11,6 +11,7 @@
 - fusion_engine: 多证据融合引擎
 - ptz_controller: 云台联动控制器
 - api_routes: 增强版API路由
+- voltage_adapter: 220kV/500kV电压等级适配管理器
 """
 
 from __future__ import annotations
@@ -99,6 +100,14 @@ from platform_core.extended_model_registry_manager import (
     initialize_extended_models,
 )
 
+# 显式导入 - 电压等级适配管理器
+from platform_core.voltage_adapter import (
+    VoltageLevel,
+    VoltageAdapterManager,
+    VoltageAdaptedPlugin,
+    create_voltage_api_routes,
+)
+
 # 导出列表
 __all__ = [
     # 推理引擎
@@ -167,4 +176,10 @@ __all__ = [
     "get_extended_model_registry_manager",
     "get_extended_registry",
     "initialize_extended_models",
+
+    # 电压等级适配管理器
+    "VoltageLevel",
+    "VoltageAdapterManager",
+    "VoltageAdaptedPlugin",
+    "create_voltage_api_routes",
 ]

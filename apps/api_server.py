@@ -997,6 +997,13 @@ def create_api_app() -> FastAPI:
     except ImportError as e:
         print(f"[Warning] 增强路由模块未加载: {e}")
 
+    # ============== 集成电压等级管理路由 ==============
+    try:
+        from platform_core.voltage_api import integrate_voltage_routes
+        integrate_voltage_routes(app)
+    except ImportError as e:
+        print(f"[Warning] 电压等级管理路由未加载: {e}")
+
     return app
 
 

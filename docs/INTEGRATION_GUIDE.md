@@ -329,6 +329,6 @@ python -c "import onnxruntime as ort; print(ort.get_available_providers())"
 ## 📝 相关文档
 
 - [训练系统详细文档](docs/TRAINING.md)
-- [部署指南](files/DEPLOYMENT_GUIDE.md)
+- [部署指南](docs/DEPLOYMENT_GUIDE.md)
 - [模型配置](configs/models_config.yaml)
 - [架构说明](ARCHITECTURE.md)
