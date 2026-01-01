@@ -39,11 +39,11 @@ onnxruntime>=1.16.0
 # onnxruntime-gpu>=1.16.0
 
 # TensorRT加速 (可选)
-# tensorrt>=8.6.0
+tensorrt>=8.6.0
 
 # OCR支持 (可选)
-# paddleocr>=2.7.0
-# easyocr>=1.7.0
+ paddleocr>=2.7.0
+ easyocr>=1.7.0
 
 # 日志
 loguru>=0.7.2

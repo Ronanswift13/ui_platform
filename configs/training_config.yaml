@@ -1,0 +1,344 @@
+# =============================================================================
+# 破夜绘明激光监测平台 - 训练配置文件
+# =============================================================================
+#
+# 本文件定义了所有模型的训练超参数
+# 可根据实际数据集和硬件条件调整
+
+# 全局配置
+global:
+  # 数据目录
+  data_dir: "data"
+  
+  # 检查点目录
+  checkpoint_dir: "checkpoints"
+  
+  # ONNX输出目录
+  onnx_dir: "models"
+  
+  # 日志目录
+  log_dir: "logs"
+  
+  # 默认训练参数
+  default_epochs: 50
+  default_batch_size: 16
+  default_learning_rate: 0.0001
+  default_weight_decay: 0.00001
+  
+  # 优化器
+  optimizer: "adamw"  # adam, adamw, sgd
+  scheduler: "cosine"  # cosine, step, plateau
+  
+  # 早停
+  early_stopping: true
+  patience: 10
+  
+  # 混合精度 (仅CUDA)
+  use_amp: false
+  
+  # 数据增强
+  augmentation: true
+  
+  # ONNX导出
+  onnx_opset: 17
+  onnx_dynamic_batch: true
+  onnx_simplify: true
+
+# =============================================================================
+# Mac M系列专用配置
+# =============================================================================
+mac_config:
+  device: "mps"
+  precision: "float32"  # MPS暂不完全支持float16
+  batch_size_factor: 1.0  # 24G内存可以用较大batch
+  num_workers: 4
+
+# =============================================================================
+# Windows部署配置  
+# =============================================================================
+windows_config:
+  device: "cuda"
+  precision: "float16"  # 使用FP16加速
+  use_tensorrt: true
+  tensorrt_workspace_mb: 2048
+
+# =============================================================================
+# A组 - 主变巡视模型配置
+# =============================================================================
+transformer_inspection:
+  # 缺陷检测模型
+  defect_yolov8n:
+    type: "detection"
+    architecture: "yolov8"
+    scale: "n"
+    input_size: [640, 640]
+    num_classes: 6
+    classes:
+      - "oil_leak"        # 油泄漏
+      - "rust"            # 锈蚀
+      - "damage"          # 破损
+      - "foreign_object"  # 异物
+      - "crack"           # 裂纹
+      - "discoloration"   # 变色
+    
+    # 训练参数
+    epochs: 50
+    batch_size: 16
+    learning_rate: 0.0001
+    
+    # 检测参数
+    confidence_threshold: 0.5
+    nms_threshold: 0.45
+    
+    # 数据增强
+    augmentation:
+      horizontal_flip: 0.5
+      vertical_flip: 0.1
+      rotation: 15
+      color_jitter: 0.2
+      mosaic: 0.5
+  
+  # 油位分割模型
+  oil_unet:
+    type: "segmentation"
+    architecture: "unet"
+    input_size: [512, 512]
+    num_classes: 2
+    
+    epochs: 30
+    batch_size: 8
+    learning_rate: 0.0001
+  
+  # 硅胶分类模型
+  silica_cnn:
+    type: "classification"
+    architecture: "cnn"
+    input_size: [224, 224]
+    num_classes: 4
+    classes:
+      - "blue"     # 正常
+      - "pink"     # 轻度受潮
+      - "white"    # 严重受潮
+      - "unknown"  # 无法识别
+    
+    epochs: 30
+    batch_size: 32
+    learning_rate: 0.0001
+  
+  # 热成像异常模型
+  thermal_anomaly:
+    type: "classification"
+    architecture: "resnet18"
+    input_size: [224, 224]
+    num_classes: 3
+    classes:
+      - "normal"   # 正常
+      - "warning"  # 预警
+      - "alarm"    # 告警
+    
+    epochs: 30
+    batch_size: 32
+    temperature_range: [-20, 150]
+
+# =============================================================================
+# B组 - 开关间隔模型配置
+# =============================================================================
+switch_inspection:
+  # 开关状态检测
+  switch_yolov8s:
+    type: "detection"
+    architecture: "yolov8"
+    scale: "s"
+    input_size: [640, 640]
+    num_classes: 8
+    classes:
+      - "breaker_open"      # 断路器分
+      - "breaker_closed"    # 断路器合
+      - "isolator_open"     # 隔离开关分
+      - "isolator_closed"   # 隔离开关合
+      - "grounding_open"    # 接地开关分
+      - "grounding_closed"  # 接地开关合
+      - "indicator_red"     # 红色指示灯
+      - "indicator_green"   # 绿色指示灯
+    
+    epochs: 50
+    batch_size: 16
+    confidence_threshold: 0.6
+  
+  # 指示牌OCR
+  indicator_ocr:
+    type: "ocr"
+    architecture: "crnn"
+    input_size: [32, 128]
+    charset: "分合开关ONOFF断路器隔离接地0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    
+    epochs: 40
+    batch_size: 64
+    learning_rate: 0.001
+
+# =============================================================================
+# C组 - 母线巡视模型配置
+# =============================================================================
+busbar_inspection:
+  # 母线缺陷检测 (小目标优化)
+  busbar_yolov8m:
+    type: "detection"
+    architecture: "yolov8"
+    scale: "m"
+    input_size: [1280, 1280]  # 高分辨率
+    num_classes: 8
+    classes:
+      - "insulator_crack"   # 绝缘子裂纹
+      - "insulator_dirty"   # 绝缘子污损
+      - "fitting_loose"     # 金具松动
+      - "fitting_rust"      # 金具锈蚀
+      - "wire_damage"       # 导线破损
+      - "foreign_object"    # 异物悬挂
+      - "bird"              # 鸟类
+      - "insect"            # 飞虫
+    
+    epochs: 60
+    batch_size: 8  # 大尺寸减少batch
+    confidence_threshold: 0.4  # 小目标降低阈值
+    
+    # 切片推理
+    slicing:
+      enabled: true
+      tile_size: 1280
+      overlap: 128
+  
+  # 环境干扰过滤
+  noise_classifier:
+    type: "classification"
+    architecture: "cnn"
+    input_size: [128, 128]
+    num_classes: 5
+    classes:
+      - "real_defect"   # 真实缺陷
+      - "bird"          # 鸟类
+      - "insect"        # 飞虫
+      - "shadow"        # 阴影
+      - "reflection"    # 反光
+    
+    epochs: 30
+    batch_size: 32
+
+# =============================================================================
+# D组 - 电容器巡视模型配置
+# =============================================================================
+capacitor_inspection:
+  # 电容器检测
+  capacitor_yolov8:
+    type: "detection"
+    architecture: "yolov8"
+    scale: "n"
+    input_size: [640, 640]
+    num_classes: 6
+    classes:
+      - "capacitor_unit"    # 电容器单元
+      - "capacitor_tilted"  # 倾斜
+      - "capacitor_fallen"  # 倒塌
+      - "capacitor_missing" # 缺失
+      - "connection_wire"   # 连接线
+      - "fence"             # 围栏
+    
+    epochs: 50
+    batch_size: 16
+  
+  # 入侵检测
+  rtdetr_intrusion:
+    type: "detection"
+    architecture: "rtdetr"
+    input_size: [640, 640]
+    num_classes: 4
+    classes:
+      - "person"    # 人员
+      - "vehicle"   # 车辆
+      - "animal"    # 动物
+      - "unknown"   # 未知
+    
+    epochs: 50
+    batch_size: 16
+    
+    # 时序跟踪
+    tracking:
+      enabled: true
+      confirm_frames: 3
+      max_disappeared: 5
+
+# =============================================================================
+# E组 - 表计读数模型配置
+# =============================================================================
+meter_reading:
+  # 关键点检测
+  hrnet_keypoint:
+    type: "keypoint"
+    architecture: "hrnet"
+    input_size: [256, 256]
+    num_keypoints: 8  # 中心、刻度起点、终点等
+    
+    epochs: 40
+    batch_size: 32
+    learning_rate: 0.0001
+  
+  # 数字OCR
+  crnn_ocr:
+    type: "ocr"
+    architecture: "crnn"
+    input_size: [32, 128]
+    charset_size: 37  # 0-9 + a-z + blank
+    
+    epochs: 40
+    batch_size: 64
+  
+  # 表计分类
+  meter_classifier:
+    type: "classification"
+    architecture: "resnet18"
+    input_size: [224, 224]
+    num_classes: 5
+    classes:
+      - "pressure_gauge"  # 压力表
+      - "temperature"     # 温度表
+      - "oil_level"       # 油位表
+      - "sf6_pressure"    # SF6压力表
+      - "digital"         # 数字表
+    
+    epochs: 30
+    batch_size: 32
+
+# =============================================================================
+# 数据集配置
+# =============================================================================
+datasets:
+  # 公开数据集 (预训练)
+  public:
+    power_equipment:
+      path: "data/public/power_equipment"
+      format: "coco"
+      description: "电力设备缺陷检测公开数据集"
+    
+    transmission_line:
+      path: "data/public/transmission_line"
+      format: "voc"
+      description: "输电线路航拍数据集"
+    
+    meter_reading:
+      path: "data/public/meter"
+      format: "classification"
+      description: "工业表计读数数据集"
+  
+  # 云南保山站数据 (微调)
+  baoshan:
+    path: "data/baoshan"
+    format: "coco"
+    description: "云南保山站实地采集数据"
+    
+    # 需采集的数据类型
+    required_data:
+      - "可见光图像"
+      - "热成像数据"
+      - "3D LiDAR点云"
+      - "声学数据"
+      - "SF6传感器数据"
+      - "高光谱图像"
