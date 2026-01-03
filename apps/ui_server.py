@@ -82,6 +82,14 @@ def create_app() -> FastAPI:
         if route_path and route_path.startswith("/api"):
             app.routes.append(route)
 
+    # ============== 集成训练API路由 ==============
+    try:
+        from apps.training_api import router as training_router
+        app.include_router(training_router)
+        print("✓ 训练API路由已集成")
+    except ImportError as e:
+        print(f"✗ 训练API导入失败: {e}")
+
     # ============== 页面路由 ==============
 
     @app.get("/", response_class=HTMLResponse)
@@ -132,7 +140,7 @@ def create_app() -> FastAPI:
                 print(f"获取插件 {module['plugin_id']} 的UI配置失败: {e}")
 
         return templates.TemplateResponse(
-            "pages/module.html",
+            "pages/module_with_training.html",
             {
                 "request": request,
                 "active_tab": module_id,
@@ -184,7 +192,7 @@ def create_app() -> FastAPI:
     async def training_page(request: Request):
         """模型训练管理页面"""
         return templates.TemplateResponse(
-            "pages/training.html",
+            "pages/training_enhanced.html",
             {
                 "request": request,
                 "active_tab": "training",

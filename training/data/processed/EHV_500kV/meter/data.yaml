@@ -1,17 +1,14 @@
 names:
   0: sf6_pressure_gauge
-  1: sf6_density_relay
-  2: gas_relay
-  3: oil_temp_gauge
-  4: oil_level_gauge
-nc: 5
+  1: oil_temp_gauge
+  2: oil_level_gauge
+  3: digital_display
+  4: pointer_gauge
+  5: led_indicator
+nc: 6
 path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/EHV_500kV/meter
 plugin: meter
 test: images/test
-thermal_thresholds:
-  alarm: 95
-  normal: 65
-  warning: 80
 train: images/train
 val: images/val
 voltage_level: EHV_500kV

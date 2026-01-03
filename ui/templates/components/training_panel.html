@@ -1,0 +1,242 @@
+<!-- 
+训练控制面板组件
+用法: {% include 'components/training_panel.html' %}
+需要在页面中设置 module_id 变量
+-->
+
+<div class="card mb-3" id="training-panel">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-cpu"></i> 模型训练
+        </h5>
+        <span class="badge bg-secondary" id="training-status-badge">未训练</span>
+    </div>
+    <div class="card-body">
+        <!-- 电压等级选择 -->
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="bi bi-lightning-charge"></i> 电压等级
+            </label>
+            <select class="form-select form-select-sm" id="training-voltage-select">
+                <option value="">-- 选择电压等级 --</option>
+                <optgroup label="特高压 (UHV)">
+                    <option value="UHV_1000kV_AC">1000kV 交流</option>
+                    <option value="UHV_800kV_DC">±800kV 直流</option>
+                </optgroup>
+                <optgroup label="超高压 (EHV)">
+                    <option value="EHV_500kV">500kV</option>
+                    <option value="EHV_330kV">330kV</option>
+                    <option value="EHV_750kV">750kV</option>
+                </optgroup>
+                <optgroup label="高压 (HV)">
+                    <option value="HV_220kV" selected>220kV</option>
+                    <option value="HV_110kV">110kV</option>
+                </optgroup>
+                <optgroup label="中压 (MV)">
+                    <option value="MV_35kV">35kV</option>
+                    <option value="MV_66kV">66kV</option>
+                </optgroup>
+                <optgroup label="低压 (LV)">
+                    <option value="LV_10kV">10kV</option>
+                    <option value="LV_6kV">6kV</option>
+                    <option value="LV_380V">380V</option>
+                </optgroup>
+            </select>
+        </div>
+
+        <!-- 数据集状态 -->
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="bi bi-database"></i> 数据集状态
+            </label>
+            <div class="dataset-status-card p-2 border rounded" id="dataset-status-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span id="dataset-status-text">检查中...</span>
+                    <span class="badge" id="dataset-status-badge">-</span>
+                </div>
+                <div class="mt-2 small text-muted" id="dataset-stats">
+                    <span>训练: <strong id="train-count">0</strong></span>
+                    <span class="ms-2">验证: <strong id="val-count">0</strong></span>
+                    <span class="ms-2">测试: <strong id="test-count">0</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据下载按钮 -->
+        <div class="mb-3" id="download-section">
+            <label class="form-label">
+                <i class="bi bi-cloud-download"></i> 下载公开数据集
+            </label>
+            <div class="d-grid gap-2" id="download-buttons">
+                <!-- 动态生成 -->
+            </div>
+            <div class="progress mt-2" id="download-progress-container" style="display: none;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     id="download-progress-bar" 
+                     role="progressbar" 
+                     style="width: 0%"></div>
+            </div>
+            <small class="text-muted" id="download-status-text"></small>
+        </div>
+
+        <!-- 训练参数 -->
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="bi bi-sliders"></i> 训练参数
+            </label>
+            <div class="row g-2">
+                <div class="col-6">
+                    <label class="form-label small">训练轮数</label>
+                    <input type="number" class="form-control form-control-sm" 
+                           id="training-epochs" value="100" min="10" max="500">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small">批次大小</label>
+                    <select class="form-select form-select-sm" id="training-batch-size">
+                        <option value="8">8</option>
+                        <option value="16" selected>16</option>
+                        <option value="32">32</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 训练进度 -->
+        <div class="mb-3" id="training-progress-section" style="display: none;">
+            <label class="form-label">
+                <i class="bi bi-activity"></i> 训练进度
+            </label>
+            <div class="progress mb-2" style="height: 25px;">
+                <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
+                     id="training-progress-bar" 
+                     role="progressbar" 
+                     style="width: 0%">
+                    <span id="training-progress-text">0%</span>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between small text-muted">
+                <span>Epoch: <strong id="current-epoch">0</strong>/<strong id="total-epochs">100</strong></span>
+                <span>mAP50: <strong id="current-map">-</strong></span>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted" id="training-message">准备中...</small>
+            </div>
+        </div>
+
+        <!-- 已训练模型信息 -->
+        <div class="mb-3" id="trained-model-section" style="display: none;">
+            <label class="form-label">
+                <i class="bi bi-check-circle text-success"></i> 已训练模型
+            </label>
+            <div class="trained-model-card p-2 border rounded border-success bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-success"><i class="bi bi-cpu"></i> <span id="trained-model-name">-</span></span>
+                    <span class="badge bg-success">已就绪</span>
+                </div>
+                <div class="mt-1 small text-muted">
+                    <span>mAP50: <strong id="trained-model-map">-</strong></span>
+                    <span class="ms-2">训练时间: <span id="trained-model-time">-</span></span>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-outline-success btn-sm" id="btn-use-model">
+                        <i class="bi bi-play-fill"></i> 使用此模型
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btn-retrain">
+                        <i class="bi bi-arrow-repeat"></i> 重新训练
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary" id="btn-start-training" disabled>
+                <i class="bi bi-play-circle"></i> 开始训练
+            </button>
+            <button class="btn btn-danger" id="btn-cancel-training" style="display: none;">
+                <i class="bi bi-stop-circle"></i> 取消训练
+            </button>
+        </div>
+
+        <!-- 占位符数据说明 -->
+        <div class="alert alert-warning mt-3" id="placeholder-warning" style="display: none;">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>需要现场数据</strong>
+            <p class="mb-0 small" id="placeholder-instructions">
+                当前数据集为占位符，需要现场采集真实数据才能进行有效训练。
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+/* 训练面板样式 */
+#training-panel .dataset-status-card {
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+#training-panel .dataset-status-card.ready {
+    background-color: #d4edda;
+    border-color: #28a745 !important;
+}
+
+#training-panel .dataset-status-card.placeholder {
+    background-color: #fff3cd;
+    border-color: #ffc107 !important;
+}
+
+#training-panel .dataset-status-card.downloading {
+    background-color: #cce5ff;
+    border-color: #007bff !important;
+}
+
+#training-panel .trained-model-card {
+    transition: all 0.3s ease;
+}
+
+#training-panel .trained-model-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#training-panel .progress {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+#training-panel .progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* 下载按钮样式 */
+#training-panel .download-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+}
+
+#training-panel .download-btn .dataset-info {
+    text-align: left;
+}
+
+#training-panel .download-btn .dataset-name {
+    font-weight: 500;
+}
+
+#training-panel .download-btn .dataset-count {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+#training-panel .training-active {
+    animation: pulse 2s infinite;
+}
+</style>

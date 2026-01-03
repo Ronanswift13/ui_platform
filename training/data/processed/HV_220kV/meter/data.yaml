@@ -2,14 +2,13 @@ names:
   0: sf6_pressure_gauge
   1: oil_temp_gauge
   2: oil_level_gauge
-nc: 3
+  3: digital_display
+  4: pointer_gauge
+  5: led_indicator
+nc: 6
 path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/HV_220kV/meter
 plugin: meter
 test: images/test
-thermal_thresholds:
-  alarm: 85
-  normal: 60
-  warning: 75
 train: images/train
 val: images/val
 voltage_level: HV_220kV
