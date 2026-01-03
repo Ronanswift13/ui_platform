@@ -1,0 +1,4 @@
+cabinet_switch
+air_breaker
+indicator_light
+label

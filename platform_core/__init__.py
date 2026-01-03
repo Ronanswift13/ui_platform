@@ -11,7 +11,7 @@
 - fusion_engine: 多证据融合引擎
 - ptz_controller: 云台联动控制器
 - api_routes: 增强版API路由
-- voltage_adapter: 220kV/500kV电压等级适配管理器
+- voltage_adapter_extended: 全电压等级适配管理器
 """
 
 from __future__ import annotations
@@ -100,13 +100,32 @@ from platform_core.extended_model_registry_manager import (
     initialize_extended_models,
 )
 
-# 显式导入 - 电压等级适配管理器
-from platform_core.voltage_adapter import (
+# 显式导入 - 电压等级适配管理器 (全电压等级)
+from platform_core.voltage_adapter_extended import (
+    VoltageCategory,
     VoltageLevel,
     VoltageAdapterManager,
-    VoltageAdaptedPlugin,
-    create_voltage_api_routes,
+    create_voltage_adapter,
+    get_all_voltage_categories,
+    VOLTAGE_CONFIGS,
+    MODEL_LIBRARIES,
+    PLUGIN_CAPABILITIES,
+    VOLTAGE_CATEGORY_MAPPING,
 )
+
+# 显式导入 - 电压等级管理 API (可选)
+try:
+    from platform_core.voltage_api_extended import (
+        create_voltage_router,
+        integrate_voltage_routes,
+        voltage_manager as global_voltage_manager,
+    )
+    VOLTAGE_API_AVAILABLE = True
+except ImportError:
+    VOLTAGE_API_AVAILABLE = False
+    create_voltage_router = None
+    integrate_voltage_routes = None
+    global_voltage_manager = None
 
 # 导出列表
 __all__ = [
@@ -178,8 +197,19 @@ __all__ = [
     "initialize_extended_models",
 
     # 电压等级适配管理器
+    "VoltageCategory",
     "VoltageLevel",
     "VoltageAdapterManager",
-    "VoltageAdaptedPlugin",
-    "create_voltage_api_routes",
+    "create_voltage_adapter",
+    "get_all_voltage_categories",
+    "VOLTAGE_CONFIGS",
+    "MODEL_LIBRARIES",
+    "PLUGIN_CAPABILITIES",
+    "VOLTAGE_CATEGORY_MAPPING",
+
+    # 电压等级管理 API
+    "VOLTAGE_API_AVAILABLE",
+    "create_voltage_router",
+    "integrate_voltage_routes",
+    "global_voltage_manager",
 ]

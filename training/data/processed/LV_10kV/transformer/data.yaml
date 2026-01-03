@@ -1,0 +1,16 @@
+names:
+  0: rust
+  1: oil_leak
+  2: radiator_damage
+  3: box_transformer
+nc: 4
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/LV_10kV/transformer
+plugin: transformer
+test: images/test
+thermal_thresholds:
+  alarm: 70
+  normal: 45
+  warning: 60
+train: images/train
+val: images/val
+voltage_level: LV_10kV

@@ -1,344 +1,805 @@
 # =============================================================================
-# 破夜绘明激光监测平台 - 训练配置文件
+# 破夜绘明激光监测平台 - 多电压等级训练数据配置
+# 训练路径: /Users/ronan/Desktop/破夜绘明激光监测平台/training
 # =============================================================================
-#
-# 本文件定义了所有模型的训练超参数
-# 可根据实际数据集和硬件条件调整
 
-# 全局配置
-global:
-  # 数据目录
-  data_dir: "data"
-  
-  # 检查点目录
-  checkpoint_dir: "checkpoints"
-  
-  # ONNX输出目录
-  onnx_dir: "models"
-  
-  # 日志目录
-  log_dir: "logs"
-  
+# 基础路径配置
+paths:
+  base_training_path: "/Users/ronan/Desktop/破夜绘明激光监测平台/training"
+  checkpoints_path: "${base_training_path}/checkpoints"
+  data_path: "${base_training_path}/data"
+  exports_path: "${base_training_path}/exports"
+  logs_path: "${base_training_path}/logs"
+  results_path: "${base_training_path}/results"
+
+# =============================================================================
+# 公开数据集来源配置
+# =============================================================================
+public_datasets:
+  # 绝缘子缺陷检测数据集
+  insulator_defect:
+    name: "Insulator-Defect Detection Dataset"
+    source: "datasetninja"
+    url: "https://datasetninja.com/insulator-defect-detection"
+    github: "https://github.com/InsulatorData/InsulatorDataSet"
+    figshare: "https://doi.org/10.6084/m9.figshare.26409637"
+    size: "2.43GB"
+    images: 1600
+    classes: ["insulator", "damaged", "flashover"]
+    format: "Supervisely/YOLO"
+    voltage_levels: ["500kV", "330kV", "220kV", "110kV"]
+    applicable_plugins: ["busbar", "transformer"]
+    
+  # 中国电力线绝缘子数据集 (CPLID)
+  cplid:
+    name: "Chinese Power Line Insulator Dataset"
+    source: "State Grid Corporation of China"
+    github: "https://github.com/InsulatorData/InsulatorDataSet"
+    images: 848  # 600 normal + 248 defective
+    classes: ["normal_insulator", "defective_insulator"]
+    format: "YOLO"
+    voltage_levels: ["all"]
+    applicable_plugins: ["busbar"]
+    
+  # 统一公开绝缘子数据集 (UPID)
+  upid:
+    name: "Unifying Public Insulator Dataset"
+    source: "Research augmentation of CPLID"
+    github: "https://github.com/phd-benel/MPID"
+    images: 6860
+    classes: ["insulator", "damaged", "flashover", "hammer"]
+    format: "YOLO"
+    voltage_levels: ["all"]
+    applicable_plugins: ["busbar"]
+    
+  # IEEE绝缘子缺陷数据集 (IDID)
+  idid:
+    name: "Insulator Defect Image Dataset"
+    source: "IEEE DataPort / Electric Power Research Institute"
+    url: "https://ieee-dataport.org/competitions/insulator-defect-detection"
+    images: 1600
+    classes: ["good", "broken", "flashed", "insulator_string"]
+    format: "YOLO"
+    voltage_levels: ["110kV", "220kV", "500kV"]
+    applicable_plugins: ["busbar", "transformer"]
+    
+  # 电力设备红外热像数据集
+  ir_power_equipment:
+    name: "Power Equipment Infrared Image Dataset"
+    source: "Northeast Electric Power University"
+    images: 2560
+    classes: ["lightning_arrester", "transformer", "switch", "reactor", 
+              "current_transformer_1", "current_transformer_2", 
+              "voltage_transformer", "discharge_coil", "insulator", "fuse"]
+    format: "VOC"
+    voltage_levels: ["220kV", "500kV"]
+    applicable_plugins: ["transformer", "switch", "meter"]
+    
+  # 变压器热像数据集
+  transformer_thermal:
+    name: "Thermal Images Dataset - Transformer"
+    source: "Mendeley Data"
+    url: "https://data.mendeley.com/datasets/8mg8mkc7k5/3"
+    images: 255
+    classes: ["healthy", "fault_type_1", "fault_type_2", "fault_type_3",
+              "fault_type_4", "fault_type_5", "fault_type_6", "fault_type_7", "fault_type_8"]
+    format: "Images"
+    voltage_levels: ["all"]
+    applicable_plugins: ["transformer"]
+    
+  # 高压设备红外数据集
+  hv_ir_dataset:
+    name: "Infrared Thermal Image Dataset of High Voltage Equipment"
+    source: "SciDB"
+    url: "https://www.scidb.cn/en/detail?dataSetId=e416c488169f484485ad7575dcfc43ce"
+    classes: ["circuit_breaker", "power_transformer", "surge_arrester", 
+              "disconnector", "wave_trap"]
+    format: "FLIR Images"
+    voltage_levels: ["132kV", "220kV"]
+    applicable_plugins: ["transformer", "switch"]
+    
+  # 电表读数数据集
+  ufpr_amr:
+    name: "UFPR-AMR Dataset"
+    source: "Federal University of Paraná"
+    url: "https://arxiv.org/abs/1902.09600"
+    github: "https://github.com/raysonlaroca/ufpr-amr-dataset"
+    images: 2000
+    classes: ["counter", "digit_0", "digit_1", "digit_2", "digit_3", 
+              "digit_4", "digit_5", "digit_6", "digit_7", "digit_8", "digit_9"]
+    format: "YOLO"
+    voltage_levels: ["all"]
+    applicable_plugins: ["meter"]
+    
+  # Copel电表数据集
+  copel_amr:
+    name: "Copel-AMR Dataset"
+    source: "Energy Company of Paraná"
+    github: "https://github.com/raysonlaroca/copel-amr-dataset"
+    images: 12500
+    classes: ["meter_counter", "digits"]
+    format: "YOLO"
+    voltage_levels: ["all"]
+    applicable_plugins: ["meter"]
+    
+  # 变电站设备缺陷数据集
+  substation_defect:
+    name: "Substation Equipment Defect Dataset"
+    source: "State Grid Shandong Electric Power Company"
+    reference: "https://www.mdpi.com/1424-8220/24/18/5914"
+    images: 12968
+    classes: ["damaged_meter", "oil_leakage", "damaged_breather", 
+              "cracked_insulator", "floating_object", "abnormal_door",
+              "silicone_discoloration", "rust", "bird_nest", 
+              "floor_oil_pollution", "shell_breakage", "broken_cover"]
+    format: "YOLO"
+    voltage_levels: ["220kV", "500kV"]
+    applicable_plugins: ["transformer", "switch", "meter", "capacitor"]
+
+# =============================================================================
+# 电压等级训练配置
+# =============================================================================
+voltage_levels:
+  # 特高压 (UHV)
+  UHV_1000kV_AC:
+    name: "1000kV交流特高压"
+    category: "UHV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "oil_leak"
+          - "rust"
+          - "surface_damage"
+          - "foreign_object"
+          - "silica_gel_normal"
+          - "silica_gel_abnormal"
+          - "oil_level_normal"
+          - "oil_level_abnormal"
+          - "bushing_crack"
+          - "porcelain_contamination"
+          - "partial_discharge"
+          - "core_ground_current"
+          - "winding_deformation"
+        thermal_thresholds:
+          normal: 70
+          warning: 85
+          alarm: 100
+        data_sources:
+          public: ["transformer_thermal", "ir_power_equipment"]
+          placeholder_required: true
+          placeholder_reason: "特高压主变容量大(1000-3000MVA)，公开数据极少，需现场采集"
+          
+      switch:
+        detection_classes:
+          - "breaker_open"
+          - "breaker_closed"
+          - "isolator_open"
+          - "isolator_closed"
+          - "grounding_open"
+          - "grounding_closed"
+          - "indicator_red"
+          - "indicator_green"
+          - "gis_position"
+          - "gis_sf6_density"
+        angle_reference:
+          breaker: {open_deg: -65, closed_deg: 35}
+          isolator: {open_deg: -75, closed_deg: 25}
+          grounding: {open_deg: -85, closed_deg: 15}
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "特高压GIS动作视频和角度标定数据需现场采集"
+          
+      busbar:
+        detection_classes:
+          - "insulator_crack"
+          - "insulator_dirty"
+          - "insulator_flashover"
+          - "fitting_loose"
+          - "fitting_rust"
+          - "wire_damage"
+          - "foreign_object"
+          - "bird"
+          - "pin_missing"
+          - "spacer_damage"
+          - "corona_discharge"
+        data_sources:
+          public: ["insulator_defect", "cplid", "upid", "idid"]
+          placeholder_required: true
+          placeholder_reason: "特高压母线跨度大，需无人机或远距摄像机现场采集"
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_unit"
+          - "capacitor_tilted"
+          - "capacitor_fallen"
+          - "capacitor_missing"
+          - "person"
+          - "vehicle"
+          - "fuse_blown"
+          - "silver_contact_damage"
+        data_sources:
+          public: []
+          placeholder_required: true
+          placeholder_reason: "特高压电容器样本极少，需现场拍摄各缺陷状态"
+          
+      meter:
+        detection_classes:
+          - "sf6_pressure_gauge"
+          - "sf6_density_relay"
+          - "oil_temp_gauge"
+          - "oil_level_gauge"
+          - "gas_relay"
+          - "digital_display"
+          - "pointer_gauge"
+        data_sources:
+          public: ["ufpr_amr", "copel_amr"]
+          placeholder_required: true
+          placeholder_reason: "特定型号仪表外观差异大，需站内拍摄样本微调"
+
+  UHV_800kV_DC:
+    name: "±800kV直流特高压"
+    category: "UHV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "converter_transformer"
+          - "oil_leak"
+          - "bushing_crack"
+          - "cooling_system"
+          - "tap_changer"
+        thermal_thresholds:
+          normal: 70
+          warning: 85
+          alarm: 100
+        data_sources:
+          public: ["transformer_thermal"]
+          placeholder_required: true
+          placeholder_reason: "换流变压器专用数据需现场采集"
+          
+      switch:
+        detection_classes:
+          - "converter_valve"
+          - "thyristor_status"
+          - "cooling_water"
+          - "valve_temperature"
+          - "dc_breaker"
+        data_sources:
+          public: []
+          placeholder_required: true
+          placeholder_reason: "换流阀监测数据需现场采集"
+
+  # 超高压 (EHV)
+  EHV_500kV:
+    name: "500kV超高压"
+    category: "EHV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "oil_leak"
+          - "rust"
+          - "surface_damage"
+          - "foreign_object"
+          - "silica_gel_normal"
+          - "silica_gel_abnormal"
+          - "oil_level_normal"
+          - "oil_level_abnormal"
+          - "bushing_crack"
+          - "porcelain_contamination"
+        thermal_thresholds:
+          normal: 65
+          warning: 80
+          alarm: 95
+        data_sources:
+          public: ["transformer_thermal", "ir_power_equipment", "substation_defect"]
+          placeholder_required: false
+          
+      switch:
+        detection_classes:
+          - "breaker_open"
+          - "breaker_closed"
+          - "isolator_open"
+          - "isolator_closed"
+          - "grounding_open"
+          - "grounding_closed"
+          - "indicator_red"
+          - "indicator_green"
+          - "gis_position"
+        angle_reference:
+          breaker: {open_deg: -60, closed_deg: 30}
+          isolator: {open_deg: -70, closed_deg: 20}
+          grounding: {open_deg: -80, closed_deg: 10}
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "GIS位置指示符号数据稀少"
+          
+      busbar:
+        detection_classes:
+          - "insulator_crack"
+          - "insulator_dirty"
+          - "insulator_flashover"
+          - "fitting_loose"
+          - "fitting_rust"
+          - "wire_damage"
+          - "foreign_object"
+          - "bird"
+          - "pin_missing"
+          - "spacer_damage"
+        data_sources:
+          public: ["insulator_defect", "cplid", "upid", "idid"]
+          placeholder_required: true
+          placeholder_reason: "闪络痕迹和间隔棒损坏样本少"
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_unit"
+          - "capacitor_tilted"
+          - "capacitor_fallen"
+          - "capacitor_missing"
+          - "person"
+          - "vehicle"
+          - "fuse_blown"
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "熔断/倾斜场景需现场采集"
+          
+      meter:
+        detection_classes:
+          - "sf6_pressure_gauge"
+          - "sf6_density_relay"
+          - "gas_relay"
+          - "oil_temp_gauge"
+          - "oil_level_gauge"
+        data_sources:
+          public: ["ufpr_amr", "copel_amr"]
+          placeholder_required: true
+          placeholder_reason: "特定品牌密度继电器样本较少"
+
+  EHV_330kV:
+    name: "330kV超高压"
+    category: "EHV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "oil_leak"
+          - "rust"
+          - "surface_damage"
+          - "silica_gel_normal"
+          - "silica_gel_abnormal"
+          - "oil_level_normal"
+          - "oil_level_abnormal"
+        thermal_thresholds:
+          normal: 63
+          warning: 78
+          alarm: 92
+        data_sources:
+          public: ["transformer_thermal", "ir_power_equipment"]
+          placeholder_required: false
+          
+      switch:
+        detection_classes:
+          - "breaker_open"
+          - "breaker_closed"
+          - "isolator_open"
+          - "isolator_closed"
+          - "grounding_open"
+          - "grounding_closed"
+          - "indicator_red"
+          - "indicator_green"
+        angle_reference:
+          breaker: {open_deg: -58, closed_deg: 32}
+          isolator: {open_deg: -68, closed_deg: 22}
+          grounding: {open_deg: -78, closed_deg: 12}
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: false
+          
+      busbar:
+        detection_classes:
+          - "insulator_crack"
+          - "insulator_dirty"
+          - "fitting_loose"
+          - "fitting_rust"
+          - "wire_damage"
+          - "foreign_object"
+          - "bird"
+        data_sources:
+          public: ["insulator_defect", "cplid", "upid"]
+          placeholder_required: false
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_unit"
+          - "capacitor_tilted"
+          - "capacitor_fallen"
+          - "fuse_blown"
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          
+      meter:
+        detection_classes:
+          - "sf6_pressure_gauge"
+          - "oil_temp_gauge"
+          - "oil_level_gauge"
+        data_sources:
+          public: ["ufpr_amr"]
+          placeholder_required: false
+
+  # 高压 (HV)
+  HV_220kV:
+    name: "220kV高压"
+    category: "HV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "oil_leak"
+          - "rust"
+          - "surface_damage"
+          - "foreign_object"
+          - "silica_gel_normal"
+          - "silica_gel_abnormal"
+          - "oil_level_normal"
+          - "oil_level_abnormal"
+        thermal_thresholds:
+          normal: 60
+          warning: 75
+          alarm: 85
+        data_sources:
+          public: ["transformer_thermal", "ir_power_equipment", "substation_defect"]
+          placeholder_required: false
+          
+      switch:
+        detection_classes:
+          - "breaker_open"
+          - "breaker_closed"
+          - "isolator_open"
+          - "isolator_closed"
+          - "grounding_open"
+          - "grounding_closed"
+          - "indicator_red"
+          - "indicator_green"
+        angle_reference:
+          breaker: {open_deg: -55, closed_deg: 35}
+          isolator: {open_deg: -65, closed_deg: 25}
+          grounding: {open_deg: -75, closed_deg: 15}
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: false
+          
+      busbar:
+        detection_classes:
+          - "insulator_crack"
+          - "insulator_dirty"
+          - "fitting_loose"
+          - "fitting_rust"
+          - "wire_damage"
+          - "foreign_object"
+          - "bird"
+          - "bird_nest"
+        data_sources:
+          public: ["insulator_defect", "cplid", "upid", "idid"]
+          placeholder_required: false
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_unit"
+          - "capacitor_tilted"
+          - "capacitor_fallen"
+          - "capacitor_missing"
+          - "person"
+          - "vehicle"
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "倾斜和掉落数据需现场模拟"
+          
+      meter:
+        detection_classes:
+          - "sf6_pressure_gauge"
+          - "oil_temp_gauge"
+          - "oil_level_gauge"
+        data_sources:
+          public: ["ufpr_amr", "copel_amr"]
+          placeholder_required: false
+
+  HV_110kV:
+    name: "110kV高压"
+    category: "HV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "oil_leak"
+          - "rust"
+          - "surface_damage"
+          - "silica_gel_normal"
+          - "silica_gel_abnormal"
+          - "oil_level_normal"
+          - "oil_level_abnormal"
+        thermal_thresholds:
+          normal: 55
+          warning: 70
+          alarm: 80
+        data_sources:
+          public: ["transformer_thermal", "substation_defect"]
+          placeholder_required: false
+          
+      switch:
+        detection_classes:
+          - "breaker_open"
+          - "breaker_closed"
+          - "isolator_open"
+          - "isolator_closed"
+          - "grounding_open"
+          - "grounding_closed"
+          - "indicator_red"
+          - "indicator_green"
+        angle_reference:
+          breaker: {open_deg: -55, closed_deg: 35}
+          isolator: {open_deg: -65, closed_deg: 25}
+          grounding: {open_deg: -75, closed_deg: 15}
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "不同型号断路器开合角度数据缺少"
+          
+      busbar:
+        detection_classes:
+          - "insulator_crack"
+          - "insulator_dirty"
+          - "fitting_loose"
+          - "fitting_rust"
+          - "wire_damage"
+          - "foreign_object"
+          - "bird"
+          - "bird_nest"
+        data_sources:
+          public: ["insulator_defect", "cplid", "upid"]
+          placeholder_required: false
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_unit"
+          - "capacitor_tilted"
+          - "capacitor_fallen"
+          - "person"
+          - "vehicle"
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          
+      meter:
+        detection_classes:
+          - "sf6_pressure_gauge"
+          - "oil_temp_gauge"
+          - "oil_level_gauge"
+        data_sources:
+          public: ["ufpr_amr"]
+          placeholder_required: false
+
+  # 中压 (MV)
+  MV_35kV:
+    name: "35kV中压"
+    category: "MV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "oil_leak"
+          - "rust"
+          - "silica_gel_normal"
+          - "silica_gel_abnormal"
+          - "oil_level_normal"
+          - "oil_level_abnormal"
+          - "conductor_rust"
+        thermal_thresholds:
+          normal: 50
+          warning: 65
+          alarm: 75
+        data_sources:
+          public: ["transformer_thermal"]
+          placeholder_required: true
+          placeholder_reason: "需采集站内导电接头锈蚀和油渍图像"
+          
+      switch:
+        detection_classes:
+          - "breaker_open"
+          - "breaker_closed"
+          - "isolator_open"
+          - "isolator_closed"
+          - "indicator_red"
+          - "indicator_green"
+          - "cabinet_door"
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "中压开关结构型号较多"
+          
+      busbar:
+        detection_classes:
+          - "insulator_crack"
+          - "insulator_dirty"
+          - "fitting_loose"
+          - "wire_damage"
+          - "foreign_object"
+        data_sources:
+          public: ["insulator_defect", "cplid"]
+          placeholder_required: true
+          placeholder_reason: "导线紧固件松动和异物缠绕数据"
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_unit"
+          - "capacitor_tilted"
+          - "capacitor_missing"
+          - "safety_distance"
+        data_sources:
+          public: []
+          placeholder_required: true
+          placeholder_reason: "暂无公开数据，需现场采集"
+          
+      meter:
+        detection_classes:
+          - "digital_meter"
+          - "analog_meter"
+          - "transformer_monitor"
+        data_sources:
+          public: ["ufpr_amr", "copel_amr"]
+          placeholder_required: true
+          placeholder_reason: "电表遮挡、污渍样本需现场采集"
+
+  # 低压 (LV)
+  LV_10kV:
+    name: "10kV低压"
+    category: "LV"
+    plugins:
+      transformer:
+        detection_classes:
+          - "rust"
+          - "oil_leak"
+          - "radiator_damage"
+          - "box_transformer"
+        thermal_thresholds:
+          normal: 45
+          warning: 60
+          alarm: 70
+        data_sources:
+          public: ["transformer_thermal", "substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "现场低压箱变故障图像"
+          
+      switch:
+        detection_classes:
+          - "cabinet_switch"
+          - "air_breaker"
+          - "indicator_light"
+          - "label"
+        data_sources:
+          public: ["substation_defect"]
+          placeholder_required: true
+          placeholder_reason: "标签老化和模糊样本"
+          
+      busbar:
+        detection_classes:
+          - "bolt_loose"
+          - "wire_damage"
+          - "foreign_object"
+        data_sources:
+          public: ["insulator_defect"]
+          placeholder_required: true
+          placeholder_reason: "螺栓松动近景照片"
+          
+      capacitor:
+        detection_classes:
+          - "capacitor_bulge"
+          - "capacitor_leak"
+        data_sources:
+          public: []
+          placeholder_required: true
+          placeholder_reason: "鼓包和漏液样本需现场采集"
+          
+      meter:
+        detection_classes:
+          - "energy_meter"
+          - "water_meter"
+          - "pointer_meter"
+          - "digital_meter"
+        data_sources:
+          public: ["ufpr_amr", "copel_amr"]
+          placeholder_required: true
+          placeholder_reason: "老旧表和污染表图片"
+
+# =============================================================================
+# 训练超参数配置
+# =============================================================================
+training:
   # 默认训练参数
-  default_epochs: 50
-  default_batch_size: 16
-  default_learning_rate: 0.0001
-  default_weight_decay: 0.00001
-  
-  # 优化器
-  optimizer: "adamw"  # adam, adamw, sgd
-  scheduler: "cosine"  # cosine, step, plateau
-  
-  # 早停
-  early_stopping: true
-  patience: 10
-  
-  # 混合精度 (仅CUDA)
-  use_amp: false
-  
-  # 数据增强
-  augmentation: true
-  
-  # ONNX导出
-  onnx_opset: 17
-  onnx_dynamic_batch: true
-  onnx_simplify: true
-
-# =============================================================================
-# Mac M系列专用配置
-# =============================================================================
-mac_config:
-  device: "mps"
-  precision: "float32"  # MPS暂不完全支持float16
-  batch_size_factor: 1.0  # 24G内存可以用较大batch
-  num_workers: 4
-
-# =============================================================================
-# Windows部署配置  
-# =============================================================================
-windows_config:
-  device: "cuda"
-  precision: "float16"  # 使用FP16加速
-  use_tensorrt: true
-  tensorrt_workspace_mb: 2048
-
-# =============================================================================
-# A组 - 主变巡视模型配置
-# =============================================================================
-transformer_inspection:
-  # 缺陷检测模型
-  defect_yolov8n:
-    type: "detection"
-    architecture: "yolov8"
-    scale: "n"
-    input_size: [640, 640]
-    num_classes: 6
-    classes:
-      - "oil_leak"        # 油泄漏
-      - "rust"            # 锈蚀
-      - "damage"          # 破损
-      - "foreign_object"  # 异物
-      - "crack"           # 裂纹
-      - "discoloration"   # 变色
-    
-    # 训练参数
-    epochs: 50
+  default:
+    epochs: 100
     batch_size: 16
-    learning_rate: 0.0001
-    
-    # 检测参数
-    confidence_threshold: 0.5
-    nms_threshold: 0.45
-    
-    # 数据增强
-    augmentation:
-      horizontal_flip: 0.5
-      vertical_flip: 0.1
-      rotation: 15
-      color_jitter: 0.2
-      mosaic: 0.5
-  
-  # 油位分割模型
-  oil_unet:
-    type: "segmentation"
-    architecture: "unet"
-    input_size: [512, 512]
-    num_classes: 2
-    
-    epochs: 30
-    batch_size: 8
-    learning_rate: 0.0001
-  
-  # 硅胶分类模型
-  silica_cnn:
-    type: "classification"
-    architecture: "cnn"
-    input_size: [224, 224]
-    num_classes: 4
-    classes:
-      - "blue"     # 正常
-      - "pink"     # 轻度受潮
-      - "white"    # 严重受潮
-      - "unknown"  # 无法识别
-    
-    epochs: 30
-    batch_size: 32
-    learning_rate: 0.0001
-  
-  # 热成像异常模型
-  thermal_anomaly:
-    type: "classification"
-    architecture: "resnet18"
-    input_size: [224, 224]
-    num_classes: 3
-    classes:
-      - "normal"   # 正常
-      - "warning"  # 预警
-      - "alarm"    # 告警
-    
-    epochs: 30
-    batch_size: 32
-    temperature_range: [-20, 150]
-
-# =============================================================================
-# B组 - 开关间隔模型配置
-# =============================================================================
-switch_inspection:
-  # 开关状态检测
-  switch_yolov8s:
-    type: "detection"
-    architecture: "yolov8"
-    scale: "s"
-    input_size: [640, 640]
-    num_classes: 8
-    classes:
-      - "breaker_open"      # 断路器分
-      - "breaker_closed"    # 断路器合
-      - "isolator_open"     # 隔离开关分
-      - "isolator_closed"   # 隔离开关合
-      - "grounding_open"    # 接地开关分
-      - "grounding_closed"  # 接地开关合
-      - "indicator_red"     # 红色指示灯
-      - "indicator_green"   # 绿色指示灯
-    
-    epochs: 50
-    batch_size: 16
-    confidence_threshold: 0.6
-  
-  # 指示牌OCR
-  indicator_ocr:
-    type: "ocr"
-    architecture: "crnn"
-    input_size: [32, 128]
-    charset: "分合开关ONOFF断路器隔离接地0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    
-    epochs: 40
-    batch_size: 64
     learning_rate: 0.001
+    weight_decay: 0.0005
+    momentum: 0.937
+    warmup_epochs: 3
+    img_size: 640
+    optimizer: "AdamW"
+    scheduler: "cosine"
+    
+  # 按设备类型的特殊配置
+  plugin_specific:
+    transformer:
+      epochs: 150
+      batch_size: 8
+      img_size: 1280  # 大目标需要更高分辨率
+      
+    switch:
+      epochs: 100
+      batch_size: 16
+      img_size: 640
+      
+    busbar:
+      epochs: 120
+      batch_size: 16
+      img_size: 1280  # 小目标检测
+      
+    capacitor:
+      epochs: 80
+      batch_size: 16
+      img_size: 640
+      
+    meter:
+      epochs: 100
+      batch_size: 32  # OCR任务可以用更大batch
+      img_size: 416
+
+  # 数据增强配置
+  augmentation:
+    hsv_h: 0.015
+    hsv_s: 0.7
+    hsv_v: 0.4
+    degrees: 10
+    translate: 0.1
+    scale: 0.5
+    shear: 2.0
+    flipud: 0.5
+    fliplr: 0.5
+    mosaic: 1.0
+    mixup: 0.1
+    
+  # Few-shot学习配置
+  few_shot:
+    enabled: true
+    support_set_size: 5
+    query_set_size: 15
+    episodes: 1000
+    meta_lr: 0.001
 
 # =============================================================================
-# C组 - 母线巡视模型配置
+# 模型配置
 # =============================================================================
-busbar_inspection:
-  # 母线缺陷检测 (小目标优化)
-  busbar_yolov8m:
-    type: "detection"
-    architecture: "yolov8"
-    scale: "m"
-    input_size: [1280, 1280]  # 高分辨率
-    num_classes: 8
-    classes:
-      - "insulator_crack"   # 绝缘子裂纹
-      - "insulator_dirty"   # 绝缘子污损
-      - "fitting_loose"     # 金具松动
-      - "fitting_rust"      # 金具锈蚀
-      - "wire_damage"       # 导线破损
-      - "foreign_object"    # 异物悬挂
-      - "bird"              # 鸟类
-      - "insect"            # 飞虫
+models:
+  backbone:
+    default: "yolov8m"
+    options: ["yolov8n", "yolov8s", "yolov8m", "yolov8l", "yolov8x"]
     
-    epochs: 60
-    batch_size: 8  # 大尺寸减少batch
-    confidence_threshold: 0.4  # 小目标降低阈值
-    
-    # 切片推理
-    slicing:
-      enabled: true
-      tile_size: 1280
-      overlap: 128
-  
-  # 环境干扰过滤
-  noise_classifier:
-    type: "classification"
-    architecture: "cnn"
-    input_size: [128, 128]
-    num_classes: 5
-    classes:
-      - "real_defect"   # 真实缺陷
-      - "bird"          # 鸟类
-      - "insect"        # 飞虫
-      - "shadow"        # 阴影
-      - "reflection"    # 反光
-    
-    epochs: 30
-    batch_size: 32
+  # 按电压等级推荐的模型
+  voltage_model_mapping:
+    UHV: "yolov8l"      # 特高压：大模型，高精度
+    EHV: "yolov8m"      # 超高压：中等模型
+    HV: "yolov8m"       # 高压：中等模型
+    MV: "yolov8s"       # 中压：轻量模型
+    LV: "yolov8n"       # 低压：最轻量模型
 
 # =============================================================================
-# D组 - 电容器巡视模型配置
+# 输出格式配置
 # =============================================================================
-capacitor_inspection:
-  # 电容器检测
-  capacitor_yolov8:
-    type: "detection"
-    architecture: "yolov8"
-    scale: "n"
-    input_size: [640, 640]
-    num_classes: 6
-    classes:
-      - "capacitor_unit"    # 电容器单元
-      - "capacitor_tilted"  # 倾斜
-      - "capacitor_fallen"  # 倒塌
-      - "capacitor_missing" # 缺失
-      - "connection_wire"   # 连接线
-      - "fence"             # 围栏
-    
-    epochs: 50
-    batch_size: 16
-  
-  # 入侵检测
-  rtdetr_intrusion:
-    type: "detection"
-    architecture: "rtdetr"
-    input_size: [640, 640]
-    num_classes: 4
-    classes:
-      - "person"    # 人员
-      - "vehicle"   # 车辆
-      - "animal"    # 动物
-      - "unknown"   # 未知
-    
-    epochs: 50
-    batch_size: 16
-    
-    # 时序跟踪
-    tracking:
-      enabled: true
-      confirm_frames: 3
-      max_disappeared: 5
-
-# =============================================================================
-# E组 - 表计读数模型配置
-# =============================================================================
-meter_reading:
-  # 关键点检测
-  hrnet_keypoint:
-    type: "keypoint"
-    architecture: "hrnet"
-    input_size: [256, 256]
-    num_keypoints: 8  # 中心、刻度起点、终点等
-    
-    epochs: 40
-    batch_size: 32
-    learning_rate: 0.0001
-  
-  # 数字OCR
-  crnn_ocr:
-    type: "ocr"
-    architecture: "crnn"
-    input_size: [32, 128]
-    charset_size: 37  # 0-9 + a-z + blank
-    
-    epochs: 40
-    batch_size: 64
-  
-  # 表计分类
-  meter_classifier:
-    type: "classification"
-    architecture: "resnet18"
-    input_size: [224, 224]
-    num_classes: 5
-    classes:
-      - "pressure_gauge"  # 压力表
-      - "temperature"     # 温度表
-      - "oil_level"       # 油位表
-      - "sf6_pressure"    # SF6压力表
-      - "digital"         # 数字表
-    
-    epochs: 30
-    batch_size: 32
-
-# =============================================================================
-# 数据集配置
-# =============================================================================
-datasets:
-  # 公开数据集 (预训练)
-  public:
-    power_equipment:
-      path: "data/public/power_equipment"
-      format: "coco"
-      description: "电力设备缺陷检测公开数据集"
-    
-    transmission_line:
-      path: "data/public/transmission_line"
-      format: "voc"
-      description: "输电线路航拍数据集"
-    
-    meter_reading:
-      path: "data/public/meter"
-      format: "classification"
-      description: "工业表计读数数据集"
-  
-  # 云南保山站数据 (微调)
-  baoshan:
-    path: "data/baoshan"
-    format: "coco"
-    description: "云南保山站实地采集数据"
-    
-    # 需采集的数据类型
-    required_data:
-      - "可见光图像"
-      - "热成像数据"
-      - "3D LiDAR点云"
-      - "声学数据"
-      - "SF6传感器数据"
-      - "高光谱图像"
+export:
+  formats: ["onnx", "torchscript", "coreml"]
+  onnx:
+    opset: 12
+    simplify: true
+    dynamic: true
+  tensorrt:
+    fp16: true
+    int8: false

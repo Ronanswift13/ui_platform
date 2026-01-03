@@ -1,0 +1,19 @@
+names:
+  0: capacitor_unit
+  1: capacitor_tilted
+  2: capacitor_fallen
+  3: capacitor_missing
+  4: person
+  5: vehicle
+  6: fuse_blown
+nc: 7
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/EHV_500kV/capacitor
+plugin: capacitor
+test: images/test
+thermal_thresholds:
+  alarm: 95
+  normal: 65
+  warning: 80
+train: images/train
+val: images/val
+voltage_level: EHV_500kV

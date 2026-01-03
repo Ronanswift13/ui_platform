@@ -1,0 +1,23 @@
+names:
+  0: insulator_crack
+  1: insulator_dirty
+  2: insulator_flashover
+  3: fitting_loose
+  4: fitting_rust
+  5: wire_damage
+  6: foreign_object
+  7: bird
+  8: pin_missing
+  9: spacer_damage
+  10: corona_discharge
+nc: 11
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/UHV_800kV_DC/busbar
+plugin: busbar
+test: images/test
+thermal_thresholds:
+  alarm: 100
+  normal: 70
+  warning: 85
+train: images/train
+val: images/val
+voltage_level: UHV_800kV_DC

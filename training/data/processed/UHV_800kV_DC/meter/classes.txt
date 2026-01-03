@@ -1,0 +1,7 @@
+sf6_pressure_gauge
+sf6_density_relay
+oil_temp_gauge
+oil_level_gauge
+gas_relay
+digital_display
+pointer_gauge

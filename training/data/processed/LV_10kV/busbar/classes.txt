@@ -1,0 +1,3 @@
+bolt_loose
+wire_damage
+foreign_object

@@ -1,0 +1,19 @@
+names:
+  0: oil_leak
+  1: rust
+  2: silica_gel_normal
+  3: silica_gel_abnormal
+  4: oil_level_normal
+  5: oil_level_abnormal
+  6: conductor_rust
+nc: 7
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/MV_35kV/transformer
+plugin: transformer
+test: images/test
+thermal_thresholds:
+  alarm: 75
+  normal: 50
+  warning: 65
+train: images/train
+val: images/val
+voltage_level: MV_35kV

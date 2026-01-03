@@ -1,0 +1,2 @@
+capacitor_bulge
+capacitor_leak

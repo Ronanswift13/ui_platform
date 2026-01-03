@@ -1,0 +1,7 @@
+breaker_open
+breaker_closed
+isolator_open
+isolator_closed
+indicator_red
+indicator_green
+cabinet_door

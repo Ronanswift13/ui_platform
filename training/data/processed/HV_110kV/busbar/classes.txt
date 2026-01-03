@@ -1,0 +1,8 @@
+insulator_crack
+insulator_dirty
+fitting_loose
+fitting_rust
+wire_damage
+foreign_object
+bird
+bird_nest

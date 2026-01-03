@@ -1,0 +1,16 @@
+names:
+  0: capacitor_unit
+  1: capacitor_tilted
+  2: capacitor_missing
+  3: safety_distance
+nc: 4
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/MV_35kV/capacitor
+plugin: capacitor
+test: images/test
+thermal_thresholds:
+  alarm: 75
+  normal: 50
+  warning: 65
+train: images/train
+val: images/val
+voltage_level: MV_35kV

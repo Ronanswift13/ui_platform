@@ -1,0 +1,18 @@
+names:
+  0: capacitor_unit
+  1: capacitor_tilted
+  2: capacitor_fallen
+  3: capacitor_missing
+  4: person
+  5: vehicle
+nc: 6
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/HV_220kV/capacitor
+plugin: capacitor
+test: images/test
+thermal_thresholds:
+  alarm: 85
+  normal: 60
+  warning: 75
+train: images/train
+val: images/val
+voltage_level: HV_220kV

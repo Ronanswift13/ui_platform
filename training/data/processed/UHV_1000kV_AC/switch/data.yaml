@@ -1,0 +1,22 @@
+names:
+  0: breaker_open
+  1: breaker_closed
+  2: isolator_open
+  3: isolator_closed
+  4: grounding_open
+  5: grounding_closed
+  6: indicator_red
+  7: indicator_green
+  8: gis_position
+  9: gis_sf6_density
+nc: 10
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/UHV_1000kV_AC/switch
+plugin: switch
+test: images/test
+thermal_thresholds:
+  alarm: 100
+  normal: 70
+  warning: 85
+train: images/train
+val: images/val
+voltage_level: UHV_1000kV_AC

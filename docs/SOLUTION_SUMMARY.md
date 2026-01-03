@@ -133,25 +133,25 @@ python evaluate_training.py --report
 
 ---
 
-## 五、220kV / 500kV 变电站适配方案
+## 五、全电压等级变电站适配方案
 
 ### 设计理念
 管理员在系统中选择电压等级 → 系统自动匹配对应的模型库和设备配置
 
-### 使用 `voltage_adapter.py`
+### 使用 `voltage_adapter_extended.py`
 
 ```python
-from voltage_adapter import VoltageAdapterManager
+from platform_core.voltage_adapter_extended import VoltageAdapterManager
 
 # 初始化
 manager = VoltageAdapterManager()
 
 # 设置电压等级
-manager.set_voltage_level("500kV")  # 或 "220kV"
+manager.set_voltage_level("500kV_AC")  # 或 "220kV"、"35kV"
 
 # 获取模型路径
 model_path = manager.get_model_path("switch", "state_detection")
-# 返回: models/500kV/switch/switch_state_500kv.onnx
+# 返回: models/ehv/500kV/switch/switch_state_500kv.onnx
 
 # 获取设备配置
 config = manager.get_equipment_config("switch")
@@ -165,24 +165,25 @@ classes = manager.get_detection_classes("busbar")
 
 ```bash
 # 设置电压等级
-python voltage_adapter.py --set 500kV
+python platform_core/voltage_adapter_extended.py --set 500kV_AC
 
 # 查看当前配置
-python voltage_adapter.py --show
+python platform_core/voltage_adapter_extended.py --show
 
 # 导出配置
-python voltage_adapter.py --export config_export.yaml
+python platform_core/voltage_adapter_extended.py --export config_export.yaml
 ```
 
 ### API 集成
 
 ```python
 from fastapi import FastAPI
-from voltage_adapter import VoltageAdapterManager, create_voltage_api_routes
+from platform_core.voltage_adapter_extended import VoltageAdapterManager
+from platform_core.voltage_api_extended import integrate_voltage_routes
 
 app = FastAPI()
 adapter = VoltageAdapterManager()
-create_voltage_api_routes(app, adapter)
+integrate_voltage_routes(app)
 
 # API 端点:
 # GET  /api/voltage/current       - 获取当前电压等级
@@ -280,7 +281,7 @@ python prepare_training_data.py --convert voc2coco --input data/raw --output dat
 |------|------|
 | `fix_type_errors.py` | Pylance 类型错误修复工具 |
 | `evaluate_training.py` | 训练结果评估工具 |
-| `voltage_adapter.py` | 220kV/500kV 电压等级适配管理器 |
+| `voltage_adapter_extended.py` | 全电压等级适配管理器 |
 | `prepare_training_data.py` | 训练数据下载与准备工具 |
 | `SOLUTION_SUMMARY.md` | 本解决方案总结文档 |
 

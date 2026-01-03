@@ -1,0 +1,3 @@
+sf6_pressure_gauge
+oil_temp_gauge
+oil_level_gauge

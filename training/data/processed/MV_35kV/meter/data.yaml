@@ -1,0 +1,15 @@
+names:
+  0: digital_meter
+  1: analog_meter
+  2: transformer_monitor
+nc: 3
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/MV_35kV/meter
+plugin: meter
+test: images/test
+thermal_thresholds:
+  alarm: 75
+  normal: 50
+  warning: 65
+train: images/train
+val: images/val
+voltage_level: MV_35kV

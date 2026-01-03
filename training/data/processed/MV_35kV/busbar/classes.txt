@@ -1,0 +1,5 @@
+insulator_crack
+insulator_dirty
+fitting_loose
+wire_damage
+foreign_object

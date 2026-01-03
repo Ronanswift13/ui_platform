@@ -1,0 +1,15 @@
+names:
+  0: bolt_loose
+  1: wire_damage
+  2: foreign_object
+nc: 3
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/LV_10kV/busbar
+plugin: busbar
+test: images/test
+thermal_thresholds:
+  alarm: 70
+  normal: 45
+  warning: 60
+train: images/train
+val: images/val
+voltage_level: LV_10kV

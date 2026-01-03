@@ -1,0 +1,17 @@
+names:
+  0: sf6_pressure_gauge
+  1: sf6_density_relay
+  2: gas_relay
+  3: oil_temp_gauge
+  4: oil_level_gauge
+nc: 5
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/EHV_330kV/meter
+plugin: meter
+test: images/test
+thermal_thresholds:
+  alarm: 92
+  normal: 63
+  warning: 78
+train: images/train
+val: images/val
+voltage_level: EHV_330kV

@@ -1,0 +1,20 @@
+names:
+  0: insulator_crack
+  1: insulator_dirty
+  2: fitting_loose
+  3: fitting_rust
+  4: wire_damage
+  5: foreign_object
+  6: bird
+  7: bird_nest
+nc: 8
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/HV_220kV/busbar
+plugin: busbar
+test: images/test
+thermal_thresholds:
+  alarm: 85
+  normal: 60
+  warning: 75
+train: images/train
+val: images/val
+voltage_level: HV_220kV

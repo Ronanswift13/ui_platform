@@ -1,0 +1,11 @@
+insulator_crack
+insulator_dirty
+insulator_flashover
+fitting_loose
+fitting_rust
+wire_damage
+foreign_object
+bird
+pin_missing
+spacer_damage
+corona_discharge

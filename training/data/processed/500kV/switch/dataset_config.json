@@ -1,0 +1,30 @@
+{
+  "plugin": "switch",
+  "voltage_level": "500kV",
+  "output_format": "yolo",
+  "train_ratio": 0.8,
+  "val_ratio": 0.1,
+  "test_ratio": 0.09999999999999995,
+  "applicable_datasets": [
+    "substation_defect_8000",
+    "substation_real_7500",
+    "switch_state_600",
+    "control_panel_1800",
+    "thermal_defect_1900",
+    "switchgear_thermal_3000",
+    "elek_seg"
+  ],
+  "label_map": {
+    "breaker_open": "breaker_open",
+    "breaker_closed": "breaker_closed",
+    "isolator_open": "isolator_open",
+    "isolator_closed": "isolator_closed",
+    "grounding_open": "grounding_open",
+    "grounding_closed": "grounding_closed",
+    "indicator_red": "indicator_red",
+    "indicator_green": "indicator_green",
+    "分": "breaker_open",
+    "合": "breaker_closed"
+  },
+  "created_at": "2026-01-02T22:26:14.744092"
+}

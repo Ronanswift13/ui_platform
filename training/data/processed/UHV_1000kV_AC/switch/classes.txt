@@ -1,0 +1,10 @@
+breaker_open
+breaker_closed
+isolator_open
+isolator_closed
+grounding_open
+grounding_closed
+indicator_red
+indicator_green
+gis_position
+gis_sf6_density

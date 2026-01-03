@@ -1,0 +1,15 @@
+names:
+  0: sf6_pressure_gauge
+  1: oil_temp_gauge
+  2: oil_level_gauge
+nc: 3
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/HV_110kV/meter
+plugin: meter
+test: images/test
+thermal_thresholds:
+  alarm: 80
+  normal: 55
+  warning: 70
+train: images/train
+val: images/val
+voltage_level: HV_110kV

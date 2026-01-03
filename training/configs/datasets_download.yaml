@@ -1,0 +1,377 @@
+# =============================================================================
+# 破夜绘明激光监测平台 - 公开数据集下载配置
+# =============================================================================
+
+# 数据集下载链接和说明
+datasets:
+  # ============================================================================
+  # 绝缘子缺陷检测数据集 (适用于: busbar, transformer)
+  # ============================================================================
+  insulator_defect_detection:
+    name: "Insulator-Defect Detection Dataset"
+    description: "1600张绝缘子缺陷图像，包含正常、损坏、闪络三个类别"
+    source: "Changzhou University & Chinese Academy of Sciences"
+    year: 2022
+    images: 1600
+    classes:
+      - insulator
+      - damaged  
+      - flashover
+    
+    # 下载方式
+    download:
+      # 方式1: Dataset Ninja (推荐)
+      datasetninja:
+        url: "https://datasetninja.com/insulator-defect-detection"
+        format: "Supervisely"
+        size: "2.43 GB"
+        instructions: |
+          1. 访问 https://datasetninja.com/insulator-defect-detection
+          2. 点击 "Download" 按钮
+          3. 选择格式 (推荐 YOLO 或 Supervisely)
+          4. 下载并解压到 data/raw/insulator_defect/
+      
+      # 方式2: Python代码下载
+      python_api:
+        code: |
+          import dataset_tools as dtools
+          dtools.download(dataset='Insulator-Defect Detection', dst_dir='data/raw/insulator_defect/')
+        
+      # 方式3: 原始数据
+      original:
+        url: "https://doi.org/10.6084/m9.figshare.26409637"
+        format: "原始格式"
+    
+    # 适用插件和电压等级
+    applicable:
+      plugins:
+        - busbar
+        - transformer
+      voltage_levels:
+        - UHV_1000kV_AC
+        - EHV_500kV
+        - EHV_330kV
+        - HV_220kV
+        - HV_110kV
+
+  # ============================================================================
+  # 中国电力线绝缘子数据集 CPLID (适用于: busbar)
+  # ============================================================================
+  cplid:
+    name: "Chinese Power Line Insulator Dataset (CPLID)"
+    description: "600张正常绝缘子 + 248张缺陷绝缘子，由国家电网提供"
+    source: "State Grid Corporation of China"
+    year: 2018
+    images: 848
+    classes:
+      - normal_insulator
+      - defective_insulator
+    
+    download:
+      github:
+        url: "https://github.com/InsulatorData/InsulatorDataSet"
+        instructions: |
+          git clone https://github.com/InsulatorData/InsulatorDataSet.git data/raw/cplid/
+          
+          或者:
+          1. 访问 https://github.com/InsulatorData/InsulatorDataSet
+          2. 点击 "Code" -> "Download ZIP"
+          3. 解压到 data/raw/cplid/
+    
+    applicable:
+      plugins:
+        - busbar
+      voltage_levels:
+        - all
+
+  # ============================================================================
+  # 合并公开绝缘子数据集 MPID (适用于: busbar)
+  # ============================================================================  
+  mpid:
+    name: "Merged Public Insulator Dataset (MPID)"
+    description: "合并多个公开数据集，包含多类型绝缘子的无人机巡检图像"
+    source: "Research Compilation"
+    year: 2023
+    images: 6000+
+    classes:
+      - insulator
+      - damaged
+      - flashover
+      - hammer
+    
+    download:
+      github:
+        url: "https://github.com/phd-benel/MPID"
+        format: "YOLO"
+        instructions: |
+          git clone https://github.com/phd-benel/MPID.git data/raw/mpid/
+    
+    applicable:
+      plugins:
+        - busbar
+      voltage_levels:
+        - all
+
+  # ============================================================================
+  # 电表读数数据集 UFPR-AMR (适用于: meter)
+  # ============================================================================
+  ufpr_amr:
+    name: "UFPR-AMR Dataset"
+    description: "2000张电表图像，用于自动抄表训练"
+    source: "Federal University of Paraná"
+    year: 2019
+    images: 2000
+    classes:
+      - counter
+      - digit_0
+      - digit_1
+      - digit_2
+      - digit_3
+      - digit_4
+      - digit_5
+      - digit_6
+      - digit_7
+      - digit_8
+      - digit_9
+    
+    download:
+      github:
+        url: "https://github.com/raysonlaroca/ufpr-amr-dataset"
+        format: "Custom"
+        instructions: |
+          git clone https://github.com/raysonlaroca/ufpr-amr-dataset.git data/raw/ufpr_amr/
+    
+    paper:
+      title: "Convolutional Neural Networks for Automatic Meter Reading"
+      doi: "10.1117/1.JEI.28.1.013023"
+      arxiv: "https://arxiv.org/abs/1902.09600"
+    
+    applicable:
+      plugins:
+        - meter
+      voltage_levels:
+        - all
+
+  # ============================================================================
+  # Copel电表数据集 (适用于: meter)
+  # ============================================================================
+  copel_amr:
+    name: "Copel-AMR Dataset"
+    description: "12500张电表图像，现场采集"
+    source: "Energy Company of Paraná (Copel)"
+    year: 2023
+    images: 12500
+    classes:
+      - meter_counter
+      - digits
+    
+    download:
+      github:
+        url: "https://github.com/raysonlaroca/copel-amr-dataset"
+        instructions: |
+          git clone https://github.com/raysonlaroca/copel-amr-dataset.git data/raw/copel_amr/
+    
+    applicable:
+      plugins:
+        - meter
+      voltage_levels:
+        - all
+
+  # ============================================================================
+  # 变压器热成像数据集 (适用于: transformer)
+  # ============================================================================
+  transformer_thermal:
+    name: "Thermal Images Dataset - Transformer"
+    description: "255张变压器热成像图像，包含正常和8种故障类型"
+    source: "Babol Noshirvani University of Technology"
+    year: 2021
+    images: 255
+    classes:
+      - healthy
+      - fault_type_1  # 短路故障类型1
+      - fault_type_2
+      - fault_type_3
+      - fault_type_4
+      - fault_type_5
+      - fault_type_6
+      - fault_type_7
+      - fault_type_8
+    
+    download:
+      mendeley:
+        url: "https://data.mendeley.com/datasets/8mg8mkc7k5/3"
+        format: "Images + Ground Truth"
+        instructions: |
+          1. 访问 https://data.mendeley.com/datasets/8mg8mkc7k5/3
+          2. 点击 "Download" 下载数据
+          3. 解压到 data/raw/transformer_thermal/
+        
+        contact: "najafi.mohamad.sh@gmail.com"
+    
+    applicable:
+      plugins:
+        - transformer
+      voltage_levels:
+        - all
+
+  # ============================================================================
+  # IEEE绝缘子缺陷数据集 (适用于: busbar, transformer)
+  # ============================================================================
+  ieee_idid:
+    name: "Insulator Defect Image Dataset (IDID)"
+    description: "IEEE DataPort上的绝缘子缺陷数据集"
+    source: "Electric Power Research Institute"
+    year: 2021
+    images: 1600
+    classes:
+      - good
+      - broken
+      - flashed
+      - insulator_string
+    
+    download:
+      ieee_dataport:
+        url: "https://ieee-dataport.org/competitions/insulator-defect-detection"
+        requires_subscription: true
+        instructions: |
+          1. 访问 https://ieee-dataport.org/competitions/insulator-defect-detection
+          2. 需要IEEE DataPort订阅
+          3. 下载数据集
+          4. 解压到 data/raw/ieee_idid/
+    
+    applicable:
+      plugins:
+        - busbar
+        - transformer
+      voltage_levels:
+        - HV_110kV
+        - HV_220kV
+        - EHV_500kV
+
+  # ============================================================================
+  # 高压设备红外数据集 (适用于: transformer, switch)
+  # ============================================================================
+  hv_ir_equipment:
+    name: "Infrared Thermal Image Dataset of High Voltage Equipment"
+    description: "132kV变电站设备红外图像，包含断路器、变压器、避雷器等"
+    source: "SciDB"
+    year: 2024
+    images: 500+
+    classes:
+      - circuit_breaker
+      - power_transformer
+      - surge_arrester
+      - disconnector
+      - wave_trap
+    
+    download:
+      scidb:
+        url: "https://www.scidb.cn/en/detail?dataSetId=e416c488169f484485ad7575dcfc43ce"
+        format: "FLIR Images"
+        instructions: |
+          1. 访问上述链接
+          2. 注册SciDB账号
+          3. 下载数据集
+          4. 解压到 data/raw/hv_ir_equipment/
+    
+    applicable:
+      plugins:
+        - transformer
+        - switch
+      voltage_levels:
+        - HV_110kV
+        - HV_220kV
+
+# ============================================================================
+# 需要现场采集的数据说明
+# ============================================================================
+placeholder_requirements:
+  UHV_1000kV_AC:
+    transformer:
+      reason: "特高压主变容量大(1000-3000MVA)，公开数据极少"
+      requirements:
+        - "多视角可见光图像 (正面、侧面、顶部)"
+        - "红外热成像图像"
+        - "局放监测图像"
+        - "套管裂纹高清图像"
+        - "油位刻度图像"
+      recommended_count: 500+
+      
+    switch:
+      reason: "特高压GIS组合电器数据稀缺"
+      requirements:
+        - "GIS位置指示器图像"
+        - "开合动作视频 (用于角度标定)"
+        - "SF6密度继电器图像"
+      recommended_count: 300+
+      
+    busbar:
+      reason: "特高压母线跨度大，需要无人机采集"
+      requirements:
+        - "远距高清图像"
+        - "绝缘子串倾斜图像"
+        - "闪络痕迹图像"
+        - "LiDAR点云数据"
+      recommended_count: 400+
+
+  EHV_500kV:
+    switch:
+      reason: "GIS位置指示符号数据稀少"
+      requirements:
+        - "GIS位置指示器各状态图像"
+        - "开合角度标定视频"
+      recommended_count: 200+
+      
+    busbar:
+      reason: "闪络痕迹和间隔棒损坏样本少"
+      requirements:
+        - "闪络痕迹高清图像"
+        - "间隔棒损坏图像"
+      recommended_count: 200+
+
+  MV_35kV:
+    all_plugins:
+      reason: "中压变电站数据较少"
+      requirements:
+        - "户内开关柜图像"
+        - "环网柜状态图像"
+        - "箱式变电站外观图像"
+      recommended_count: 300+
+
+  LV_10kV:
+    capacitor:
+      reason: "低压电容器缺陷数据稀缺"
+      requirements:
+        - "电容器鼓包图像"
+        - "漏液图像"
+      recommended_count: 100+
+
+# ============================================================================
+# 数据格式转换说明
+# ============================================================================
+format_conversion:
+  supervisely_to_yolo:
+    description: "将Supervisely格式转换为YOLO格式"
+    script: |
+      # 使用supervisely库转换
+      # pip install supervisely
+      import supervisely as sly
+      
+      # 加载项目
+      project = sly.Project('path/to/supervisely/project', sly.OpenMode.READ)
+      
+      # 导出为YOLO格式
+      sly.convert.export_to_yolo(project, 'path/to/output/yolo')
+      
+  coco_to_yolo:
+    description: "将COCO格式转换为YOLO格式"
+    script: |
+      # 使用ultralytics转换
+      from ultralytics.data.converter import convert_coco
+      convert_coco(labels_dir='path/to/coco/annotations')
+      
+  voc_to_yolo:
+    description: "将VOC格式转换为YOLO格式"
+    script: |
+      from ultralytics.data.converter import convert_voc
+      convert_voc('path/to/VOC')

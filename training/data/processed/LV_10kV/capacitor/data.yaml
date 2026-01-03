@@ -1,0 +1,14 @@
+names:
+  0: capacitor_bulge
+  1: capacitor_leak
+nc: 2
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/LV_10kV/capacitor
+plugin: capacitor
+test: images/test
+thermal_thresholds:
+  alarm: 70
+  normal: 45
+  warning: 60
+train: images/train
+val: images/val
+voltage_level: LV_10kV

@@ -1,0 +1,562 @@
+# =============================================================================
+# 变电站电压等级配置文件
+# =============================================================================
+# 本文件定义了各电压等级变电站的详细配置参数
+# 包括设备型号、检测阈值、模型路径等
+# =============================================================================
+
+# 当前选择的电压等级
+current_voltage_level: null
+
+# 电压等级分类定义
+voltage_categories:
+  特高压:
+    code: UHV
+    description: 交流1000kV及以上、直流±800kV及以上
+    levels:
+      - 1000kV_AC
+      - 1100kV_AC
+      - ±800kV_DC
+      - ±1100kV_DC
+    characteristics:
+      - 输送容量大 (可达10000MW)
+      - 输电距离远 (超过1000km)
+      - 电磁环境要求高
+      - 全部采用GIS设备
+      - 需要特殊的过电压保护
+
+  超高压:
+    code: EHV
+    description: 交流330kV-750kV、直流±500kV
+    levels:
+      - 500kV_AC
+      - 330kV_AC
+      - 750kV_AC
+      - ±500kV_DC
+      - ±660kV_DC
+    characteristics:
+      - 主网骨干电压等级
+      - 大容量输电
+      - GIS或AIS设备
+      - 需要串补装置
+
+  高压:
+    code: HV
+    description: 110kV、220kV
+    levels:
+      - 220kV
+      - 110kV
+    characteristics:
+      - 区域电网主力电压
+      - 城市电网骨干
+      - 设备成熟可靠
+      - 运维经验丰富
+
+  中压:
+    code: MV
+    description: 35kV、66kV
+    levels:
+      - 35kV
+      - 66kV
+    characteristics:
+      - 配电网电压等级
+      - 工业用户常用
+      - 设备紧凑
+      - 可实现无人值守
+
+  低压:
+    code: LV
+    description: 10kV及以下
+    levels:
+      - 10kV
+      - 6kV
+      - 380V
+    characteristics:
+      - 配电终端
+      - 直接供电用户
+      - 设备小型化
+      - 智能化程度高
+
+# =============================================================================
+# 各电压等级详细配置
+# =============================================================================
+
+voltage_level_configs:
+  # ---------------------------------------------------------------------------
+  # 特高压交流 1000kV
+  # ---------------------------------------------------------------------------
+  1000kV_AC:
+    category: 特高压
+    voltage_kv: 1000
+    type: AC
+    
+    transformer:
+      capacity_range_mva: [1000, 3000]
+      typical_models:
+        - ODFPS-1000000/1000
+        - ODFPS-1200000/1000
+      cooling_types: [ODAF, OFWF]
+      thermal_thresholds:
+        normal: 70
+        warning: 85
+        alarm: 100
+      special_monitoring:
+        - 油色谱在线监测
+        - 局部放电监测
+        - 铁芯接地电流监测
+        - 绕组变形检测
+    
+    switch:
+      types:
+        - 1000kV SF6断路器
+        - 1000kV GIS组合电器
+      rated_breaking_current_ka: [50, 63]
+      features:
+        - 双断口/四断口设计
+        - 合闸电阻
+        - 操作过电压抑制
+    
+    busbar:
+      height_m: 20
+      phase_spacing_m: 15
+      conductor_types:
+        - LGJ-800/55
+        - LGJQ-1000/70
+        - 软导线8×LGJ-630/45
+    
+    monitoring_plugins:
+      - uhv_bushing_monitor
+      - uhv_corona_detection
+      - gis_monitoring
+      - transformer_monitor
+      - thermal_imaging
+
+  # ---------------------------------------------------------------------------
+  # 特高压直流 ±800kV
+  # ---------------------------------------------------------------------------
+  ±800kV_DC:
+    category: 特高压
+    voltage_kv: 800
+    type: DC
+    
+    converter_station:
+      converter_transformer_capacity_mva: [400, 600]
+      converter_valve_types:
+        - 晶闸管换流阀
+        - 12脉动换流阀
+      cooling_system:
+        - 阀冷系统
+        - 油冷系统
+    
+    dc_equipment:
+      smoothing_reactor:
+        type: 干式平波电抗器
+        inductance_mh: [150, 300]
+      dc_filter:
+        types: [直流滤波器, 高频滤波器]
+    
+    monitoring_plugins:
+      - converter_valve_monitor
+      - uhv_bushing_monitor
+      - transformer_monitor
+      - thermal_imaging
+
+  # ---------------------------------------------------------------------------
+  # 超高压交流 500kV
+  # ---------------------------------------------------------------------------
+  500kV_AC:
+    category: 超高压
+    voltage_kv: 500
+    type: AC
+    
+    transformer:
+      capacity_range_mva: [500, 1000]
+      typical_models:
+        - OSFPSZ-500000/500
+        - OSFPS-750000/500
+        - OSFPSZ-1000000/500
+      cooling_types: [OFAF, ODAF]
+      thermal_thresholds:
+        normal: 65
+        warning: 80
+        alarm: 95
+    
+    switch:
+      types:
+        - SF6断路器
+        - GIS组合电器
+      isolator_types:
+        - GW4-500
+        - GW5-500D
+        - GW6-500W
+    
+    busbar:
+      height_m: 15
+      phase_spacing_m: 9
+      conductor_types:
+        - LGJ-630/45
+        - LGJQ-800/55
+    
+    monitoring_plugins:
+      - gis_monitoring
+      - sf6_density_relay
+      - transformer_monitor
+      - switch_state_detection
+      - busbar_inspection
+      - meter_reading
+      - thermal_imaging
+
+  # ---------------------------------------------------------------------------
+  # 超高压交流 330kV
+  # ---------------------------------------------------------------------------
+  330kV_AC:
+    category: 超高压
+    voltage_kv: 330
+    type: AC
+    notes: 西北电网主要电压等级
+    
+    transformer:
+      capacity_range_mva: [180, 500]
+      typical_models:
+        - SFPSZ-180000/330
+        - SFPSZ-240000/330
+        - SFPSZ-360000/330
+      thermal_thresholds:
+        normal: 63
+        warning: 78
+        alarm: 92
+    
+    switch:
+      types:
+        - SF6断路器
+        - GIS组合电器
+      isolator_types:
+        - GW4-330
+        - GW5-330D
+    
+    busbar:
+      height_m: 12
+      phase_spacing_m: 7
+    
+    monitoring_plugins:
+      - gis_monitoring
+      - sf6_density_relay
+      - transformer_monitor
+      - switch_state_detection
+      - busbar_inspection
+      - meter_reading
+      - thermal_imaging
+
+  # ---------------------------------------------------------------------------
+  # 高压 220kV
+  # ---------------------------------------------------------------------------
+  220kV:
+    category: 高压
+    voltage_kv: 220
+    type: AC
+    
+    transformer:
+      capacity_range_mva: [50, 180]
+      typical_models:
+        - SZ11-50000/220
+        - SFSZ11-120000/220
+        - SFSZ9-180000/220
+      cooling_types: [ONAN, ONAF, OFAF]
+      thermal_thresholds:
+        normal: 60
+        warning: 75
+        alarm: 85
+    
+    switch:
+      types:
+        - SF6断路器
+        - 真空断路器
+      isolator_types:
+        - GW4-220
+        - GW5-220D
+      angle_reference:
+        breaker:
+          open_deg: -55
+          closed_deg: 35
+        isolator:
+          open_deg: -65
+          closed_deg: 25
+        grounding:
+          open_deg: -75
+          closed_deg: 15
+    
+    busbar:
+      height_m: 8
+      phase_spacing_m: 4.5
+      conductor_types:
+        - LGJ-400/35
+    
+    monitoring_plugins:
+      - transformer_monitor
+      - switch_state_detection
+      - busbar_inspection
+      - meter_reading
+      - thermal_imaging
+
+  # ---------------------------------------------------------------------------
+  # 高压 110kV
+  # ---------------------------------------------------------------------------
+  110kV:
+    category: 高压
+    voltage_kv: 110
+    type: AC
+    
+    transformer:
+      capacity_range_mva: [20, 63]
+      typical_models:
+        - SZ11-20000/110
+        - SZ11-31500/110
+        - SZ11-50000/110
+        - SZ11-63000/110
+      cooling_types: [ONAN, ONAF]
+      thermal_thresholds:
+        normal: 55
+        warning: 70
+        alarm: 80
+    
+    switch:
+      types:
+        - SF6断路器
+        - 真空断路器
+      isolator_types:
+        - GW4-110
+        - GW5-110D
+      angle_reference:
+        breaker:
+          open_deg: -50
+          closed_deg: 40
+        isolator:
+          open_deg: -60
+          closed_deg: 30
+    
+    busbar:
+      height_m: 6
+      phase_spacing_m: 3
+      conductor_types:
+        - LGJ-240/30
+        - LGJ-300/35
+    
+    monitoring_plugins:
+      - transformer_monitor
+      - switch_state_detection
+      - busbar_inspection
+      - meter_reading
+      - thermal_imaging
+
+  # ---------------------------------------------------------------------------
+  # 中压 35kV
+  # ---------------------------------------------------------------------------
+  35kV:
+    category: 中压
+    voltage_kv: 35
+    type: AC
+    
+    transformer:
+      capacity_range_mva: [2, 20]
+      typical_models:
+        - S11-3150/35
+        - S11-6300/35
+        - S11-10000/35
+        - SZ11-16000/35
+        - SZ11-20000/35
+      cooling_types: [ONAN]
+      thermal_thresholds:
+        normal: 50
+        warning: 65
+        alarm: 75
+      dry_type_available: true
+    
+    switch:
+      types:
+        - 真空断路器
+        - SF6断路器
+      isolator_types:
+        - GW4-35
+        - GN-35
+      cabinet_types:
+        - 户内开关柜
+        - 箱式变电站
+    
+    busbar:
+      height_m: 4
+      phase_spacing_m: 1.5
+      types:
+        - 户内母线
+        - 绝缘母线
+    
+    automation:
+      综合自动化系统: true
+      无人值守: true
+      远程监控: true
+    
+    monitoring_plugins:
+      - transformer_monitor
+      - switch_state_detection
+      - cabinet_inspection
+      - meter_reading
+      - thermal_imaging
+      - environment_monitor
+
+  # ---------------------------------------------------------------------------
+  # 低压 10kV
+  # ---------------------------------------------------------------------------
+  10kV:
+    category: 低压
+    voltage_kv: 10
+    type: AC
+    
+    transformer:
+      capacity_range_kva: [100, 2000]
+      typical_models:
+        - S11-315/10
+        - S11-500/10
+        - S11-800/10
+        - S11-1000/10
+        - S11-1600/10
+        - SCB11-1000/10  # 干式
+      cooling_types: [ONAN, AN]
+      thermal_thresholds:
+        normal: 45
+        warning: 60
+        alarm: 70
+      dry_type_common: true
+    
+    switch:
+      types:
+        - 真空断路器
+        - 负荷开关
+      cabinet_types:
+        - 开关柜
+        - 环网柜
+        - 充气柜
+    
+    busbar:
+      height_m: 2.5
+      phase_spacing_m: 0.3
+      types:
+        - 矩形母线
+        - 管形母线
+        - 绝缘母线
+    
+    smart_features:
+      智能电容器: true
+      自动投切: true
+      智能仪表: true
+      多功能电力仪表: true
+    
+    monitoring_plugins:
+      - transformer_monitor
+      - switch_state_detection
+      - cabinet_inspection
+      - meter_reading
+      - smart_meter
+      - thermal_imaging
+      - environment_monitor
+
+# =============================================================================
+# 模型库路径配置
+# =============================================================================
+
+model_base_path: models
+
+model_directories:
+  uhv:
+    1000kV_AC: models/uhv/1000kV_AC
+    ±800kV_DC: models/uhv/800kV_DC
+    ±1100kV_DC: models/uhv/1100kV_DC
+  ehv:
+    500kV_AC: models/ehv/500kV
+    330kV_AC: models/ehv/330kV
+    750kV_AC: models/ehv/750kV
+  hv:
+    220kV: models/hv/220kV
+    110kV: models/hv/110kV
+  mv:
+    35kV: models/mv/35kV
+    66kV: models/mv/66kV
+  lv:
+    10kV: models/lv/10kV
+    6kV: models/lv/6kV
+
+# =============================================================================
+# 插件功能配置
+# =============================================================================
+
+plugins:
+  # 特高压专有
+  uhv_bushing_monitor:
+    name: 特高压套管监测
+    voltage_levels: [1000kV_AC, ±800kV_DC, ±1100kV_DC]
+    priority: high
+
+  uhv_corona_detection:
+    name: 特高压电晕检测
+    voltage_levels: [1000kV_AC, ±800kV_DC, 500kV_AC]
+    priority: high
+
+  converter_valve_monitor:
+    name: 换流阀监测
+    voltage_levels: [±800kV_DC, ±1100kV_DC, ±500kV_DC]
+    priority: high
+
+  # 通用功能
+  gis_monitoring:
+    name: GIS设备监测
+    voltage_levels: [1000kV_AC, 500kV_AC, 330kV_AC, 220kV, 110kV]
+    priority: medium
+
+  transformer_monitor:
+    name: 变压器监测
+    voltage_levels: all
+    priority: high
+
+  switch_state_detection:
+    name: 开关状态检测
+    voltage_levels: all
+    priority: high
+
+  busbar_inspection:
+    name: 母线巡检
+    voltage_levels: all
+    priority: medium
+
+  meter_reading:
+    name: 表计读数识别
+    voltage_levels: all
+    priority: medium
+
+  thermal_imaging:
+    name: 红外热成像分析
+    voltage_levels: all
+    priority: high
+
+  # 中低压专有
+  cabinet_inspection:
+    name: 开关柜巡检
+    voltage_levels: [35kV, 10kV, 6kV]
+    priority: medium
+
+  environment_monitor:
+    name: 环境监测
+    voltage_levels: [35kV, 10kV]
+    priority: low
+
+  smart_meter:
+    name: 智能仪表读取
+    voltage_levels: [35kV, 10kV, 6kV, 380V]
+    priority: medium
+
+# =============================================================================
+# 系统配置
+# =============================================================================
+
+system:
+  auto_save_config: true
+  config_backup_count: 5
+  log_level: INFO
+  api_prefix: /api/voltage

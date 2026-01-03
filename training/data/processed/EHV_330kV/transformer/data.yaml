@@ -1,0 +1,22 @@
+names:
+  0: oil_leak
+  1: rust
+  2: surface_damage
+  3: foreign_object
+  4: silica_gel_normal
+  5: silica_gel_abnormal
+  6: oil_level_normal
+  7: oil_level_abnormal
+  8: bushing_crack
+  9: porcelain_contamination
+nc: 10
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/EHV_330kV/transformer
+plugin: transformer
+test: images/test
+thermal_thresholds:
+  alarm: 92
+  normal: 63
+  warning: 78
+train: images/train
+val: images/val
+voltage_level: EHV_330kV

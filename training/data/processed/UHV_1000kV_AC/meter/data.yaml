@@ -1,0 +1,19 @@
+names:
+  0: sf6_pressure_gauge
+  1: sf6_density_relay
+  2: oil_temp_gauge
+  3: oil_level_gauge
+  4: gas_relay
+  5: digital_display
+  6: pointer_gauge
+nc: 7
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/UHV_1000kV_AC/meter
+plugin: meter
+test: images/test
+thermal_thresholds:
+  alarm: 100
+  normal: 70
+  warning: 85
+train: images/train
+val: images/val
+voltage_level: UHV_1000kV_AC

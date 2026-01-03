@@ -171,15 +171,24 @@ def create_app() -> FastAPI:
     @app.get("/settings/voltage", response_class=HTMLResponse)
     async def settings_voltage_page(request: Request):
         """电压等级设置页面"""
-        from platform_core.voltage_api import voltage_manager
-
-        current_level = voltage_manager.get_current_level()
         return templates.TemplateResponse(
-            "pages/settings_voltage.html",
+            "pages/settings_voltage_extended.html",
             {
                 "request": request,
                 "active_tab": "settings",
-                "current_voltage_level": current_level,
+            },
+        )
+
+    # ============== 模型训练页面 ==============
+    @app.get("/training", response_class=HTMLResponse)
+    async def training_page(request: Request):
+        """模型训练管理页面"""
+        return templates.TemplateResponse(
+            "pages/training.html",
+            {
+                "request": request,
+                "active_tab": "training",
+                "version": "2.0.0",
             },
         )
 

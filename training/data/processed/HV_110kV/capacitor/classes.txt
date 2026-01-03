@@ -1,0 +1,6 @@
+capacitor_unit
+capacitor_tilted
+capacitor_fallen
+capacitor_missing
+person
+vehicle

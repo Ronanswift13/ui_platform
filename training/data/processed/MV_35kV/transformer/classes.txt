@@ -1,0 +1,7 @@
+oil_leak
+rust
+silica_gel_normal
+silica_gel_abnormal
+oil_level_normal
+oil_level_abnormal
+conductor_rust

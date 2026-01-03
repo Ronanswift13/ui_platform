@@ -1,0 +1,4 @@
+energy_meter
+water_meter
+pointer_meter
+digital_meter

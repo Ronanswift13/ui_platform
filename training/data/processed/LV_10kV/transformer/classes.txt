@@ -1,0 +1,4 @@
+rust
+oil_leak
+radiator_damage
+box_transformer

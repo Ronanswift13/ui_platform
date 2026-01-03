@@ -1,0 +1,4 @@
+capacitor_unit
+capacitor_tilted
+capacitor_missing
+safety_distance

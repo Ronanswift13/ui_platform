@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}模型训练 - 输变电监测平台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-3">
+        <!-- 训练导航 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-cpu"></i> 训练管理</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="#overview" class="list-group-item list-group-item-action active" data-bs-toggle="list">
+                    <i class="bi bi-grid"></i> 概览
+                </a>
+                <a href="#data-prep" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                    <i class="bi bi-database"></i> 数据准备
+                </a>
+                <a href="#train" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                    <i class="bi bi-play-circle"></i> 模型训练
+                </a>
+                <a href="#evaluate" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                    <i class="bi bi-graph-up"></i> 评估验证
+                </a>
+                <a href="#deploy" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                    <i class="bi bi-rocket"></i> 模型部署
+                </a>
+            </div>
+        </div>
+
+        <!-- 训练状态 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-activity"></i> 训练状态</h6>
+            </div>
+            <div class="card-body p-2">
+                <div id="training-status">
+                    <span class="badge bg-secondary">空闲</span>
+                </div>
+                <div id="training-progress" class="mt-2" style="display:none;">
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated"
+                             role="progressbar" style="width: 0%">0%</div>
+                    </div>
+                    <small class="text-muted" id="progress-text"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <div class="tab-content">
+            <!-- 概览 -->
+            <div class="tab-pane fade show active" id="overview">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">训练系统概览</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <h3 id="model-count">0</h3>
+                                        <small>已训练模型</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h3 id="dataset-count">0</h3>
+                                        <small>数据集</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h3 id="voltage-count">5</h3>
+                                        <small>电压等级</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center">
+                                        <h3 id="plugin-count-train">5</h3>
+                                        <small>检测插件</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="mt-4">支持的电压等级</h6>
+                        <table class="table table-sm">
+                            <thead><tr><th>类别</th><th>电压等级</th><th>说明</th></tr></thead>
+                            <tbody>
+                                <tr><td>特高压 (UHV)</td><td>1000kV交流, ±800kV直流</td><td>交流1000kV及以上</td></tr>
+                                <tr><td>超高压 (EHV)</td><td>500kV, 330kV, 750kV</td><td>交流330kV-750kV</td></tr>
+                                <tr><td>高压 (HV)</td><td>220kV, 110kV</td><td>110kV、220kV</td></tr>
+                                <tr><td>中压 (MV)</td><td>35kV, 66kV</td><td>35kV、66kV</td></tr>
+                                <tr><td>低压 (LV)</td><td>10kV, 6kV, 380V</td><td>10kV及以下</td></tr>
+                            </tbody>
+                        </table>
+
+                        <h6 class="mt-4">支持的检测插件</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <div class="card h-100"><div class="card-body p-2">
+                                    <i class="bi bi-box text-primary"></i> <strong>transformer</strong><br>
+                                    <small class="text-muted">主变压器巡检</small>
+                                </div></div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="card h-100"><div class="card-body p-2">
+                                    <i class="bi bi-toggle-on text-success"></i> <strong>switch</strong><br>
+                                    <small class="text-muted">开关间隔检测</small>
+                                </div></div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="card h-100"><div class="card-body p-2">
+                                    <i class="bi bi-diagram-3 text-info"></i> <strong>busbar</strong><br>
+                                    <small class="text-muted">母线巡检</small>
+                                </div></div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="card h-100"><div class="card-body p-2">
+                                    <i class="bi bi-battery-charging text-warning"></i> <strong>capacitor</strong><br>
+                                    <small class="text-muted">电容器巡检</small>
+                                </div></div>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <div class="card h-100"><div class="card-body p-2">
+                                    <i class="bi bi-speedometer2 text-danger"></i> <strong>meter</strong><br>
+                                    <small class="text-muted">表计读数</small>
+                                </div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 数据准备 -->
+            <div class="tab-pane fade" id="data-prep">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">数据准备</h5>
+                        <button class="btn btn-primary btn-sm" id="btn-prepare-data">
+                            <i class="bi bi-download"></i> 准备数据
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">电压等级</label>
+                                <select class="form-select" id="data-voltage">
+                                    <option value="">全部</option>
+                                    <option value="UHV_1000kV_AC">特高压 1000kV AC</option>
+                                    <option value="EHV_500kV">超高压 500kV</option>
+                                    <option value="HV_220kV">高压 220kV</option>
+                                    <option value="HV_110kV">高压 110kV</option>
+                                    <option value="MV_35kV">中压 35kV</option>
+                                    <option value="LV_10kV">低压 10kV</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">插件类型</label>
+                                <select class="form-select" id="data-plugin">
+                                    <option value="">全部</option>
+                                    <option value="transformer">主变压器</option>
+                                    <option value="switch">开关间隔</option>
+                                    <option value="busbar">母线</option>
+                                    <option value="capacitor">电容器</option>
+                                    <option value="meter">表计</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="skip-download">
+                            <label class="form-check-label" for="skip-download">跳过下载，仅生成目录结构</label>
+                        </div>
+
+                        <h6>数据集状态</h6>
+                        <div id="dataset-status" class="table-responsive">
+                            <table class="table table-sm">
+                                <thead><tr><th>数据集</th><th>状态</th><th>图像数</th></tr></thead>
+                                <tbody id="dataset-table">
+                                    <tr><td colspan="3" class="text-center text-muted">点击"准备数据"开始</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模型训练 -->
+            <div class="tab-pane fade" id="train">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">模型训练</h5>
+                        <div>
+                            <button class="btn btn-success btn-sm" id="btn-start-train">
+                                <i class="bi bi-play"></i> 开始训练
+                            </button>
+                            <button class="btn btn-danger btn-sm" id="btn-stop-train" disabled>
+                                <i class="bi bi-stop"></i> 停止
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">电压等级</label>
+                                <select class="form-select" id="train-voltage">
+                                    <option value="HV_220kV">高压 220kV</option>
+                                    <option value="HV_110kV">高压 110kV</option>
+                                    <option value="EHV_500kV">超高压 500kV</option>
+                                    <option value="UHV_1000kV_AC">特高压 1000kV AC</option>
+                                    <option value="MV_35kV">中压 35kV</option>
+                                    <option value="LV_10kV">低压 10kV</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">插件类型</label>
+                                <select class="form-select" id="train-plugin">
+                                    <option value="transformer">主变压器</option>
+                                    <option value="switch">开关间隔</option>
+                                    <option value="busbar">母线</option>
+                                    <option value="capacitor">电容器</option>
+                                    <option value="meter">表计</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">训练轮数</label>
+                                <input type="number" class="form-control" id="train-epochs" value="100" min="1" max="500">
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">批次大小</label>
+                                <input type="number" class="form-control" id="train-batch" value="16" min="1" max="64">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">图像尺寸</label>
+                                <select class="form-select" id="train-imgsize">
+                                    <option value="640">640</option>
+                                    <option value="512">512</option>
+                                    <option value="416">416</option>
+                                    <option value="320">320</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">模型大小</label>
+                                <select class="form-select" id="train-model">
+                                    <option value="yolov8n">YOLOv8n (最轻量)</option>
+                                    <option value="yolov8s">YOLOv8s (轻量)</option>
+                                    <option value="yolov8m" selected>YOLOv8m (中等)</option>
+                                    <option value="yolov8l">YOLOv8l (大)</option>
+                                    <option value="yolov8x">YOLOv8x (最大)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="train-all">
+                            <label class="form-check-label" for="train-all">训练所有模型</label>
+                        </div>
+
+                        <h6>训练日志</h6>
+                        <pre class="bg-dark text-light p-3" style="max-height: 300px; overflow-y: auto;" id="train-log">
+等待开始训练...
+                        </pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 评估验证 -->
+            <div class="tab-pane fade" id="evaluate">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">模型评估</h5>
+                        <button class="btn btn-info btn-sm" id="btn-evaluate">
+                            <i class="bi bi-graph-up"></i> 开始评估
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">选择模型</label>
+                                <select class="form-select" id="eval-model">
+                                    <option value="">选择已训练的模型...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">验证数据集</label>
+                                <select class="form-select" id="eval-dataset">
+                                    <option value="">自动选择</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <h6>评估结果</h6>
+                        <div id="eval-results">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="card"><div class="card-body text-center">
+                                        <h4 id="metric-map">-</h4>
+                                        <small class="text-muted">mAP@0.5</small>
+                                    </div></div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card"><div class="card-body text-center">
+                                        <h4 id="metric-precision">-</h4>
+                                        <small class="text-muted">Precision</small>
+                                    </div></div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card"><div class="card-body text-center">
+                                        <h4 id="metric-recall">-</h4>
+                                        <small class="text-muted">Recall</small>
+                                    </div></div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card"><div class="card-body text-center">
+                                        <h4 id="metric-f1">-</h4>
+                                        <small class="text-muted">F1 Score</small>
+                                    </div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模型部署 -->
+            <div class="tab-pane fade" id="deploy">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">模型部署</h5>
+                        <button class="btn btn-warning btn-sm" id="btn-deploy">
+                            <i class="bi bi-rocket"></i> 部署模型
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">选择模型</label>
+                                <select class="form-select" id="deploy-model">
+                                    <option value="">选择要部署的模型...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">导出格式</label>
+                                <select class="form-select" id="deploy-format">
+                                    <option value="onnx">ONNX</option>
+                                    <option value="torchscript">TorchScript</option>
+                                    <option value="coreml">CoreML (Mac)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="deploy-all">
+                            <label class="form-check-label" for="deploy-all">部署所有已训练模型</label>
+                        </div>
+
+                        <h6>已部署模型</h6>
+                        <table class="table table-sm">
+                            <thead><tr><th>模型</th><th>电压等级</th><th>插件</th><th>格式</th><th>状态</th></tr></thead>
+                            <tbody id="deployed-models">
+                                <tr><td colspan="5" class="text-center text-muted">暂无已部署模型</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadTrainingOverview();
+    loadModels();
+
+    document.getElementById('btn-prepare-data').addEventListener('click', prepareData);
+    document.getElementById('btn-start-train').addEventListener('click', startTraining);
+    document.getElementById('btn-stop-train').addEventListener('click', stopTraining);
+    document.getElementById('btn-evaluate').addEventListener('click', evaluateModel);
+    document.getElementById('btn-deploy').addEventListener('click', deployModel);
+});
+
+async function loadTrainingOverview() {
+    try {
+        const resp = await API.get('/api/training/overview');
+        if (resp) {
+            document.getElementById('model-count').textContent = resp.model_count || 0;
+            document.getElementById('dataset-count').textContent = resp.dataset_count || 0;
+        }
+    } catch (e) { console.log('加载概览失败:', e); }
+}
+
+async function loadModels() {
+    try {
+        const models = await API.get('/api/training/models');
+        const evalSelect = document.getElementById('eval-model');
+        const deploySelect = document.getElementById('deploy-model');
+
+        if (models && models.length > 0) {
+            const options = models.map(m =>
+                `<option value="${m.path}">${m.plugin} - ${m.voltage} (${m.format})</option>`
+            ).join('');
+            evalSelect.innerHTML = '<option value="">选择已训练的模型...</option>' + options;
+            deploySelect.innerHTML = '<option value="">选择要部署的模型...</option>' + options;
+        }
+    } catch (e) { console.log('加载模型列表失败:', e); }
+}
+
+async function prepareData() {
+    const voltage = document.getElementById('data-voltage').value;
+    const plugin = document.getElementById('data-plugin').value;
+    const skipDownload = document.getElementById('skip-download').checked;
+
+    showToast('开始准备数据...', 'info');
+    try {
+        const resp = await API.post('/api/training/prepare', {
+            voltage: voltage || null,
+            plugin: plugin || null,
+            skip_download: skipDownload
+        });
+        showToast('数据准备完成', 'success');
+        updateDatasetTable(resp.datasets || []);
+    } catch (e) {
+        showToast('数据准备失败: ' + e.message, 'danger');
+    }
+}
+
+function updateDatasetTable(datasets) {
+    const tbody = document.getElementById('dataset-table');
+    if (!datasets.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">暂无数据集</td></tr>';
+        return;
+    }
+    tbody.innerHTML = datasets.map(d => `
+        <tr>
+            <td>${d.name}</td>
+            <td><span class="badge bg-${d.ready ? 'success' : 'warning'}">${d.ready ? '就绪' : '待采集'}</span></td>
+            <td>${d.image_count || 0}</td>
+        </tr>
+    `).join('');
+}
+
+async function startTraining() {
+    const voltage = document.getElementById('train-voltage').value;
+    const plugin = document.getElementById('train-plugin').value;
+    const epochs = parseInt(document.getElementById('train-epochs').value);
+    const batch = parseInt(document.getElementById('train-batch').value);
+    const imgsize = parseInt(document.getElementById('train-imgsize').value);
+    const model = document.getElementById('train-model').value;
+    const trainAll = document.getElementById('train-all').checked;
+
+    document.getElementById('btn-start-train').disabled = true;
+    document.getElementById('btn-stop-train').disabled = false;
+    document.getElementById('training-status').innerHTML = '<span class="badge bg-primary">训练中</span>';
+    document.getElementById('training-progress').style.display = 'block';
+    document.getElementById('train-log').textContent = '开始训练...\n';
+
+    try {
+        const resp = await API.post('/api/training/start', {
+            voltage: voltage,
+            plugin: plugin,
+            epochs: epochs,
+            batch_size: batch,
+            img_size: imgsize,
+            model: model,
+            train_all: trainAll
+        });
+
+        if (resp.task_id) {
+            pollTrainingStatus(resp.task_id);
+        }
+    } catch (e) {
+        showToast('启动训练失败: ' + e.message, 'danger');
+        resetTrainingUI();
+    }
+}
+
+function pollTrainingStatus(taskId) {
+    const interval = setInterval(async () => {
+        try {
+            const status = await API.get('/api/training/status/' + taskId);
+
+            const progressBar = document.querySelector('#training-progress .progress-bar');
+            progressBar.style.width = status.progress + '%';
+            progressBar.textContent = status.progress + '%';
+            document.getElementById('progress-text').textContent = status.message || '';
+
+            if (status.log) {
+                document.getElementById('train-log').textContent += status.log + '\n';
+                document.getElementById('train-log').scrollTop = document.getElementById('train-log').scrollHeight;
+            }
+
+            if (status.status === 'completed') {
+                clearInterval(interval);
+                showToast('训练完成!', 'success');
+                resetTrainingUI();
+                loadModels();
+            } else if (status.status === 'failed') {
+                clearInterval(interval);
+                showToast('训练失败: ' + status.error, 'danger');
+                resetTrainingUI();
+            }
+        } catch (e) {
+            clearInterval(interval);
+            resetTrainingUI();
+        }
+    }, 2000);
+}
+
+function resetTrainingUI() {
+    document.getElementById('btn-start-train').disabled = false;
+    document.getElementById('btn-stop-train').disabled = true;
+    document.getElementById('training-status').innerHTML = '<span class="badge bg-secondary">空闲</span>';
+    document.getElementById('training-progress').style.display = 'none';
+}
+
+async function stopTraining() {
+    try {
+        await API.post('/api/training/stop');
+        showToast('训练已停止', 'warning');
+        resetTrainingUI();
+    } catch (e) {
+        showToast('停止失败: ' + e.message, 'danger');
+    }
+}
+
+async function evaluateModel() {
+    const model = document.getElementById('eval-model').value;
+    if (!model) {
+        showToast('请选择模型', 'warning');
+        return;
+    }
+
+    showToast('开始评估...', 'info');
+    try {
+        const resp = await API.post('/api/training/evaluate', { model_path: model });
+
+        document.getElementById('metric-map').textContent = (resp.map50 * 100).toFixed(1) + '%';
+        document.getElementById('metric-precision').textContent = (resp.precision * 100).toFixed(1) + '%';
+        document.getElementById('metric-recall').textContent = (resp.recall * 100).toFixed(1) + '%';
+        document.getElementById('metric-f1').textContent = (resp.f1 * 100).toFixed(1) + '%';
+
+        showToast('评估完成', 'success');
+    } catch (e) {
+        showToast('评估失败: ' + e.message, 'danger');
+    }
+}
+
+async function deployModel() {
+    const model = document.getElementById('deploy-model').value;
+    const format = document.getElementById('deploy-format').value;
+    const deployAll = document.getElementById('deploy-all').checked;
+
+    if (!model && !deployAll) {
+        showToast('请选择模型或勾选"部署所有"', 'warning');
+        return;
+    }
+
+    showToast('开始部署...', 'info');
+    try {
+        const resp = await API.post('/api/training/deploy', {
+            model_path: model || null,
+            format: format,
+            deploy_all: deployAll
+        });
+
+        showToast('部署完成', 'success');
+        updateDeployedModels(resp.deployed || []);
+    } catch (e) {
+        showToast('部署失败: ' + e.message, 'danger');
+    }
+}
+
+function updateDeployedModels(models) {
+    const tbody = document.getElementById('deployed-models');
+    if (!models.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">暂无已部署模型</td></tr>';
+        return;
+    }
+    tbody.innerHTML = models.map(m => `
+        <tr>
+            <td>${m.name}</td>
+            <td>${m.voltage}</td>
+            <td>${m.plugin}</td>
+            <td><span class="badge bg-info">${m.format}</span></td>
+            <td><span class="badge bg-success">已部署</span></td>
+        </tr>
+    `).join('');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+names:
+  0: capacitor_unit
+  1: capacitor_tilted
+  2: capacitor_fallen
+  3: capacitor_missing
+  4: person
+  5: vehicle
+  6: fuse_blown
+  7: silver_contact_damage
+nc: 8
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/UHV_1000kV_AC/capacitor
+plugin: capacitor
+test: images/test
+thermal_thresholds:
+  alarm: 100
+  normal: 70
+  warning: 85
+train: images/train
+val: images/val
+voltage_level: UHV_1000kV_AC

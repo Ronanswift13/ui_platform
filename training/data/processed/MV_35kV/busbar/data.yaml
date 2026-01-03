@@ -1,0 +1,17 @@
+names:
+  0: insulator_crack
+  1: insulator_dirty
+  2: fitting_loose
+  3: wire_damage
+  4: foreign_object
+nc: 5
+path: /Users/ronan/Desktop/破夜绘明激光监测平台/training/data/processed/MV_35kV/busbar
+plugin: busbar
+test: images/test
+thermal_thresholds:
+  alarm: 75
+  normal: 50
+  warning: 65
+train: images/train
+val: images/val
+voltage_level: MV_35kV
