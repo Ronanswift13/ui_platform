@@ -1,0 +1,40 @@
+# 示例站点配置
+
+site:
+  id: "site_001"
+  name: "示例变电站"
+  code: "S001"
+  location: "XX省XX市"
+  voltage_level: "220kV"
+
+# 点位列表
+positions:
+  - id: "pos_001"
+    name: "1号主变监控点"
+    camera_id: "cam_001"
+    ptz_preset:
+      pan: 0.0
+      tilt: -15.0
+      zoom: 2.0
+    devices:
+      - id: "dev_001"
+        name: "1号主变压器"
+        type: "transformer"
+        components:
+          - id: "comp_001"
+            name: "高压套管"
+            type: "bushing"
+          - id: "comp_002"
+            name: "散热器"
+            type: "radiator"
+          - id: "comp_003"
+            name: "油位计"
+            type: "oil_level"
+
+  - id: "pos_002"
+    name: "开关间隔监控点"
+    camera_id: "cam_002"
+    devices:
+      - id: "dev_002"
+        name: "1号断路器"
+        type: "switch"

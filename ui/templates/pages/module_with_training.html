@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="module-id" content="{{ module_id }}">
+    <title>{{ module_name }} - 输变电监测平台</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding-top: 1rem;
+            overflow-y: auto;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0;
+            transition: all 0.3s;
+        }
+        
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 1.5rem;
+            min-height: 100vh;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+        
+        .video-container img,
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .no-signal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #6c757d;
+        }
+        
+        .detection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid #eee;
+            font-weight: 500;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        
+        .status-indicator.online { background-color: var(--success-color); }
+        .status-indicator.offline { background-color: var(--danger-color); }
+        .status-indicator.warning { background-color: var(--warning-color); }
+
+        /* 电压等级徽章样式 */
+        .voltage-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .voltage-badge:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .voltage-badge.uhv { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .voltage-badge.ehv { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        .voltage-badge.hv { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
+        .voltage-badge.mv { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333; }
+        .voltage-badge.lv { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+
+        /* 功能标签样式 */
+        .feature-tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            margin: 0.1rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background: #e9ecef;
+            color: #495057;
+        }
+        .feature-tag.active { background: #28a745; color: white; }
+        .feature-tag.inactive { background: #dee2e6; color: #6c757d; text-decoration: line-through; }
+        
+        .result-item {
+            padding: 0.75rem;
+            border-left: 3px solid transparent;
+            margin-bottom: 0.5rem;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .result-item.normal { border-left-color: var(--success-color); }
+        .result-item.warning { border-left-color: var(--warning-color); }
+        .result-item.error { border-left-color: var(--danger-color); }
+        
+        /* 训练面板动画 */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .training-active {
+            animation: pulse 2s infinite;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 200px;
+            }
+            .main-content {
+                margin-left: 200px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <nav class="sidebar">
+        <div class="px-3 mb-4">
+            <h5 class="mb-0">
+                <i class="bi bi-lightning-charge"></i> 
+                输变电监测
+            </h5>
+            <small class="text-muted">激光星芒破夜绘明</small>
+        </div>
+        
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="/">
+                    <i class="bi bi-house-door"></i> 首页
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'transformer' %}active{% endif %}" href="/module/transformer">
+                    <i class="bi bi-box"></i> 主变巡视
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'switch' %}active{% endif %}" href="/module/switch">
+                    <i class="bi bi-toggle-on"></i> 开关间隔
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'busbar' %}active{% endif %}" href="/module/busbar">
+                    <i class="bi bi-diagram-3"></i> 母线巡视
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'capacitor' %}active{% endif %}" href="/module/capacitor">
+                    <i class="bi bi-battery-charging"></i> 电容器
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'meter' %}active{% endif %}" href="/module/meter">
+                    <i class="bi bi-speedometer2"></i> 表计读数
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'bird' %}active{% endif %}" href="/module/bird">
+                    <i class="bi bi-feather"></i> 鸟类监控
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if module_id == 'indoor_fence' %}active{% endif %}" href="/module/indoor_fence">
+                    <i class="bi bi-shield-shaded"></i> 室内围栏
+                </a>
+            </li>
+            <li class="nav-item mt-3">
+                <a class="nav-link" href="/training">
+                    <i class="bi bi-cpu"></i> 模型训练
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="/settings/voltage">
+                    <i class="bi bi-gear"></i> 电压设置
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="main-content">
+        <!-- 页面标题 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="mb-0">
+                    <i class="bi bi-{{ module_icon }}"></i> {{ module_name }}
+                </h4>
+                <small class="text-muted">{{ module_description }}</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <!-- 电压等级徽章 -->
+                <a href="/settings/voltage" class="voltage-badge" id="voltage-badge" title="点击修改电压等级">
+                    <i class="bi bi-lightning-charge me-1"></i>
+                    <span id="voltage-level-text">加载中...</span>
+                </a>
+                <span class="badge bg-{{ 'success' if plugin_status == 'ready' else 'secondary' }}">
+                    <span class="status-indicator {{ 'online' if plugin_status == 'ready' else 'offline' }}"></span>
+                    {{ '插件就绪' if plugin_status == 'ready' else '插件未加载' }}
+                </span>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- 左侧: 视频流和检测结果 -->
+            <div class="col-lg-8">
+                <!-- 视频流 -->
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi bi-camera-video"></i> 实时视频流
+                        </span>
+                        <span class="badge bg-secondary" id="camera-connection-badge">未连接</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="video-container" id="video-container">
+                            <img id="camera-stream" src="" alt="视频流" style="display: none;">
+                            <div class="no-signal" id="no-signal">
+                                <i class="bi bi-camera-video-off" style="font-size: 3rem;"></i>
+                                <p class="mt-2" id="no-signal-text">等待摄像头连接...</p>
+                            </div>
+                            <canvas class="detection-overlay" id="detection-overlay"></canvas>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <button class="btn btn-primary btn-sm" id="btn-detect" disabled>
+                                    <i class="bi bi-search"></i> 检测
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" id="btn-clear">
+                                    <i class="bi bi-x-circle"></i> 清除
+                                </button>
+                            </div>
+                            <div id="detect-loading" style="display: none;">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                <span class="ms-1">检测中...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 检测结果 -->
+                <div class="card" id="results-card" style="display: none;">
+                    <div class="card-header">
+                        <i class="bi bi-list-check"></i> 检测结果
+                    </div>
+                    <div class="card-body">
+                        <div id="results-list"></div>
+                        <div id="no-results" class="text-center text-muted py-4" style="display: none;">
+                            <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                            <p class="mt-2">未检测到异常</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 告警记录 -->
+                <div class="card mt-3" id="alarms-card" style="display: none;">
+                    <div class="card-header">
+                        <i class="bi bi-exclamation-triangle text-warning"></i> 告警记录
+                    </div>
+                    <div class="card-body">
+                        <div id="alarms-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧: 控制面板和训练 -->
+            <div class="col-lg-4">
+                <!-- 摄像头控制 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <i class="bi bi-camera"></i> 摄像头接入
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">选择摄像头</label>
+                            <select class="form-select form-select-sm" id="camera-select">
+                                <option value="">-- 选择摄像头 --</option>
+                            </select>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small" id="camera-status">
+                                <span class="status-indicator offline" id="camera-status-indicator"></span>
+                                <span id="camera-status-text">未连接</span>
+                            </span>
+                            <button class="btn btn-outline-primary btn-sm" id="btn-refresh-cameras">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 检测设置 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <i class="bi bi-sliders"></i> 检测设置
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">置信度阈值</label>
+                            <input type="range" class="form-range" id="confidence-threshold"
+                                   min="0.1" max="1" step="0.05" value="0.25">
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>0.1</span>
+                                <span id="confidence-value">0.25</span>
+                                <span>1.0</span>
+                            </div>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="auto-detect" checked>
+                            <label class="form-check-label" for="auto-detect">
+                                自动检测模式
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="show-overlay" checked>
+                            <label class="form-check-label" for="show-overlay">
+                                显示检测框
+                            </label>
+                        </div>
+
+                        <!-- 电压等级功能显示 -->
+                        <div class="border-top pt-3">
+                            <label class="form-label small text-muted">
+                                <i class="bi bi-lightning-charge"></i> 当前电压等级可用功能
+                            </label>
+                            <div id="voltage-features-container">
+                                <small class="text-muted">加载中...</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== 训练控制面板 ========== -->
+                <div class="card mb-3" id="training-panel">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-cpu"></i> 模型训练
+                        </h5>
+                        <span class="badge bg-secondary" id="training-status-badge">未训练</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- 电压等级选择 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-lightning-charge"></i> 电压等级
+                            </label>
+                            <select class="form-select form-select-sm" id="training-voltage-select">
+                                <option value="">-- 选择电压等级 --</option>
+                                <optgroup label="特高压 (UHV)">
+                                    <option value="UHV_1000kV_AC">1000kV 交流</option>
+                                    <option value="UHV_800kV_DC">±800kV 直流</option>
+                                </optgroup>
+                                <optgroup label="超高压 (EHV)">
+                                    <option value="EHV_500kV">500kV</option>
+                                    <option value="EHV_330kV">330kV</option>
+                                    <option value="EHV_750kV">750kV</option>
+                                </optgroup>
+                                <optgroup label="高压 (HV)">
+                                    <option value="HV_220kV" selected>220kV</option>
+                                    <option value="HV_110kV">110kV</option>
+                                </optgroup>
+                                <optgroup label="中压 (MV)">
+                                    <option value="MV_35kV">35kV</option>
+                                    <option value="MV_66kV">66kV</option>
+                                </optgroup>
+                                <optgroup label="低压 (LV)">
+                                    <option value="LV_10kV">10kV</option>
+                                    <option value="LV_6kV">6kV</option>
+                                    <option value="LV_380V">380V</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- 数据集状态 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-database"></i> 数据集状态
+                            </label>
+                            <div class="dataset-status-card p-2 border rounded" id="dataset-status-card">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span id="dataset-status-text">检查中...</span>
+                                    <span class="badge" id="dataset-status-badge">-</span>
+                                </div>
+                                <div class="mt-2 small text-muted" id="dataset-stats">
+                                    <span>训练: <strong id="train-count">0</strong></span>
+                                    <span class="ms-2">验证: <strong id="val-count">0</strong></span>
+                                    <span class="ms-2">测试: <strong id="test-count">0</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 数据下载 -->
+                        <div class="mb-3" id="download-section">
+                            <label class="form-label">
+                                <i class="bi bi-cloud-download"></i> 下载公开数据集
+                            </label>
+                            <div class="d-grid gap-2" id="download-buttons">
+                                <small class="text-muted">加载中...</small>
+                            </div>
+                            <div class="progress mt-2" id="download-progress-container" style="display: none; height: 20px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="download-progress-bar" 
+                                     role="progressbar" 
+                                     style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted" id="download-status-text"></small>
+                        </div>
+
+                        <!-- 训练参数 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-sliders"></i> 训练参数
+                            </label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small">训练轮数</label>
+                                    <input type="number" class="form-control form-control-sm" 
+                                           id="training-epochs" value="100" min="10" max="500">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">批次大小</label>
+                                    <select class="form-select form-select-sm" id="training-batch-size">
+                                        <option value="8">8</option>
+                                        <option value="16" selected>16</option>
+                                        <option value="32">32</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 训练进度 -->
+                        <div class="mb-3" id="training-progress-section" style="display: none;">
+                            <label class="form-label">
+                                <i class="bi bi-activity"></i> 训练进度
+                            </label>
+                            <div class="progress mb-2" style="height: 25px;">
+                                <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
+                                     id="training-progress-bar" 
+                                     role="progressbar" 
+                                     style="width: 0%">
+                                    <span id="training-progress-text">0%</span>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>Epoch: <strong id="current-epoch">0</strong>/<strong id="total-epochs">100</strong></span>
+                                <span>mAP50: <strong id="current-map">-</strong></span>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted" id="training-message">准备中...</small>
+                            </div>
+                        </div>
+
+                        <!-- 已训练模型 -->
+                        <div class="mb-3" id="trained-model-section" style="display: none;">
+                            <label class="form-label">
+                                <i class="bi bi-check-circle text-success"></i> 已训练模型
+                            </label>
+                            <div class="p-2 border rounded border-success bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-success">
+                                        <i class="bi bi-cpu"></i> <span id="trained-model-name">-</span>
+                                    </span>
+                                    <span class="badge bg-success">已就绪</span>
+                                </div>
+                                <div class="mt-1 small text-muted">
+                                    <span>mAP50: <strong id="trained-model-map">-</strong></span>
+                                    <span class="ms-2">时间: <span id="trained-model-time">-</span></span>
+                                </div>
+                                <div class="mt-2">
+                                    <button class="btn btn-outline-success btn-sm" id="btn-use-model">
+                                        <i class="bi bi-play-fill"></i> 使用
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" id="btn-retrain">
+                                        <i class="bi bi-arrow-repeat"></i> 重训练
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" id="btn-start-training" disabled>
+                                <i class="bi bi-play-circle"></i> 开始训练
+                            </button>
+                            <button class="btn btn-danger" id="btn-cancel-training" style="display: none;">
+                                <i class="bi bi-stop-circle"></i> 取消训练
+                            </button>
+                        </div>
+
+                        <!-- 占位符警告 -->
+                        <div class="alert alert-warning mt-3 mb-0" id="placeholder-warning" style="display: none;">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>需要现场数据</strong>
+                            <p class="mb-0 small" id="placeholder-instructions">
+                                当前数据集为占位符，需要现场采集真实数据才能进行有效训练。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <!-- ========== 训练控制面板结束 ========== -->
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 电压等级管理脚本 -->
+    <script src="/static/js/voltage_manager.js"></script>
+
+    <!-- 训练面板脚本 -->
+    <script src="/static/js/training_panel.js"></script>
+
+    <!-- 模块通用脚本 -->
+    <script src="/static/js/module_common.js"></script>
+
+    <script>
+        // 获取当前模块ID
+        const moduleId = document.querySelector('meta[name="module-id"]')?.content || 'transformer';
+
+        // 电压等级功能配置 - 不同电压等级对应不同功能
+        const voltageFeatureConfig = {
+            transformer: {
+                'UHV': ['油位监测', '油温监测', '套管检测', '渗漏检测', '特高压电晕检测', 'GIS局放监测', '油色谱监测'],
+                'EHV': ['油位监测', '油温监测', '套管检测', '渗漏检测', 'SF6监测', 'GIS监测', '局放监测'],
+                'HV': ['油位监测', '油温监测', '套管检测', '渗漏检测', '绝缘子污秽'],
+                'MV': ['油位监测', '油温监测', '套管检测', '配电柜监测'],
+                'LV': ['油温监测', '配电箱监测']
+            },
+            switch: {
+                'UHV': ['断路器状态', '隔离开关状态', '接地开关状态', 'SF6压力', 'GIS组合电器监测', '特高压开关监测'],
+                'EHV': ['断路器状态', '隔离开关状态', '接地开关状态', 'SF6压力', 'GIS监测'],
+                'HV': ['断路器状态', '隔离开关状态', '接地开关状态', 'SF6压力'],
+                'MV': ['断路器状态', '隔离开关状态', '真空开关监测'],
+                'LV': ['断路器状态', '空气开关状态']
+            },
+            busbar: {
+                'UHV': ['绝缘子缺陷', '金具锈蚀', '异物检测', '销钉缺失', '特高压母线监测', '电晕放电检测'],
+                'EHV': ['绝缘子缺陷', '金具锈蚀', '异物检测', '销钉缺失', 'GIS母线监测'],
+                'HV': ['绝缘子缺陷', '金具锈蚀', '异物检测', '销钉缺失'],
+                'MV': ['绝缘子缺陷', '金具锈蚀', '异物检测'],
+                'LV': ['母线连接检测', '绝缘损伤检测']
+            },
+            capacitor: {
+                'UHV': ['倾斜检测', '缺失检测', '入侵检测', '特高压电容器组监测', '温升异常检测'],
+                'EHV': ['倾斜检测', '缺失检测', '入侵检测', '电容器组监测'],
+                'HV': ['倾斜检测', '缺失检测', '入侵检测'],
+                'MV': ['倾斜检测', '缺失检测', '电容器柜监测'],
+                'LV': ['电容器状态监测']
+            },
+            meter: {
+                'UHV': ['指针表读数', '数字表读数', 'SF6表读数', '特高压专用表计', '在线监测数据'],
+                'EHV': ['指针表读数', '数字表读数', 'SF6表读数', 'GIS表计读数'],
+                'HV': ['指针表读数', '数字表读数', 'SF6表读数'],
+                'MV': ['指针表读数', '数字表读数'],
+                'LV': ['数字表读数', '电能表读数']
+            }
+        };
+
+        // 电压等级管理
+        const VoltageUI = {
+            currentLevel: null,
+            currentCategory: null,
+
+            init: async function() {
+                await this.loadCurrentVoltage();
+                this.setupStorageListener();
+            },
+
+            // 加载当前电压等级
+            loadCurrentVoltage: async function() {
+                try {
+                    const response = await fetch('/api/voltage/current');
+                    const data = await response.json();
+
+                    if (data.success && data.voltage_level) {
+                        this.currentLevel = data.voltage_level;
+                        this.currentCategory = this.getCategory(data.voltage_level);
+                        this.updateBadge();
+                        this.updateFeatures();
+                    } else {
+                        this.setDefaultState();
+                    }
+                } catch (error) {
+                    console.error('加载电压等级失败:', error);
+                    this.setDefaultState();
+                }
+            },
+
+            // 设置默认状态
+            setDefaultState: function() {
+                const badge = document.getElementById('voltage-badge');
+                const text = document.getElementById('voltage-level-text');
+                if (text) text.textContent = '未设置';
+                if (badge) badge.classList.add('hv');
+            },
+
+            // 从电压等级名称获取分类
+            getCategory: function(level) {
+                if (level.startsWith('UHV')) return 'UHV';
+                if (level.startsWith('EHV')) return 'EHV';
+                if (level.startsWith('HV')) return 'HV';
+                if (level.startsWith('MV')) return 'MV';
+                if (level.startsWith('LV')) return 'LV';
+                return 'HV';
+            },
+
+            // 更新电压等级徽章
+            updateBadge: function() {
+                const badge = document.getElementById('voltage-badge');
+                const text = document.getElementById('voltage-level-text');
+
+                if (!badge || !text) return;
+
+                // 移除所有分类样式
+                badge.classList.remove('uhv', 'ehv', 'hv', 'mv', 'lv');
+
+                // 添加当前分类样式
+                const categoryClass = this.currentCategory.toLowerCase();
+                badge.classList.add(categoryClass);
+
+                // 更新文本
+                text.textContent = this.currentLevel;
+            },
+
+            // 更新功能列表
+            updateFeatures: function() {
+                const container = document.getElementById('voltage-features-container');
+                if (!container) return;
+
+                const moduleFeatures = voltageFeatureConfig[moduleId] || {};
+                const features = moduleFeatures[this.currentCategory] || ['基础检测功能'];
+
+                let html = '<div class="d-flex flex-wrap gap-1">';
+                features.forEach(feature => {
+                    html += `<span class="feature-tag active"><i class="bi bi-check-circle-fill me-1"></i>${feature}</span>`;
+                });
+                html += '</div>';
+
+                container.innerHTML = html;
+            },
+
+            // 监听localStorage变化（跨标签页同步）
+            setupStorageListener: function() {
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'voltage_level' && e.newValue) {
+                        this.currentLevel = e.newValue;
+                        this.currentCategory = this.getCategory(e.newValue);
+                        this.updateBadge();
+                        this.updateFeatures();
+                    }
+                });
+
+                // 监听自定义事件（同标签页）
+                window.addEventListener('voltageChanged', (e) => {
+                    if (e.detail && e.detail.level) {
+                        this.currentLevel = e.detail.level;
+                        this.currentCategory = this.getCategory(e.detail.level);
+                        this.updateBadge();
+                        this.updateFeatures();
+                    }
+                });
+            }
+        };
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化电压等级UI
+            VoltageUI.init();
+
+            // 置信度滑块
+            document.getElementById('confidence-threshold').addEventListener('input', function() {
+                document.getElementById('confidence-value').textContent = this.value;
+            });
+        });
+    </script>
+</body>
+</html>

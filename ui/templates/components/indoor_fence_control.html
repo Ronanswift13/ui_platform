@@ -1,0 +1,352 @@
+<!-- 
+室内电子围栏控制面板
+输变电激光星芒破夜绘明监测平台 (G组)
+基于《变电站多目标操作安全监测系统》方案
+-->
+
+<!-- 检测设置 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-sliders"></i> 检测设置</h5>
+    </div>
+    <div class="card-body">
+        <!-- 人员检测 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="person_detection" id="check-person-detection" checked>
+                <label class="form-check-label fw-bold" for="check-person-detection">
+                    <i class="bi bi-person text-primary"></i> 人员检测
+                </label>
+            </div>
+            <div class="row g-2" id="person-detection-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="person-confidence" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最大跟踪人数</label>
+                    <input type="number" step="1" min="1" max="20" class="form-control form-control-sm" id="max-persons" value="10">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 越线检测 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="line_check" id="check-line-detection" checked>
+                <label class="form-check-label fw-bold" for="check-line-detection">
+                    <i class="bi bi-exclamation-triangle text-danger"></i> 越线检测
+                </label>
+            </div>
+            <div class="row g-2" id="line-detection-settings">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">黄线距离(m)</label>
+                    <input type="number" step="0.1" min="0.1" max="2" class="form-control form-control-sm" id="yellow-line-distance" value="0.5">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">警告距离(m)</label>
+                    <input type="number" step="0.1" min="0.1" max="1" class="form-control form-control-sm" id="warning-distance" value="0.3">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">危险距离(m)</label>
+                    <input type="number" step="0.05" min="0.05" max="0.5" class="form-control form-control-sm" id="danger-distance" value="0.1">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 授权校验 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="auth_check" id="check-auth" checked>
+                <label class="form-check-label fw-bold" for="check-auth">
+                    <i class="bi bi-shield-check text-success"></i> 授权校验
+                </label>
+            </div>
+            <div id="auth-settings">
+                <label class="form-label small text-muted mb-1">授权机柜列表</label>
+                <div class="d-flex flex-wrap gap-1" id="cabinet-auth-list">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 多人检测 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="multi_person" id="check-multi-person" checked>
+                <label class="form-check-label fw-bold" for="check-multi-person">
+                    <i class="bi bi-people text-warning"></i> 同柜多人检测
+                </label>
+            </div>
+            <div class="row g-2" id="multi-person-settings">
+                <div class="col-12">
+                    <label class="form-label small text-muted mb-1">每柜最大人数</label>
+                    <input type="number" step="1" min="1" max="3" class="form-control form-control-sm" id="max-per-cabinet" value="1">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 激光雷达状态 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-broadcast"></i> 激光雷达</h5>
+    </div>
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small">连接状态:</span>
+            <span class="badge bg-secondary" id="lidar-status">未连接</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small">扫描频率:</span>
+            <span class="fw-bold" id="lidar-scan-rate">-- Hz</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small">点云数量:</span>
+            <span class="fw-bold" id="lidar-point-count">--</span>
+        </div>
+        <div class="progress mb-2" style="height: 5px;">
+            <div class="progress-bar bg-info" role="progressbar" style="width: 0%" id="lidar-coverage"></div>
+        </div>
+        <div class="small text-muted text-center">覆盖率: <span id="lidar-coverage-text">--%</span></div>
+    </div>
+</div>
+
+<!-- 机柜状态矩阵 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-grid-3x2"></i> 机柜状态</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-2" id="cabinet-status-grid">
+            <!-- 动态生成 -->
+        </div>
+        <div class="mt-2 small">
+            <span class="badge bg-secondary me-1">空闲</span>
+            <span class="badge bg-primary me-1">作业中</span>
+            <span class="badge bg-danger me-1">告警</span>
+            <span class="badge bg-success me-1">已授权</span>
+        </div>
+    </div>
+</div>
+
+<!-- 人员状态 -->
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-people"></i> 人员状态</h5>
+        <span class="badge bg-info" id="person-count">0 人</span>
+    </div>
+    <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+        <div id="person-list">
+            <div class="text-center text-muted small py-3">
+                <i class="bi bi-person-x"></i> 暂无人员
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始监控
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>
+
+<script>
+// Indoor Fence 专属交互逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    const CABINET_COUNT = 6;
+    const DEFAULT_ALLOW_LIST = [3, 4, 5];
+
+    // 初始化机柜授权列表
+    function initCabinetAuthList() {
+        const container = document.getElementById('cabinet-auth-list');
+        if (!container) return;
+
+        container.innerHTML = '';
+        for (let i = 1; i <= CABINET_COUNT; i++) {
+            const isAuthorized = DEFAULT_ALLOW_LIST.includes(i);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `btn btn-sm ${isAuthorized ? 'btn-success' : 'btn-outline-secondary'} cabinet-auth-btn`;
+            btn.dataset.cabinetId = i;
+            btn.textContent = `#${i}`;
+            btn.addEventListener('click', function() {
+                this.classList.toggle('btn-success');
+                this.classList.toggle('btn-outline-secondary');
+            });
+            container.appendChild(btn);
+        }
+    }
+
+    // 初始化机柜状态网格
+    function initCabinetStatusGrid() {
+        const container = document.getElementById('cabinet-status-grid');
+        if (!container) return;
+
+        container.innerHTML = '';
+        for (let i = 1; i <= CABINET_COUNT; i++) {
+            const col = document.createElement('div');
+            col.className = 'col-4';
+            col.innerHTML = `
+                <div class="cabinet-cell text-center p-2 border rounded" id="cabinet-${i}" data-cabinet-id="${i}">
+                    <div class="fw-bold">#${i}</div>
+                    <div class="small">
+                        <span class="badge bg-secondary cabinet-status">空闲</span>
+                    </div>
+                    ${DEFAULT_ALLOW_LIST.includes(i) ? '<i class="bi bi-shield-check text-success small"></i>' : ''}
+                </div>
+            `;
+            container.appendChild(col);
+        }
+    }
+
+    // 更新机柜状态
+    function updateCabinetStatus(cabinetId, status, occupants) {
+        const cell = document.getElementById(`cabinet-${cabinetId}`);
+        if (!cell) return;
+
+        const statusBadge = cell.querySelector('.cabinet-status');
+        
+        cell.classList.remove('border-danger', 'border-primary', 'bg-danger-subtle', 'bg-primary-subtle');
+        
+        switch (status) {
+            case 'alert':
+                statusBadge.className = 'badge bg-danger cabinet-status';
+                statusBadge.textContent = '告警';
+                cell.classList.add('border-danger', 'bg-danger-subtle');
+                break;
+            case 'occupied':
+                statusBadge.className = 'badge bg-primary cabinet-status';
+                statusBadge.textContent = '作业中';
+                cell.classList.add('border-primary', 'bg-primary-subtle');
+                break;
+            default:
+                statusBadge.className = 'badge bg-secondary cabinet-status';
+                statusBadge.textContent = '空闲';
+        }
+    }
+
+    // 更新人员列表
+    function updatePersonList(persons) {
+        const container = document.getElementById('person-list');
+        const countBadge = document.getElementById('person-count');
+        
+        if (!container) return;
+        
+        countBadge.textContent = `${persons.length} 人`;
+
+        if (persons.length === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted small py-3">
+                    <i class="bi bi-person-x"></i> 暂无人员
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = persons.map(p => {
+            const stateClass = {
+                'SAFE_AUTH': 'success',
+                'SAFE_UNAUTH': 'warning',
+                'DANGER_LINE': 'danger',
+                'VISION_ONLY': 'info',
+                'LIDAR_ONLY': 'info'
+            }[p.state] || 'secondary';
+
+            const stateName = {
+                'SAFE_AUTH': '授权安全',
+                'SAFE_UNAUTH': '未授权',
+                'DANGER_LINE': '越线危险',
+                'VISION_ONLY': '仅视觉',
+                'LIDAR_ONLY': '仅雷达'
+            }[p.state] || '未知';
+
+            return `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded ${p.state === 'DANGER_LINE' ? 'border-danger bg-danger-subtle' : ''}">
+                    <div>
+                        <strong>${p.person_id}</strong>
+                        <div class="small text-muted">机柜 #${p.cabinet_id} · ${p.distance_to_line_m.toFixed(2)}m</div>
+                    </div>
+                    <span class="badge bg-${stateClass}">${stateName}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 更新雷达状态
+    function updateLidarStatus(connected, scanRate, pointCount, coverage) {
+        const statusBadge = document.getElementById('lidar-status');
+        const rateText = document.getElementById('lidar-scan-rate');
+        const countText = document.getElementById('lidar-point-count');
+        const coverageBar = document.getElementById('lidar-coverage');
+        const coverageText = document.getElementById('lidar-coverage-text');
+
+        if (statusBadge) {
+            statusBadge.className = `badge bg-${connected ? 'success' : 'secondary'}`;
+            statusBadge.textContent = connected ? '已连接' : '未连接';
+        }
+        if (rateText) rateText.textContent = `${scanRate} Hz`;
+        if (countText) countText.textContent = pointCount;
+        if (coverageBar) coverageBar.style.width = `${coverage}%`;
+        if (coverageText) coverageText.textContent = `${coverage.toFixed(1)}%`;
+    }
+
+    // 初始化
+    initCabinetAuthList();
+    initCabinetStatusGrid();
+
+    // 模拟雷达状态更新
+    updateLidarStatus(true, 10, 360, 98.5);
+
+    // 启用/禁用设置区域
+    function toggleSettings(checkboxId, settingsId) {
+        const checkbox = document.getElementById(checkboxId);
+        const settings = document.getElementById(settingsId);
+        if (checkbox && settings) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    settings.classList.remove('d-none');
+                } else {
+                    settings.classList.add('d-none');
+                }
+            });
+        }
+    }
+
+    // 暴露更新函数供外部调用
+    window.IndoorFenceUI = {
+        updateCabinetStatus: updateCabinetStatus,
+        updatePersonList: updatePersonList,
+        updateLidarStatus: updateLidarStatus,
+    };
+});
+</script>
+
+<style>
+.cabinet-cell {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.cabinet-cell:hover {
+    background-color: #f8f9fa;
+}
+.cabinet-auth-btn {
+    min-width: 40px;
+}
+</style>

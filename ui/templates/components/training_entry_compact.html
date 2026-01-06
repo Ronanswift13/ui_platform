@@ -1,0 +1,143 @@
+{# 
+训练入口组件（精简版）
+用法: {% include 'components/training_entry_compact.html' %}
+需要在页面设置 module_id 变量
+#}
+
+<div class="card mb-3" id="training-entry-compact">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span class="small"><i class="bi bi-cpu"></i> 模型训练</span>
+        <span class="badge" id="training-compact-badge">检查中...</span>
+    </div>
+    <div class="card-body py-2">
+        {# 状态指示 #}
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="small">
+                <span id="training-compact-status">检查训练状态...</span>
+            </div>
+            <div id="training-compact-map" class="small text-muted" style="display: none;">
+                mAP50: <strong id="training-compact-map-value">-</strong>
+            </div>
+        </div>
+        
+        {# 数据集简要信息 #}
+        <div class="d-flex align-items-center justify-content-between small text-muted mb-2">
+            <span>数据: <span id="training-compact-data-count">-</span> 张</span>
+            <span id="training-compact-data-status">-</span>
+        </div>
+        
+        {# 进度条(训练中时显示) #}
+        <div id="training-compact-progress-wrap" style="display: none;">
+            <div class="progress mb-2" style="height: 6px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     id="training-compact-progress" style="width: 0%"></div>
+            </div>
+            <div class="small text-center text-muted" id="training-compact-progress-text">-</div>
+        </div>
+        
+        {# 操作按钮 #}
+        <div class="d-grid">
+            <a href="/training?plugin={{ module_id }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-box-arrow-up-right"></i> 训练管理
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const moduleId = '{{ module_id }}';
+    const defaultVoltage = 'HV_220kV';
+    let pollInterval = null;
+    
+    async function loadStatus() {
+        try {
+            const response = await fetch(`/api/training/status/${defaultVoltage}/${moduleId}`);
+            const data = await response.json();
+            if (data.success) {
+                updateDisplay(data);
+            }
+        } catch (error) {
+            console.error('加载训练状态失败:', error);
+            document.getElementById('training-compact-badge').textContent = '错误';
+            document.getElementById('training-compact-badge').className = 'badge bg-danger';
+        }
+    }
+    
+    function updateDisplay(data) {
+        const badge = document.getElementById('training-compact-badge');
+        const status = document.getElementById('training-compact-status');
+        const mapDiv = document.getElementById('training-compact-map');
+        const mapValue = document.getElementById('training-compact-map-value');
+        const dataCount = document.getElementById('training-compact-data-count');
+        const dataStatus = document.getElementById('training-compact-data-status');
+        const progressWrap = document.getElementById('training-compact-progress-wrap');
+        const progressBar = document.getElementById('training-compact-progress');
+        const progressText = document.getElementById('training-compact-progress-text');
+        
+        {# 数据集状态 #}
+        if (data.dataset) {
+            dataCount.textContent = data.dataset.total_count || 0;
+            
+            const statusMap = {
+                'ready': { text: '就绪', class: 'text-success' },
+                'downloaded': { text: '已下载', class: 'text-info' },
+                'placeholder': { text: '占位符', class: 'text-warning' },
+                'not_downloaded': { text: '未下载', class: 'text-muted' }
+            };
+            const ds = statusMap[data.dataset.status] || statusMap['not_downloaded'];
+            dataStatus.textContent = ds.text;
+            dataStatus.className = `small ${ds.class}`;
+        }
+        
+        {# 训练状态 #}
+        if (data.completed_model) {
+            badge.textContent = '已训练';
+            badge.className = 'badge bg-success';
+            status.innerHTML = '<i class="bi bi-check-circle text-success"></i> 模型已就绪';
+            mapDiv.style.display = 'block';
+            mapValue.textContent = data.completed_model.best_map50 
+                ? data.completed_model.best_map50.toFixed(4) : '-';
+            progressWrap.style.display = 'none';
+            stopPolling();
+        } else if (data.task && ['training', 'preparing'].includes(data.task.status)) {
+            badge.textContent = '训练中';
+            badge.className = 'badge bg-warning';
+            status.innerHTML = '<i class="bi bi-hourglass-split text-warning"></i> ' + (data.task.message || '训练中...');
+            mapDiv.style.display = 'none';
+            progressWrap.style.display = 'block';
+            progressBar.style.width = `${data.task.progress || 0}%`;
+            progressText.textContent = `Epoch ${data.task.current_epoch || 0}/${data.task.total_epochs || 100}`;
+            startPolling();
+        } else {
+            badge.textContent = '未训练';
+            badge.className = 'badge bg-secondary';
+            status.innerHTML = '<i class="bi bi-info-circle text-muted"></i> 暂无模型';
+            mapDiv.style.display = 'none';
+            progressWrap.style.display = 'none';
+            stopPolling();
+        }
+    }
+    
+    function startPolling() {
+        if (!pollInterval) {
+            pollInterval = setInterval(loadStatus, 3000);
+        }
+    }
+    
+    function stopPolling() {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        if (moduleId) {
+            loadStatus();
+            {# 每60秒检查一次状态 #}
+            setInterval(loadStatus, 60000);
+        }
+    });
+})();
+</script>

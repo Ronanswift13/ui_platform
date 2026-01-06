@@ -1,0 +1,113 @@
+# ============================================================
+# 表计无建模增强读数插件配置 (E组)
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
+
+# 模型配置
+model:
+  path: "models/meter_reading.onnx"
+  device: "cpu"
+
+# 推理配置 - 按性能指标标定
+inference:
+  confidence_threshold: 0.6
+  nms_threshold: 0.4
+  max_detections: 50
+
+# 支持的表计类型
+meter_types:
+  analog:
+    - pressure_gauge
+    - temperature_gauge
+    - oil_level_gauge
+    - sf6_density_gauge
+    - ammeter
+    - voltmeter
+  digital:
+    - digital_display
+    - LED_indicator
+    - seven_segment
+
+# 关键点检测配置
+keypoint_detection:
+  analog_keypoints:
+    - center
+    - scale_min
+    - scale_max
+    - pointer_tip
+    - pointer_base
+  digital_keypoints:
+    - display_tl
+    - display_br
+
+# 透视矫正配置
+perspective_correction:
+  enabled: true
+  max_rotation: 45
+  min_scale: 0.5
+  max_scale: 2.0
+
+# 读数计算配置
+reading_calculation:
+  auto_range:
+    enabled: true
+  interpolation: "linear"
+  decimal_places: 2
+
+# 失败兜底配置
+fallback:
+  retry_count: 3
+  manual_review_threshold: 0.5
+  use_history: true
+  history_window: 5
+
+# 图像预处理配置
+preprocessing:
+  enhance_lighting: true
+  anti_glare: true
+  contrast_enhancement: 1.2
+
+# 指针检测算法参数
+pointer_detection:
+  hough_threshold: 50
+  min_line_length: 30
+  max_line_gap: 10
+  angle_range:
+    min: -150
+    max: 150
+
+# 刻度识别配置
+scale_recognition:
+  ocr_enabled: true
+  tick_detection:
+    min_ticks: 5
+    max_ticks: 20
+
+# 数字显示识别配置
+digital_recognition:
+  ocr_engine: "easyocr"
+  char_whitelist: "0123456789.-+eE"
+  seven_segment:
+    enabled: true
+    templates_path: "models/seven_segment_templates"
+
+# ROI类型映射
+roi_types:
+  pressure_gauge: "压强表"
+  temperature_gauge: "温度表"
+  oil_level_gauge: "油位表"
+  sf6_density_gauge: "SF6密度表"
+  digital_display: "数字显示屏"
+  LED_indicator: "LED指示灯"
+
+# 告警配置
+alarm:
+  out_of_range: "warning"
+  reading_failed: "info"
+  manual_review: "info"
+
+# 性能指标
+performance:
+  max_reading_time_ms: 500
+  success_rate: 0.95

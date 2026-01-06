@@ -1,0 +1,827 @@
+{% extends "base.html" %}
+
+{% block title %}模型训练管理 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plugin-card {
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 2px solid transparent;
+    }
+    
+    .plugin-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+    
+    .plugin-card.selected {
+        border-color: var(--bs-primary);
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    
+    .plugin-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .voltage-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .voltage-card {
+        padding: 0.75rem;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .voltage-card:hover {
+        border-color: var(--bs-primary);
+        background-color: #f8f9fa;
+    }
+    
+    .voltage-card.selected {
+        border-color: var(--bs-primary);
+        background-color: #e7f1ff;
+    }
+    
+    .dataset-item {
+        padding: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        transition: all 0.3s;
+    }
+    
+    .dataset-item:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .dataset-item.can-download {
+        border-left: 3px solid var(--bs-success);
+    }
+    
+    .dataset-item.manual-download {
+        border-left: 3px solid var(--bs-warning);
+    }
+    
+    .dataset-item.no-download {
+        border-left: 3px solid var(--bs-secondary);
+    }
+    
+    .training-status-card {
+        padding: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+    }
+    
+    .progress-lg {
+        height: 25px;
+        border-radius: 12px;
+    }
+    
+    .progress-lg .progress-bar {
+        font-size: 0.85rem;
+        line-height: 25px;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    
+    .training-active {
+        animation: pulse 1.5s infinite;
+    }
+    
+    .back-to-plugin {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 1000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 页面标题和返回按钮 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3><i class="bi bi-cpu"></i> 模型训练管理</h3>
+            <p class="text-muted mb-0">选择插件和电压等级，下载数据集并训练AI模型</p>
+        </div>
+        <div>
+            <a href="/" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-house"></i> 返回首页
+            </a>
+            <button class="btn btn-primary" id="btn-go-to-plugin" style="display: none;">
+                <i class="bi bi-arrow-right"></i> 前往插件页面
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 左侧：插件和电压等级选择 -->
+        <div class="col-lg-4">
+            <!-- 插件选择 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-puzzle"></i> 选择检测插件
+                </div>
+                <div class="card-body">
+                    <div class="row g-2" id="plugin-list">
+                        <div class="col-6">
+                            <div class="plugin-card text-center p-3 rounded" data-plugin="transformer">
+                                <i class="bi bi-box plugin-icon text-primary"></i>
+                                <div class="fw-bold">主变巡视</div>
+                                <small class="text-muted">transformer</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="plugin-card text-center p-3 rounded" data-plugin="switch">
+                                <i class="bi bi-toggle-on plugin-icon text-success"></i>
+                                <div class="fw-bold">开关间隔</div>
+                                <small class="text-muted">switch</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="plugin-card text-center p-3 rounded" data-plugin="busbar">
+                                <i class="bi bi-diagram-3 plugin-icon text-info"></i>
+                                <div class="fw-bold">母线巡视</div>
+                                <small class="text-muted">busbar</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="plugin-card text-center p-3 rounded" data-plugin="capacitor">
+                                <i class="bi bi-battery-charging plugin-icon text-warning"></i>
+                                <div class="fw-bold">电容器</div>
+                                <small class="text-muted">capacitor</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="plugin-card text-center p-3 rounded" data-plugin="meter">
+                                <i class="bi bi-speedometer2 plugin-icon text-danger"></i>
+                                <div class="fw-bold">表计读数</div>
+                                <small class="text-muted">meter</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 电压等级选择 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-lightning-charge"></i> 选择电压等级
+                </div>
+                <div class="card-body">
+                    <div class="voltage-grid" id="voltage-list">
+                        <div class="voltage-card" data-voltage="UHV_1000kV_AC">
+                            <strong>1000kV</strong>
+                            <div class="small text-muted">交流特高压</div>
+                        </div>
+                        <div class="voltage-card" data-voltage="UHV_800kV_DC">
+                            <strong>±800kV</strong>
+                            <div class="small text-muted">直流特高压</div>
+                        </div>
+                        <div class="voltage-card" data-voltage="EHV_500kV">
+                            <strong>500kV</strong>
+                            <div class="small text-muted">超高压</div>
+                        </div>
+                        <div class="voltage-card selected" data-voltage="HV_220kV">
+                            <strong>220kV</strong>
+                            <div class="small text-muted">高压</div>
+                        </div>
+                        <div class="voltage-card" data-voltage="HV_110kV">
+                            <strong>110kV</strong>
+                            <div class="small text-muted">高压</div>
+                        </div>
+                        <div class="voltage-card" data-voltage="MV_35kV">
+                            <strong>35kV</strong>
+                            <div class="small text-muted">中压</div>
+                        </div>
+                        <div class="voltage-card" data-voltage="LV_10kV">
+                            <strong>10kV</strong>
+                            <div class="small text-muted">低压</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 已训练模型 -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-check-circle"></i> 已训练模型
+                </div>
+                <div class="card-body" id="trained-models-list">
+                    <p class="text-muted small mb-0">选择插件和电压等级后显示</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中间：数据集和训练 -->
+        <div class="col-lg-5">
+            <!-- 训练状态 -->
+            <div class="training-status-card mb-3" id="training-status-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0"><i class="bi bi-activity"></i> 训练状态</h5>
+                    <span class="badge bg-light text-dark" id="global-status">空闲</span>
+                </div>
+                <div id="current-training-info" style="display: none;">
+                    <div class="mb-2">当前任务: <strong id="current-task-name">-</strong></div>
+                    <div class="progress progress-lg">
+                        <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" 
+                             id="global-progress-bar" style="width: 0%">0%</div>
+                    </div>
+                    <div class="small mt-2 d-flex justify-content-between">
+                        <span>Epoch: <span id="global-epoch">0</span>/<span id="global-total-epoch">100</span></span>
+                        <span>mAP50: <span id="global-map">-</span></span>
+                    </div>
+                </div>
+                <div id="no-training-info">
+                    <p class="mb-0 small opacity-75">选择插件和电压等级后开始训练</p>
+                </div>
+            </div>
+
+            <!-- 数据集状态 -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-database"></i> 数据集状态</span>
+                    <span class="badge bg-secondary" id="dataset-status-badge">未选择</span>
+                </div>
+                <div class="card-body">
+                    <div id="dataset-info">
+                        <p class="text-muted text-center py-3">请先选择插件</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 可下载数据集 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-cloud-download"></i> 可用数据集
+                </div>
+                <div class="card-body" id="datasets-container">
+                    <p class="text-muted text-center py-3">请先选择插件</p>
+                </div>
+                
+                <!-- 下载进度 -->
+                <div class="card-footer" id="download-progress-section" style="display: none;">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1 me-3">
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="download-progress" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <small class="text-muted" id="download-status">准备中...</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 训练参数 -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-sliders"></i> 训练参数
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">训练轮数 (Epochs)</label>
+                            <input type="number" class="form-control" id="epochs" value="100" min="10" max="500">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">批次大小 (Batch Size)</label>
+                            <select class="form-select" id="batch-size">
+                                <option value="8">8 (低显存)</option>
+                                <option value="16" selected>16 (推荐)</option>
+                                <option value="32">32 (高显存)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-primary btn-lg" id="btn-start-training" disabled>
+                            <i class="bi bi-play-circle"></i> 开始训练
+                        </button>
+                        <button class="btn btn-danger" id="btn-cancel-training" style="display: none;">
+                            <i class="bi bi-stop-circle"></i> 取消训练
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：训练历史 -->
+        <div class="col-lg-3">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-clock-history"></i> 训练历史
+                </div>
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;" id="training-history">
+                    <p class="text-muted small mb-0">暂无训练记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 悬浮返回按钮 -->
+<div class="back-to-plugin" id="back-to-plugin-float" style="display: none;">
+    <a href="#" class="btn btn-success btn-lg shadow" id="btn-back-to-plugin">
+        <i class="bi bi-arrow-left"></i> 返回 <span id="back-plugin-name">插件</span>
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TrainingPage = {
+    selectedPlugin: null,
+    selectedVoltage: 'HV_220kV',
+    currentTaskId: null,
+    pollingInterval: null,
+    downloadPollingInterval: null,
+    
+    pluginNames: {
+        'transformer': '主变巡视',
+        'switch': '开关间隔',
+        'busbar': '母线巡视',
+        'capacitor': '电容器',
+        'meter': '表计读数'
+    },
+    
+    init: function() {
+        this.bindEvents();
+        this.loadTrainingHistory();
+        
+        // 检查URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const plugin = urlParams.get('plugin');
+        if (plugin) {
+            this.selectPlugin(plugin);
+        }
+    },
+    
+    bindEvents: function() {
+        const self = this;
+        
+        // 插件选择
+        document.querySelectorAll('.plugin-card').forEach(card => {
+            card.addEventListener('click', function() {
+                self.selectPlugin(this.dataset.plugin);
+            });
+        });
+        
+        // 电压等级选择
+        document.querySelectorAll('.voltage-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.voltage-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                self.selectedVoltage = this.dataset.voltage;
+                self.loadDatasetStatus();
+            });
+        });
+        
+        // 开始训练
+        document.getElementById('btn-start-training').addEventListener('click', () => self.startTraining());
+        
+        // 取消训练
+        document.getElementById('btn-cancel-training').addEventListener('click', () => self.cancelTraining());
+        
+        // 前往插件页面
+        document.getElementById('btn-go-to-plugin').addEventListener('click', function() {
+            if (self.selectedPlugin) {
+                window.location.href = `/module/${self.selectedPlugin}`;
+            }
+        });
+    },
+    
+    selectPlugin: function(plugin) {
+        this.selectedPlugin = plugin;
+        
+        // 更新UI
+        document.querySelectorAll('.plugin-card').forEach(c => c.classList.remove('selected'));
+        document.querySelector(`.plugin-card[data-plugin="${plugin}"]`)?.classList.add('selected');
+        
+        // 显示前往插件按钮
+        const btnGoTo = document.getElementById('btn-go-to-plugin');
+        btnGoTo.style.display = 'inline-block';
+        btnGoTo.innerHTML = `<i class="bi bi-arrow-right"></i> 前往${this.pluginNames[plugin]}`;
+        
+        // 显示悬浮返回按钮
+        document.getElementById('back-to-plugin-float').style.display = 'block';
+        document.getElementById('back-plugin-name').textContent = this.pluginNames[plugin];
+        document.getElementById('btn-back-to-plugin').href = `/module/${plugin}`;
+        
+        // 加载数据
+        this.loadDatasetStatus();
+        this.loadAvailableDatasets();
+    },
+    
+    loadDatasetStatus: async function() {
+        if (!this.selectedPlugin || !this.selectedVoltage) return;
+        
+        try {
+            const response = await fetch(`/api/training/status/${this.selectedVoltage}/${this.selectedPlugin}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                this.updateDatasetDisplay(data.dataset);
+                this.updateTaskDisplay(data.task);
+                this.updateCompletedModel(data.completed_model);
+            }
+        } catch (error) {
+            console.error('加载数据集状态失败:', error);
+        }
+    },
+    
+    updateDatasetDisplay: function(dataset) {
+        const infoDiv = document.getElementById('dataset-info');
+        const badge = document.getElementById('dataset-status-badge');
+        const btnStart = document.getElementById('btn-start-training');
+        
+        if (!dataset) {
+            infoDiv.innerHTML = '<p class="text-muted text-center py-3">数据未就绪</p>';
+            badge.textContent = '未就绪';
+            badge.className = 'badge bg-secondary';
+            btnStart.disabled = true;
+            return;
+        }
+        
+        let statusClass = 'secondary';
+        let statusText = '未下载';
+        
+        switch (dataset.status) {
+            case 'ready':
+                statusClass = 'success';
+                statusText = '就绪';
+                btnStart.disabled = false;
+                break;
+            case 'downloaded':
+                statusClass = 'info';
+                statusText = '已下载';
+                btnStart.disabled = dataset.total_count < 10;
+                break;
+            case 'placeholder':
+                statusClass = 'warning';
+                statusText = '占位符';
+                btnStart.disabled = true;
+                break;
+            default:
+                btnStart.disabled = true;
+        }
+        
+        badge.textContent = statusText;
+        badge.className = `badge bg-${statusClass}`;
+        
+        infoDiv.innerHTML = `
+            <div class="text-center mb-3">
+                <strong>${this.selectedVoltage}</strong> - <strong>${this.pluginNames[this.selectedPlugin]}</strong>
+            </div>
+            <div class="row text-center">
+                <div class="col-4">
+                    <div class="h4 mb-0 text-primary">${dataset.train_count || 0}</div>
+                    <small class="text-muted">训练集</small>
+                </div>
+                <div class="col-4">
+                    <div class="h4 mb-0 text-info">${dataset.val_count || 0}</div>
+                    <small class="text-muted">验证集</small>
+                </div>
+                <div class="col-4">
+                    <div class="h4 mb-0 text-success">${dataset.test_count || 0}</div>
+                    <small class="text-muted">测试集</small>
+                </div>
+            </div>
+            ${dataset.status === 'placeholder' ? 
+                '<div class="alert alert-warning mt-3 mb-0 small"><i class="bi bi-exclamation-triangle"></i> 当前为占位符数据，需要下载数据集或现场采集</div>' : ''}
+        `;
+    },
+    
+    loadAvailableDatasets: async function() {
+        if (!this.selectedPlugin) return;
+        
+        try {
+            const response = await fetch(`/api/training/datasets/${this.selectedPlugin}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                this.renderDatasets(data.datasets);
+            }
+        } catch (error) {
+            console.error('加载数据集列表失败:', error);
+        }
+    },
+    
+    renderDatasets: function(datasets) {
+        const container = document.getElementById('datasets-container');
+        
+        if (Object.keys(datasets).length === 0) {
+            container.innerHTML = '<p class="text-muted text-center py-3">暂无可用数据集</p>';
+            return;
+        }
+        
+        let html = '';
+        for (const [id, ds] of Object.entries(datasets)) {
+            let itemClass = 'no-download';
+            let actionBtn = '';
+            
+            if (ds.can_download) {
+                itemClass = 'can-download';
+                actionBtn = `
+                    <button class="btn btn-primary btn-sm" onclick="TrainingPage.downloadDataset('${id}')">
+                        <i class="bi bi-cloud-download"></i> 下载
+                    </button>
+                `;
+            } else if (ds.manual_url) {
+                itemClass = 'manual-download';
+                actionBtn = `
+                    <a href="${ds.manual_url}" target="_blank" class="btn btn-outline-warning btn-sm">
+                        <i class="bi bi-box-arrow-up-right"></i> 手动下载
+                    </a>
+                `;
+            } else {
+                actionBtn = `
+                    <button class="btn btn-secondary btn-sm" disabled>
+                        <i class="bi bi-x-circle"></i> 需现场采集
+                    </button>
+                `;
+            }
+            
+            html += `
+                <div class="dataset-item ${itemClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <strong>${ds.name}</strong>
+                            <div class="small text-muted">${ds.image_count > 0 ? ds.image_count + ' 张图像' : '数量未知'}</div>
+                            <div class="small mt-1">${ds.description}</div>
+                            ${!ds.can_download && ds.unavailable_reason ? 
+                                `<div class="small text-warning mt-1"><i class="bi bi-info-circle"></i> ${ds.unavailable_reason}</div>` : ''}
+                        </div>
+                        <div class="ms-2">
+                            ${actionBtn}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    },
+    
+    downloadDataset: async function(datasetId) {
+        try {
+            const response = await fetch('/api/training/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    dataset_id: datasetId,
+                    voltage_level: this.selectedVoltage
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('download-progress-section').style.display = 'block';
+                document.getElementById('download-status').textContent = '开始下载...';
+                this.pollDownloadProgress(datasetId);
+            } else {
+                if (data.manual_url) {
+                    if (confirm(`${data.message}\n\n${data.reason}\n\n是否打开手动下载页面？`)) {
+                        window.open(data.manual_url, '_blank');
+                    }
+                } else {
+                    alert(data.message + '\n\n' + (data.reason || ''));
+                }
+            }
+        } catch (error) {
+            console.error('下载请求失败:', error);
+            alert('下载请求失败，请检查网络连接');
+        }
+    },
+    
+    pollDownloadProgress: function(datasetId) {
+        const self = this;
+        const progressBar = document.getElementById('download-progress');
+        const statusText = document.getElementById('download-status');
+        
+        if (this.downloadPollingInterval) {
+            clearInterval(this.downloadPollingInterval);
+        }
+        
+        this.downloadPollingInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/training/download/progress/${datasetId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const progress = data.progress;
+                    progressBar.style.width = `${Math.max(0, progress)}%`;
+                    statusText.textContent = data.message || `${progress.toFixed(1)}%`;
+                    
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(self.downloadPollingInterval);
+                        self.downloadPollingInterval = null;
+                        
+                        if (data.status === 'completed') {
+                            setTimeout(() => {
+                                document.getElementById('download-progress-section').style.display = 'none';
+                                self.loadDatasetStatus();
+                            }, 1500);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('获取下载进度失败:', error);
+            }
+        }, 1000);
+    },
+    
+    updateTaskDisplay: function(task) {
+        const progressSection = document.getElementById('current-training-info');
+        const noTrainingInfo = document.getElementById('no-training-info');
+        const globalStatus = document.getElementById('global-status');
+        const btnStart = document.getElementById('btn-start-training');
+        const btnCancel = document.getElementById('btn-cancel-training');
+        
+        if (!task || ['idle', 'completed', 'cancelled', 'failed'].includes(task.status)) {
+            progressSection.style.display = 'none';
+            noTrainingInfo.style.display = 'block';
+            globalStatus.textContent = '空闲';
+            globalStatus.className = 'badge bg-light text-dark';
+            btnStart.style.display = 'block';
+            btnCancel.style.display = 'none';
+            this.stopPolling();
+            return;
+        }
+        
+        progressSection.style.display = 'block';
+        noTrainingInfo.style.display = 'none';
+        globalStatus.textContent = '训练中';
+        globalStatus.className = 'badge bg-warning training-active';
+        btnStart.style.display = 'none';
+        btnCancel.style.display = 'block';
+        
+        document.getElementById('current-task-name').textContent = 
+            `${task.voltage_level} - ${this.pluginNames[task.plugin] || task.plugin}`;
+        document.getElementById('global-progress-bar').style.width = `${task.progress}%`;
+        document.getElementById('global-progress-bar').textContent = `${task.progress.toFixed(1)}%`;
+        document.getElementById('global-epoch').textContent = task.current_epoch || 0;
+        document.getElementById('global-total-epoch').textContent = task.total_epochs || 100;
+        document.getElementById('global-map').textContent = 
+            task.best_map50 ? task.best_map50.toFixed(4) : '-';
+        
+        this.currentTaskId = task.task_id;
+        this.startPolling();
+    },
+    
+    updateCompletedModel: function(model) {
+        const container = document.getElementById('trained-models-list');
+        
+        if (!model) {
+            container.innerHTML = '<p class="text-muted small mb-0">当前配置暂无已训练模型</p>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="border rounded p-3 border-success bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-success fw-bold">
+                        <i class="bi bi-check-circle-fill"></i> 模型已就绪
+                    </span>
+                    <span class="badge bg-success">可用</span>
+                </div>
+                <div class="mt-2 small">
+                    <div><strong>电压等级:</strong> ${model.voltage_level}</div>
+                    <div><strong>插件:</strong> ${this.pluginNames[model.plugin] || model.plugin}</div>
+                    <div><strong>mAP50:</strong> ${model.best_map50 ? model.best_map50.toFixed(4) : '-'}</div>
+                    <div><strong>训练时间:</strong> ${new Date(model.created_at).toLocaleString()}</div>
+                </div>
+                <div class="mt-2">
+                    <a href="/module/${model.plugin}" class="btn btn-success btn-sm">
+                        <i class="bi bi-play-fill"></i> 使用此模型
+                    </a>
+                </div>
+            </div>
+        `;
+    },
+    
+    startTraining: async function() {
+        if (!this.selectedPlugin || !this.selectedVoltage) {
+            alert('请先选择插件和电压等级');
+            return;
+        }
+        
+        const epochs = parseInt(document.getElementById('epochs').value) || 100;
+        const batchSize = parseInt(document.getElementById('batch-size').value) || 16;
+        
+        try {
+            const response = await fetch('/api/training/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    voltage_level: this.selectedVoltage,
+                    plugin: this.selectedPlugin,
+                    epochs: epochs,
+                    batch_size: batchSize
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.currentTaskId = data.task_id;
+                this.updateTaskDisplay(data.task);
+            } else {
+                alert('启动训练失败: ' + (data.message || '未知错误'));
+            }
+        } catch (error) {
+            console.error('启动训练失败:', error);
+            alert('启动训练失败，请检查网络连接');
+        }
+    },
+    
+    cancelTraining: async function() {
+        if (!this.currentTaskId) return;
+        if (!confirm('确定要取消当前训练吗？')) return;
+        
+        try {
+            await fetch(`/api/training/cancel/${this.currentTaskId}`, { method: 'POST' });
+            this.stopPolling();
+            this.loadDatasetStatus();
+        } catch (error) {
+            console.error('取消训练失败:', error);
+        }
+    },
+    
+    startPolling: function() {
+        if (this.pollingInterval) clearInterval(this.pollingInterval);
+        
+        const self = this;
+        this.pollingInterval = setInterval(() => {
+            self.loadDatasetStatus();
+        }, 2000);
+    },
+    
+    stopPolling: function() {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+    },
+    
+    loadTrainingHistory: async function() {
+        try {
+            const response = await fetch('/api/training/tasks');
+            const data = await response.json();
+            
+            if (data.success && data.tasks.length > 0) {
+                const container = document.getElementById('training-history');
+                
+                const sorted = data.tasks.sort((a, b) => 
+                    new Date(b.created_at) - new Date(a.created_at)
+                ).slice(0, 15);
+                
+                let html = '';
+                for (const task of sorted) {
+                    const statusColors = {
+                        'completed': 'success',
+                        'failed': 'danger',
+                        'cancelled': 'warning',
+                        'training': 'primary'
+                    };
+                    const statusClass = statusColors[task.status] || 'secondary';
+                    
+                    html += `
+                        <div class="border-bottom pb-2 mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="fw-bold">${task.voltage_level}</small>
+                                <span class="badge bg-${statusClass}">${task.status}</span>
+                            </div>
+                            <small class="text-muted">${this.pluginNames[task.plugin] || task.plugin}</small>
+                            <div class="small text-muted">${new Date(task.created_at).toLocaleString()}</div>
+                            ${task.best_map50 ? `<div class="small">mAP50: ${task.best_map50.toFixed(4)}</div>` : ''}
+                        </div>
+                    `;
+                }
+                container.innerHTML = html;
+            }
+        } catch (error) {
+            console.error('加载训练历史失败:', error);
+        }
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    TrainingPage.init();
+});
+</script>
+{% endblock %}

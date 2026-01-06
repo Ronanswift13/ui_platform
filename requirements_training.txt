@@ -1,0 +1,28 @@
+# 破夜绘明激光监测平台 - 训练模块依赖
+# 核心框架
+ultralytics>=8.0.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# 图像处理
+opencv-python>=4.8.0
+pillow>=10.0.0
+
+# 数据处理
+numpy>=1.24.0
+pandas>=2.0.0
+pyyaml>=6.0.0
+
+# Web框架
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# 可视化
+matplotlib>=3.7.0
+
+# 进度条
+tqdm>=4.65.0
+
+# 日志
+loguru>=0.7.0

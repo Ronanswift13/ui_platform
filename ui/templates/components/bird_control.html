@@ -1,0 +1,279 @@
+<!-- 
+鸟类监控控制面板
+输变电激光星芒破夜绘明监测平台 (F组)
+-->
+
+<!-- 检测设置 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-sliders"></i> 检测设置</h5>
+    </div>
+    <div class="card-body">
+        <!-- 鸟类检测 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="bird_detection" id="check-bird-detection" checked>
+                <label class="form-check-label fw-bold" for="check-bird-detection">
+                    <i class="bi bi-eye text-primary"></i> 鸟类检测
+                </label>
+            </div>
+            <div class="row g-2" id="bird-detection-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="bird-confidence" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">跟踪最大丢失帧</label>
+                    <input type="number" step="5" min="10" max="100" class="form-control form-control-sm" id="bird-max-track-age" value="30">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 种类识别 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="species_id" id="check-species-id" checked>
+                <label class="form-check-label fw-bold" for="check-species-id">
+                    <i class="bi bi-database text-info"></i> 种类识别
+                </label>
+            </div>
+            <div class="row g-2" id="species-settings">
+                <div class="col-12">
+                    <label class="form-label small text-muted mb-1">数据库大小</label>
+                    <input type="text" class="form-control form-control-sm" id="bird-db-size" value="8 种" readonly>
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 风险评估 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="risk_assessment" id="check-risk-assessment" checked>
+                <label class="form-check-label fw-bold" for="check-risk-assessment">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> 风险评估
+                </label>
+            </div>
+            <div class="row g-2" id="risk-settings">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">安全距离(m)</label>
+                    <input type="number" step="1" min="5" max="30" class="form-control form-control-sm" id="bird-safe-distance" value="15">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">警告距离(m)</label>
+                    <input type="number" step="1" min="3" max="15" class="form-control form-control-sm" id="bird-warning-distance" value="10">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">危险距离(m)</label>
+                    <input type="number" step="1" min="1" max="10" class="form-control form-control-sm" id="bird-danger-distance" value="5">
+                </div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 鸟巢检测 -->
+        <div class="mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input detection-type" type="checkbox" value="nest_detection" id="check-nest-detection">
+                <label class="form-check-label fw-bold" for="check-nest-detection">
+                    <i class="bi bi-house text-secondary"></i> 鸟巢检测
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 驱鸟设备 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-speaker"></i> 驱鸟设备</h5>
+    </div>
+    <div class="card-body">
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="check-deterrent-enabled">
+            <label class="form-check-label fw-bold" for="check-deterrent-enabled">
+                启用自动驱鸟
+            </label>
+        </div>
+        <div class="row g-2 d-none" id="deterrent-settings">
+            <div class="col-6">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check-acoustic" checked>
+                    <label class="form-check-label small" for="check-acoustic">
+                        声学驱鸟
+                    </label>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="check-laser">
+                    <label class="form-check-label small" for="check-laser">
+                        激光驱鸟
+                    </label>
+                </div>
+            </div>
+            <div class="col-12 mt-2">
+                <label class="form-label small text-muted mb-1">自动触发等级</label>
+                <select class="form-select form-select-sm" id="deterrent-trigger-level">
+                    <option value="warning">警告时触发</option>
+                    <option value="danger" selected>危险时触发</option>
+                    <option value="critical">紧急时触发</option>
+                </select>
+            </div>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-outline-warning btn-sm w-100" id="btn-manual-deterrent" disabled>
+                <i class="bi bi-megaphone"></i> 手动驱鸟
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 鸟类数据库 -->
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-book"></i> 鸟类数据库</h5>
+        <button class="btn btn-sm btn-outline-primary" id="btn-view-bird-db">
+            <i class="bi bi-eye"></i> 查看
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="small text-muted">
+            <div class="d-flex justify-content-between mb-1">
+                <span>已录入种类:</span>
+                <span class="fw-bold" id="bird-species-count">8</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1">
+                <span>高风险种类:</span>
+                <span class="text-danger fw-bold" id="bird-high-risk-count">2</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>中风险种类:</span>
+                <span class="text-warning fw-bold" id="bird-medium-risk-count">2</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始监控
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>
+
+<!-- 鸟类数据库模态框 -->
+<div class="modal fade" id="birdDatabaseModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-book"></i> 鸟类识别数据库</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>名称</th>
+                                <th>学名</th>
+                                <th>风险等级</th>
+                                <th>翼展(cm)</th>
+                                <th>安全说明</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bird-db-table-body">
+                            <!-- 动态填充 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Bird Monitoring 专属交互逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    // 启用/禁用设置区域
+    function toggleSettings(checkboxId, settingsId) {
+        const checkbox = document.getElementById(checkboxId);
+        const settings = document.getElementById(settingsId);
+        if (checkbox && settings) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    settings.classList.remove('d-none');
+                } else {
+                    settings.classList.add('d-none');
+                }
+            });
+        }
+    }
+
+    toggleSettings('check-deterrent-enabled', 'deterrent-settings');
+
+    // 手动驱鸟按钮
+    const btnManualDeterrent = document.getElementById('btn-manual-deterrent');
+    const checkDeterrentEnabled = document.getElementById('check-deterrent-enabled');
+    
+    if (checkDeterrentEnabled && btnManualDeterrent) {
+        checkDeterrentEnabled.addEventListener('change', function() {
+            btnManualDeterrent.disabled = !this.checked;
+        });
+    }
+
+    // 查看鸟类数据库
+    const btnViewBirdDb = document.getElementById('btn-view-bird-db');
+    if (btnViewBirdDb) {
+        btnViewBirdDb.addEventListener('click', function() {
+            loadBirdDatabase();
+            const modal = new bootstrap.Modal(document.getElementById('birdDatabaseModal'));
+            modal.show();
+        });
+    }
+
+    // 加载鸟类数据库
+    function loadBirdDatabase() {
+        // 示例数据 - 实际应从API获取
+        const birds = [
+            {id: 'B001', name: '麻雀', scientific: 'Passer montanus', risk: 'low', wingspan: 22, notes: '体型小，单只触电风险低'},
+            {id: 'B002', name: '喜鹊', scientific: 'Pica pica', risk: 'medium', wingspan: 56, notes: '喜在电塔筑巢'},
+            {id: 'B003', name: '乌鸦', scientific: 'Corvus', risk: 'medium', wingspan: 100, notes: '翼展较大'},
+            {id: 'B004', name: '老鹰', scientific: 'Aquila', risk: 'high', wingspan: 200, notes: '翼展极大，高风险'},
+            {id: 'B005', name: '白鹭', scientific: 'Egretta garzetta', risk: 'high', wingspan: 95, notes: '翼展大且腿长'},
+            {id: 'B006', name: '燕子', scientific: 'Hirundo rustica', risk: 'low', wingspan: 32, notes: '飞行敏捷'},
+            {id: 'B007', name: '斑鸠', scientific: 'Streptopelia', risk: 'low', wingspan: 50, notes: '体型适中'},
+            {id: 'B008', name: '苍鹭', scientific: 'Ardea cinerea', risk: 'high', wingspan: 185, notes: '翼展极大'},
+        ];
+
+        const tbody = document.getElementById('bird-db-table-body');
+        tbody.innerHTML = birds.map(bird => `
+            <tr>
+                <td>${bird.id}</td>
+                <td><strong>${bird.name}</strong></td>
+                <td><em>${bird.scientific}</em></td>
+                <td>
+                    <span class="badge bg-${bird.risk === 'high' ? 'danger' : bird.risk === 'medium' ? 'warning' : 'success'}">
+                        ${bird.risk === 'high' ? '高' : bird.risk === 'medium' ? '中' : '低'}
+                    </span>
+                </td>
+                <td>${bird.wingspan}</td>
+                <td class="small">${bird.notes}</td>
+            </tr>
+        `).join('');
+    }
+});
+</script>

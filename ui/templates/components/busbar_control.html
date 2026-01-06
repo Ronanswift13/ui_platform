@@ -1,0 +1,193 @@
+<!-- 母线自主巡视 - 专属控制面板 -->
+
+<!-- 缺陷检测 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle text-danger"></i> 缺陷检测</h5>
+    </div>
+    <div class="card-body">
+        <!-- 销钉缺失 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="pin_missing" id="check-pin-missing" checked>
+                <label class="form-check-label" for="check-pin-missing">
+                    <span class="badge bg-danger">销钉缺失</span> 基于ONNX/规则检测
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="pin-missing-confidence" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最小目标尺寸(px)</label>
+                    <input type="number" step="5" min="5" max="100" class="form-control form-control-sm" id="pin-missing-min-size" value="20">
+                </div>
+            </div>
+        </div>
+
+        <!-- 裂纹 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="crack" id="check-crack" checked>
+                <label class="form-check-label" for="check-crack">
+                    <span class="badge bg-danger">裂纹</span> 基于边缘密度分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">边缘密度阈值</label>
+                    <input type="number" step="0.01" min="0" max="1" class="form-control form-control-sm" id="crack-edge-density" value="0.15">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最小长度(px)</label>
+                    <input type="number" step="10" min="10" max="200" class="form-control form-control-sm" id="crack-min-length" value="50">
+                </div>
+            </div>
+        </div>
+
+        <!-- 异物 -->
+        <div class="border rounded p-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input defect-type" type="checkbox" value="foreign_object" id="check-foreign" checked>
+                <label class="form-check-label" for="check-foreign">
+                    <span class="badge bg-warning text-dark">异物</span> 基于轮廓形状分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最小面积(px²)</label>
+                    <input type="number" step="50" min="50" max="5000" class="form-control form-control-sm" id="foreign-min-area" value="200">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最大面积(px²)</label>
+                    <input type="number" step="100" min="100" max="10000" class="form-control form-control-sm" id="foreign-max-area" value="2000">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">圆度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="foreign-circularity" value="0.30">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图像质量评估 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-image text-info"></i> 图像质量评估</h5>
+    </div>
+    <div class="card-body">
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-quality-gate" checked>
+                <label class="form-check-label fw-bold" for="check-quality-gate">
+                    启用质量门禁（逆光/雨雾/遮挡过滤）
+                </label>
+            </div>
+            <div class="row g-2" id="quality-settings">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最小清晰度</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="quality-min-clarity" value="0.60">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最大曝光度</label>
+                    <input type="number" step="5" min="0" max="255" class="form-control form-control-sm" id="quality-max-exposure" value="240">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最小对比度</label>
+                    <input type="number" step="5" min="0" max="100" class="form-control form-control-sm" id="quality-min-contrast" value="20">
+                </div>
+            </div>
+        </div>
+
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-zoom-suggestion" checked>
+                <label class="form-check-label fw-bold" for="check-zoom-suggestion">
+                    启用变焦建议（目标过小时提示）
+                </label>
+            </div>
+            <div class="row g-2" id="zoom-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最小目标尺寸(px)</label>
+                    <input type="number" step="5" min="5" max="100" class="form-control form-control-sm" id="zoom-min-size" value="15">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">目标尺寸(px)</label>
+                    <input type="number" step="5" min="10" max="200" class="form-control form-control-sm" id="zoom-target-size" value="40">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 切片检测设置 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-grid-3x3 text-primary"></i> 切片检测设置</h5>
+    </div>
+    <div class="card-body">
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-tiling" checked>
+                <label class="form-check-label fw-bold" for="check-tiling">
+                    启用切片检测（4K大视场优化）
+                </label>
+            </div>
+            <div class="row g-2" id="tiling-settings">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">切片尺寸(px)</label>
+                    <input type="number" step="128" min="256" max="2048" class="form-control form-control-sm" id="tiling-size" value="640">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">重叠率</label>
+                    <input type="number" step="0.05" min="0" max="0.5" class="form-control form-control-sm" id="tiling-overlap" value="0.25">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">NMS阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="tiling-nms" value="0.45">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始检测
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>
+
+<script>
+// Busbar Inspection 专属交互逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    // 启用/禁用设置区域
+    function toggleSettings(checkboxId, settingsId) {
+        const checkbox = document.getElementById(checkboxId);
+        const settings = document.getElementById(settingsId);
+        if (checkbox && settings) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    settings.classList.remove('d-none');
+                } else {
+                    settings.classList.add('d-none');
+                }
+            });
+        }
+    }
+
+    toggleSettings('check-quality-gate', 'quality-settings');
+    toggleSettings('check-zoom-suggestion', 'zoom-settings');
+    toggleSettings('check-tiling', 'tiling-settings');
+});
+</script>

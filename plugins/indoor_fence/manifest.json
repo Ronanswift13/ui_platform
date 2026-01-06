@@ -1,0 +1,83 @@
+{
+    "id": "indoor_fence",
+    "name": "室内电子围栏插件",
+    "version": "1.0.0",
+    "description": "基于2D激光雷达的电子围栏系统，多人操作目标识别，黄线越界检测和授权校验",
+    "author": "G组",
+    "entrypoint": "plugin.py",
+    "plugin_class": "IndoorFencePlugin",
+    "capabilities": [
+        "person_detection",
+        "multi_target_tracking",
+        "zone_intrusion",
+        "authorization_check",
+        "lidar_fence"
+    ],
+    "device_types": [
+        "cabinet",
+        "indoor_area",
+        "passage",
+        "safety_zone"
+    ],
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]},
+                    "input_size": {"type": "array", "items": {"type": "integer"}}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "tracking_enabled": {"type": "boolean"}
+                }
+            },
+            "lidar": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "device_ip": {"type": "string"},
+                    "device_port": {"type": "integer"},
+                    "scan_rate_hz": {"type": "number"},
+                    "angle_offset_deg": {"type": "number"}
+                }
+            },
+            "safety_zone": {
+                "type": "object",
+                "properties": {
+                    "yellow_line_distance_m": {"type": "number"},
+                    "warning_distance_m": {"type": "number"},
+                    "danger_distance_m": {"type": "number"}
+                }
+            },
+            "cabinet_authorization": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "allow_list": {"type": "array", "items": {"type": "integer"}},
+                    "check_multi_person": {"type": "boolean"},
+                    "max_persons_per_cabinet": {"type": "integer"}
+                }
+            },
+            "fusion": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "max_time_diff_ms": {"type": "number"},
+                    "angle_match_threshold_deg": {"type": "number"}
+                }
+            }
+        }
+    }
+}

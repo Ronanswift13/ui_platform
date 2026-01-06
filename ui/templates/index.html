@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 输变电监测平台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧: 视频/图片预览区 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-camera-video"></i> 视频预览</h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" id="btn-snapshot">
+                        <i class="bi bi-camera"></i> 截图
+                    </button>
+                    <button class="btn btn-outline-primary" id="btn-fullscreen">
+                        <i class="bi bi-fullscreen"></i> 全屏
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="video-container position-relative" style="min-height: 480px; background: #1a1a1a;">
+                    <!-- 视频预览画布 -->
+                    <canvas id="video-canvas" class="w-100"></canvas>
+                    <!-- ROI叠加层 -->
+                    <div id="roi-overlay" class="position-absolute top-0 start-0 w-100 h-100" style="pointer-events: none;"></div>
+                    <!-- 加载提示 -->
+                    <div id="video-loading" class="position-absolute top-50 start-50 translate-middle text-white">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">正在连接摄像头...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果缩略图 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-images"></i> 证据帧</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-2" id="evidence-thumbnails">
+                    <div class="col-12 text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                        <p>暂无证据帧</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧: 控制面板 -->
+    <div class="col-lg-4">
+        <!-- 任务区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list-task"></i> 任务区</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">站点</label>
+                    <select class="form-select" id="select-site">
+                        <option value="">请选择站点...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">点位</label>
+                    <select class="form-select" id="select-position">
+                        <option value="">请选择点位...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">设备</label>
+                    <select class="form-select" id="select-device">
+                        <option value="">请选择设备...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">任务模板</label>
+                    <select class="form-select" id="select-task">
+                        <option value="">请选择任务模板...</option>
+                        <option value="transformer_inspection">主变外观巡检</option>
+                        <option value="switch_state">开关状态识别</option>
+                        <option value="meter_reading">表计读数</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROI区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-bounding-box"></i> ROI区</h5>
+                <button class="btn btn-sm btn-light" id="btn-add-roi">
+                    <i class="bi bi-plus"></i> 新增
+                </button>
+            </div>
+            <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                <div class="list-group list-group-flush" id="roi-list">
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-square-half"></i>
+                        <p class="mb-0 small">暂无ROI区域</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 运行区 -->
+        <div class="card mb-3">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-play-btn"></i> 运行区</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-lg" id="btn-run">
+                        <i class="bi bi-play-fill"></i> 运行任务
+                    </button>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-secondary" id="btn-pause">
+                            <i class="bi bi-pause"></i> 暂停
+                        </button>
+                        <button class="btn btn-outline-secondary" id="btn-replay">
+                            <i class="bi bi-arrow-repeat"></i> 回放
+                        </button>
+                        <button class="btn btn-outline-secondary" id="btn-export">
+                            <i class="bi bi-download"></i> 导出
+                        </button>
+                    </div>
+                    <button class="btn btn-outline-info" id="btn-review">
+                        <i class="bi bi-check2-square"></i> 人工复核
+                    </button>
+                </div>
+                <!-- 进度条 -->
+                <div class="progress mt-3" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped" id="task-progress" role="progressbar" style="width: 0%;">
+                        0%
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果区 -->
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> 结果区</h5>
+            </div>
+            <div class="card-body">
+                <!-- 结果摘要 -->
+                <div class="row mb-3">
+                    <div class="col-4 text-center">
+                        <div class="h4 text-success" id="result-normal">0</div>
+                        <small class="text-muted">正常</small>
+                    </div>
+                    <div class="col-4 text-center">
+                        <div class="h4 text-warning" id="result-warning">0</div>
+                        <small class="text-muted">告警</small>
+                    </div>
+                    <div class="col-4 text-center">
+                        <div class="h4 text-danger" id="result-error">0</div>
+                        <small class="text-muted">异常</small>
+                    </div>
+                </div>
+
+                <!-- 告警列表 -->
+                <h6><i class="bi bi-bell"></i> 告警列表</h6>
+                <div class="list-group" id="alarm-list" style="max-height: 200px; overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-check-circle"></i>
+                        <p class="mb-0 small">暂无告警</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 页面初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 加载站点列表
+    loadSites();
+    // 初始化视频预览
+    initVideoPreview();
+    // 绑定事件
+    bindEvents();
+});
+
+function loadSites() {
+    fetch('/api/sites')
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('select-site');
+            data.forEach(site => {
+                select.innerHTML += `<option value="${site.id}">${site.name}</option>`;
+            });
+        })
+        .catch(err => console.error('加载站点失败:', err));
+}
+
+function initVideoPreview() {
+    // TODO: 初始化WebSocket视频流
+    document.getElementById('video-loading').style.display = 'none';
+}
+
+function bindEvents() {
+    document.getElementById('btn-run').addEventListener('click', runTask);
+    document.getElementById('btn-add-roi').addEventListener('click', addROI);
+}
+
+function runTask() {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 运行中...';
+
+    fetch('/api/tasks/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            site_id: document.getElementById('select-site').value,
+            position_id: document.getElementById('select-position').value,
+            device_id: document.getElementById('select-device').value,
+            task_template: document.getElementById('select-task').value
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        console.log('任务已启动:', data);
+        // 开始轮询任务状态
+        pollTaskStatus(data.task_id);
+    })
+    .catch(err => {
+        console.error('启动任务失败:', err);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill"></i> 运行任务';
+    });
+}
+
+function pollTaskStatus(taskId) {
+    // TODO: 实现任务状态轮询
+}
+
+function addROI() {
+    alert('ROI编辑功能开发中...');
+}
+</script>
+{% endblock %}

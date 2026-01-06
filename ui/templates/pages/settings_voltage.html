@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+
+{% block title %}电压等级设置 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    .back-nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(10px);
+        padding: 0.75rem 0;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .voltage-category {
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        color: white;
+    }
+    
+    .voltage-category.uhv { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .voltage-category.ehv { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .voltage-category.hv { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    .voltage-category.mv { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+    .voltage-category.lv { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+    
+    .voltage-btn {
+        background: rgba(255,255,255,0.2);
+        border: 2px solid rgba(255,255,255,0.5);
+        color: inherit;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin: 0.2rem;
+        font-size: 0.9rem;
+    }
+    
+    .voltage-btn:hover {
+        background: rgba(255,255,255,0.4);
+        border-color: rgba(255,255,255,0.8);
+    }
+    
+    .voltage-btn.active {
+        background: white;
+        color: #333;
+        border-color: white;
+    }
+    
+    .stat-card {
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        color: white;
+    }
+    
+    .stat-card.plugins { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .stat-card.models { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .stat-card.classes { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .stat-card.features { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+    
+    .stat-number { font-size: 2rem; font-weight: bold; }
+    
+    .quick-nav-btn {
+        transition: all 0.3s;
+    }
+    
+    .quick-nav-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .detection-tag {
+        display: inline-block;
+        background: #e9ecef;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin: 0.1rem;
+    }
+    
+    .special-tag {
+        display: inline-block;
+        background: #ffc107;
+        color: #333;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin: 0.1rem;
+    }
+
+    .confirm-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+        color: white;
+    }
+
+    .confirm-btn {
+        background: white;
+        color: #667eea;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s;
+        width: 100%;
+    }
+
+    .confirm-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    .confirm-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .save-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+    }
+
+    .voltage-change-indicator {
+        display: none;
+        color: #ffc107;
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+    }
+
+    .voltage-change-indicator.show {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {# 返回导航 #}
+    <div class="back-nav">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <a href="/" class="btn btn-outline-secondary btn-sm me-2">
+                    <i class="bi bi-house"></i> 首页
+                </a>
+                <a href="javascript:history.back()" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-left"></i> 返回
+                </a>
+            </div>
+            <div>
+                <span class="badge bg-primary" id="current-voltage-display">
+                    当前: <span id="current-voltage-text">HV_220kV</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        {# 左侧：电压等级选择 #}
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-lightning-charge"></i> 电压等级设置
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        <i class="bi bi-info-circle"></i> 选择电压等级后，系统自动加载对应的AI模型和配置参数
+                    </p>
+                    
+                    {# 特高压 UHV #}
+                    <div class="voltage-category uhv">
+                        <h6 class="mb-1"><i class="bi bi-lightning-charge-fill"></i> 特高压 (UHV)</h6>
+                        <small>交流1000kV+、直流±800kV+</small>
+                        <div class="mt-2">
+                            <button class="voltage-btn" data-voltage="UHV_1000kV_AC">1000kV AC</button>
+                            <button class="voltage-btn" data-voltage="UHV_800kV_DC">±800kV DC</button>
+                        </div>
+                    </div>
+                    
+                    {# 超高压 EHV #}
+                    <div class="voltage-category ehv">
+                        <h6 class="mb-1"><i class="bi bi-broadcast"></i> 超高压 (EHV)</h6>
+                        <small>交流330-750kV、直流±500kV</small>
+                        <div class="mt-2">
+                            <button class="voltage-btn active" data-voltage="EHV_500kV">500kV</button>
+                            <button class="voltage-btn" data-voltage="EHV_330kV">330kV</button>
+                            <button class="voltage-btn" data-voltage="EHV_750kV">750kV</button>
+                        </div>
+                    </div>
+                    
+                    {# 高压 HV #}
+                    <div class="voltage-category hv">
+                        <h6 class="mb-1"><i class="bi bi-plug"></i> 高压 (HV)</h6>
+                        <small>110kV、220kV</small>
+                        <div class="mt-2">
+                            <button class="voltage-btn" data-voltage="HV_220kV">220kV</button>
+                            <button class="voltage-btn" data-voltage="HV_110kV">110kV</button>
+                        </div>
+                    </div>
+                    
+                    {# 中压 MV #}
+                    <div class="voltage-category mv">
+                        <h6 class="mb-1"><i class="bi bi-diagram-3"></i> 中压 (MV)</h6>
+                        <small>35kV、66kV</small>
+                        <div class="mt-2">
+                            <button class="voltage-btn" data-voltage="MV_35kV">35kV</button>
+                            <button class="voltage-btn" data-voltage="MV_66kV">66kV</button>
+                        </div>
+                    </div>
+                    
+                    {# 低压 LV #}
+                    <div class="voltage-category lv">
+                        <h6 class="mb-1"><i class="bi bi-house-door"></i> 低压 (LV)</h6>
+                        <small>10kV及以下</small>
+                        <div class="mt-2">
+                            <button class="voltage-btn" data-voltage="LV_10kV">10kV</button>
+                            <button class="voltage-btn" data-voltage="LV_380V">380V</button>
+                        </div>
+                    </div>
+
+                    {# 确定按钮区域 #}
+                    <div class="confirm-section">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div>
+                                <i class="bi bi-check-circle-fill"></i>
+                                <span>已选择: <strong id="selected-voltage-label">EHV_500kV</strong></span>
+                            </div>
+                            <small id="voltage-change-indicator" class="voltage-change-indicator">
+                                <i class="bi bi-arrow-right-circle"></i> 已更改，请确认保存
+                            </small>
+                        </div>
+                        <button class="confirm-btn" id="btn-confirm-voltage" onclick="VoltageSettings.saveVoltage()">
+                            <i class="bi bi-check2-circle"></i> 确定并应用
+                        </button>
+                        <div class="text-center mt-2 small opacity-75">
+                            <i class="bi bi-info-circle"></i> 保存后将自动更新所有插件配置
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {# 快速导航 #}
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-cursor"></i> 快速导航
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/module/transformer" class="btn btn-outline-primary quick-nav-btn">
+                            <i class="bi bi-box"></i> 主变巡视
+                        </a>
+                        <a href="/module/switch" class="btn btn-outline-success quick-nav-btn">
+                            <i class="bi bi-toggle-on"></i> 开关间隔
+                        </a>
+                        <a href="/module/busbar" class="btn btn-outline-info quick-nav-btn">
+                            <i class="bi bi-diagram-3"></i> 母线巡视
+                        </a>
+                        <a href="/module/capacitor" class="btn btn-outline-warning quick-nav-btn">
+                            <i class="bi bi-battery-charging"></i> 电容器
+                        </a>
+                        <a href="/module/meter" class="btn btn-outline-danger quick-nav-btn">
+                            <i class="bi bi-speedometer2"></i> 表计读数
+                        </a>
+                        <hr class="my-2">
+                        <a href="/training" class="btn btn-primary quick-nav-btn">
+                            <i class="bi bi-cpu"></i> 模型训练
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {# 右侧：配置详情 #}
+        <div class="col-lg-8">
+            {# 统计卡片 #}
+            <div class="row mb-3 g-2">
+                <div class="col-3">
+                    <div class="stat-card plugins">
+                        <div class="stat-number" id="stat-plugins">5</div>
+                        <div class="small">检测插件</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="stat-card models">
+                        <div class="stat-number" id="stat-models">10</div>
+                        <div class="small">AI模型</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="stat-card classes">
+                        <div class="stat-number" id="stat-classes">42</div>
+                        <div class="small">检测类别</div>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="stat-card features">
+                        <div class="stat-number" id="stat-features">9</div>
+                        <div class="small">特殊功能</div>
+                    </div>
+                </div>
+            </div>
+            
+            {# 功能标签页 #}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="configTabs">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#tab-plugins">
+                                <i class="bi bi-puzzle"></i> 插件功能
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#tab-models">
+                                <i class="bi bi-cpu"></i> AI模型
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#tab-classes">
+                                <i class="bi bi-tags"></i> 检测类别
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        {# 插件功能 #}
+                        <div class="tab-pane fade show active" id="tab-plugins">
+                            <div class="row" id="plugins-content"></div>
+                        </div>
+                        
+                        {# AI模型 #}
+                        <div class="tab-pane fade" id="tab-models">
+                            <div id="models-content"></div>
+                        </div>
+                        
+                        {# 检测类别 #}
+                        <div class="tab-pane fade" id="tab-classes">
+                            <div id="classes-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {# 特殊功能 #}
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-star-fill text-warning"></i> 特殊功能
+                </div>
+                <div class="card-body" id="special-features-content">
+                    <p class="text-muted">加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const VoltageSettings = {
+    currentVoltage: 'EHV_500kV',
+    savedVoltage: 'EHV_500kV',  // 已保存的电压等级
+    isLoading: false,
+
+    plugins: {
+        transformer: { name: '主变巡视', icon: 'box', color: 'primary',
+            features: ['油位监测', '油温监测', '套管检测', '渗漏检测'] },
+        switch: { name: '开关间隔', icon: 'toggle-on', color: 'success',
+            features: ['断路器状态', '隔离开关状态', '接地开关状态', 'SF6压力'] },
+        busbar: { name: '母线巡视', icon: 'diagram-3', color: 'info',
+            features: ['绝缘子缺陷', '金具锈蚀', '异物检测', '销钉缺失'] },
+        capacitor: { name: '电容器', icon: 'battery-charging', color: 'warning',
+            features: ['倾斜检测', '缺失检测', '入侵检测'] },
+        meter: { name: '表计读数', icon: 'speedometer2', color: 'danger',
+            features: ['指针表读数', '数字表读数', 'SF6表读数'] }
+    },
+
+    voltageConfig: {
+        'UHV_1000kV_AC': { models: 12, classes: 55, features: ['特高压电晕检测', 'GIS局放监测', '油色谱监测'] },
+        'UHV_800kV_DC': { models: 10, classes: 48, features: ['换流阀监测', '直流场监测'] },
+        'EHV_500kV': { models: 10, classes: 45, features: ['SF6监测', 'GIS监测', '局放监测'] },
+        'EHV_330kV': { models: 9, classes: 42, features: ['SF6监测', 'GIS监测'] },
+        'EHV_750kV': { models: 11, classes: 50, features: ['SF6监测', 'GIS监测', '特高压局放'] },
+        'HV_220kV': { models: 8, classes: 38, features: ['油温监测', '绝缘子污秽'] },
+        'HV_110kV': { models: 7, classes: 35, features: ['油温监测'] },
+        'MV_35kV': { models: 6, classes: 28, features: ['配电柜监测'] },
+        'MV_66kV': { models: 6, classes: 30, features: ['配电柜监测', '电缆监测'] },
+        'LV_10kV': { models: 5, classes: 22, features: ['配电箱监测'] },
+        'LV_380V': { models: 4, classes: 18, features: ['低压配电监测'] }
+    },
+
+    init: function() {
+        this.bindEvents();
+        this.loadSavedVoltage();
+    },
+
+    // 从服务器加载已保存的电压等级
+    loadSavedVoltage: async function() {
+        try {
+            const response = await fetch('/api/voltage/current');
+            const data = await response.json();
+            if (data.success && data.voltage_level) {
+                this.savedVoltage = data.voltage_level;
+                this.currentVoltage = data.voltage_level;
+                // 更新按钮状态
+                document.querySelectorAll('.voltage-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.voltage === this.currentVoltage);
+                });
+            }
+        } catch (error) {
+            console.error('加载电压等级失败:', error);
+        }
+        this.updateDisplay();
+    },
+
+    bindEvents: function() {
+        const self = this;
+        document.querySelectorAll('.voltage-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.voltage-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                self.currentVoltage = this.dataset.voltage;
+                self.updateDisplay();
+                self.updateChangeIndicator();
+            });
+        });
+    },
+
+    // 更新变更指示器
+    updateChangeIndicator: function() {
+        const indicator = document.getElementById('voltage-change-indicator');
+        const confirmBtn = document.getElementById('btn-confirm-voltage');
+        const hasChanged = this.currentVoltage !== this.savedVoltage;
+
+        if (indicator) {
+            indicator.classList.toggle('show', hasChanged);
+        }
+        if (confirmBtn) {
+            confirmBtn.innerHTML = hasChanged
+                ? '<i class="bi bi-check2-circle"></i> 确定并应用'
+                : '<i class="bi bi-check-circle"></i> 已保存';
+        }
+    },
+
+    // 保存电压等级到服务器
+    saveVoltage: async function() {
+        if (this.isLoading) return;
+
+        const confirmBtn = document.getElementById('btn-confirm-voltage');
+        const originalHtml = confirmBtn.innerHTML;
+
+        try {
+            this.isLoading = true;
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 保存中...';
+
+            const response = await fetch('/api/voltage/set', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: this.currentVoltage })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.savedVoltage = this.currentVoltage;
+                this.showToast('success', '保存成功', `电压等级已设置为 ${this.currentVoltage}，所有插件配置已更新`);
+                this.updateChangeIndicator();
+
+                // 更新页面上的当前电压显示
+                const currentText = document.getElementById('current-voltage-text');
+                if (currentText) {
+                    currentText.textContent = this.currentVoltage;
+                }
+
+                // 广播电压变更事件，供其他页面监听
+                localStorage.setItem('voltage_level', this.currentVoltage);
+                localStorage.setItem('voltage_updated_at', Date.now().toString());
+                window.dispatchEvent(new CustomEvent('voltageChanged', {
+                    detail: { level: this.currentVoltage, category: data.category }
+                }));
+            } else {
+                throw new Error(data.message || '保存失败');
+            }
+        } catch (error) {
+            console.error('保存电压等级失败:', error);
+            this.showToast('danger', '保存失败', error.message || '网络错误，请重试');
+        } finally {
+            this.isLoading = false;
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = originalHtml;
+            this.updateChangeIndicator();
+        }
+    },
+
+    // 显示提示消息
+    showToast: function(type, title, message) {
+        // 移除已存在的toast
+        const existingToast = document.querySelector('.save-toast');
+        if (existingToast) existingToast.remove();
+
+        const toastHtml = `
+            <div class="save-toast toast show align-items-center text-white bg-${type}" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <strong><i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${title}</strong>
+                        <div class="small">${message}</div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.parentElement.parentElement.remove()"></button>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', toastHtml);
+
+        // 3秒后自动消失
+        setTimeout(() => {
+            const toast = document.querySelector('.save-toast');
+            if (toast) toast.remove();
+        }, 4000);
+    },
+    
+    updateDisplay: function() {
+        document.getElementById('current-voltage-text').textContent = this.currentVoltage;
+
+        // 更新已选择的电压等级标签
+        const selectedLabel = document.getElementById('selected-voltage-label');
+        if (selectedLabel) {
+            selectedLabel.textContent = this.currentVoltage;
+        }
+
+        const config = this.voltageConfig[this.currentVoltage] || this.voltageConfig['HV_220kV'];
+
+        document.getElementById('stat-plugins').textContent = Object.keys(this.plugins).length;
+        document.getElementById('stat-models').textContent = config.models;
+        document.getElementById('stat-classes').textContent = config.classes;
+        document.getElementById('stat-features').textContent = config.features.length;
+
+        this.renderPlugins();
+        this.renderModels();
+        this.renderClasses();
+        this.renderSpecialFeatures(config.features);
+    },
+    
+    renderPlugins: function() {
+        const container = document.getElementById('plugins-content');
+        let html = '';
+        
+        for (const [id, p] of Object.entries(this.plugins)) {
+            html += `
+                <div class="col-md-6 mb-2">
+                    <div class="card h-100">
+                        <div class="card-body p-2">
+                            <div class="d-flex align-items-center mb-2">
+                                <i class="bi bi-${p.icon} text-${p.color} me-2"></i>
+                                <strong>${p.name}</strong>
+                            </div>
+                            <div class="small text-muted mb-2">
+                                ${p.features.map(f => `<span class="detection-tag">${f}</span>`).join(' ')}
+                            </div>
+                            <a href="/module/${id}" class="btn btn-sm btn-outline-${p.color}">进入</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    },
+    
+    renderModels: function() {
+        const container = document.getElementById('models-content');
+        const category = this.currentVoltage.split('_')[0];
+        const modelSize = { 'UHV': 'YOLOv8l', 'EHV': 'YOLOv8m', 'HV': 'YOLOv8m', 'MV': 'YOLOv8s', 'LV': 'YOLOv8n' }[category] || 'YOLOv8s';
+        
+        container.innerHTML = `
+            <table class="table table-sm">
+                <thead><tr><th>模型类型</th><th>架构</th><th>状态</th></tr></thead>
+                <tbody>
+                    <tr><td>缺陷检测</td><td><span class="badge bg-info">${modelSize}</span></td><td><span class="badge bg-warning">待训练</span></td></tr>
+                    <tr><td>状态识别</td><td><span class="badge bg-info">${modelSize}</span></td><td><span class="badge bg-warning">待训练</span></td></tr>
+                    <tr><td>热成像分析</td><td><span class="badge bg-info">${modelSize}</span></td><td><span class="badge bg-warning">待训练</span></td></tr>
+                    <tr><td>表计读数</td><td><span class="badge bg-info">${modelSize}</span></td><td><span class="badge bg-warning">待训练</span></td></tr>
+                </tbody>
+            </table>
+        `;
+    },
+    
+    renderClasses: function() {
+        const container = document.getElementById('classes-content');
+        let html = '';
+        
+        for (const [id, p] of Object.entries(this.plugins)) {
+            html += `
+                <div class="mb-3">
+                    <h6><i class="bi bi-${p.icon} text-${p.color}"></i> ${p.name}</h6>
+                    <div>${p.features.map(f => `<span class="detection-tag">${f}</span>`).join(' ')}</div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    },
+    
+    renderSpecialFeatures: function(features) {
+        const container = document.getElementById('special-features-content');
+        if (!features || features.length === 0) {
+            container.innerHTML = '<p class="text-muted small">当前电压等级暂无特殊功能</p>';
+            return;
+        }
+        container.innerHTML = features.map(f => `<span class="special-tag"><i class="bi bi-star-fill"></i> ${f}</span>`).join(' ');
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => VoltageSettings.init());
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+<!-- 激光摄像头接入组件 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-plug"></i> 激光摄像头接入</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">已接入设备</label>
+            <div class="d-flex gap-2">
+                <select class="form-select" id="camera-select">
+                    <option value="">未发现摄像头</option>
+                </select>
+                <button class="btn btn-outline-secondary" id="btn-refresh-cameras" title="刷新">
+                    <i class="bi bi-arrow-repeat"></i>
+                </button>
+            </div>
+            <div class="mt-2">
+                <span id="camera-status" class="badge bg-secondary">未连接</span>
+                <small id="camera-status-text" class="text-muted ms-2"></small>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-success" id="btn-connect-camera">
+                <i class="bi bi-plug"></i> 连接
+            </button>
+            <button class="btn btn-outline-danger" id="btn-disconnect-camera">
+                <i class="bi bi-slash-circle"></i> 断开
+            </button>
+        </div>
+
+        <hr>
+        <h6 class="mb-2">新增接入</h6>
+        <div class="mb-2">
+            <label class="form-label">摄像头ID</label>
+            <input type="text" class="form-control" id="camera-id" value="laser_cam" placeholder="laser_cam">
+        </div>
+        <div class="mb-2">
+            <label class="form-label">接入方式</label>
+            <select class="form-select" id="camera-type">
+                <option value="rtsp">RTSP</option>
+                <option value="usb">USB</option>
+                <option value="file">文件</option>
+                <option value="mock">Mock</option>
+            </select>
+        </div>
+        <div class="mb-2" id="camera-url-group">
+            <label class="form-label">RTSP/文件地址</label>
+            <input type="text" class="form-control" id="camera-url" placeholder="rtsp://...">
+        </div>
+        <div class="mb-2 d-none" id="camera-index-group">
+            <label class="form-label">USB设备索引</label>
+            <input type="number" class="form-control" id="camera-index" value="0">
+        </div>
+        <div class="row g-2 mb-2">
+            <div class="col-4">
+                <label class="form-label small text-muted mb-1">宽</label>
+                <input type="number" class="form-control" id="camera-width" value="1920">
+            </div>
+            <div class="col-4">
+                <label class="form-label small text-muted mb-1">高</label>
+                <input type="number" class="form-control" id="camera-height" value="1080">
+            </div>
+            <div class="col-4">
+                <label class="form-label small text-muted mb-1">FPS</label>
+                <input type="number" class="form-control" id="camera-fps" value="25">
+            </div>
+        </div>
+        <button class="btn btn-primary w-100" id="btn-register-camera">
+            <i class="bi bi-link-45deg"></i> 接入并连接
+        </button>
+    </div>
+</div>

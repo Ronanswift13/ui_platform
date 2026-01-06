@@ -1,0 +1,183 @@
+<!-- 开关间隔自主巡视 - 专属控制面板 -->
+
+<!-- 状态识别 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-eye text-info"></i> 状态识别</h5>
+    </div>
+    <div class="card-body">
+        <!-- 断路器状态 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-breaker" checked>
+                <label class="form-check-label fw-bold" for="check-breaker">
+                    <span class="badge bg-primary">断路器</span> 分合位状态识别
+                </label>
+            </div>
+            <div class="ms-4 mt-2" id="breaker-settings">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">置信度阈值</label>
+                        <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="breaker-confidence" value="0.60">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">识别方法</label>
+                        <select class="form-select form-control-sm" id="breaker-method">
+                            <option value="indicator">指示器</option>
+                            <option value="linkage">连杆</option>
+                            <option value="both">组合</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 隔离开关状态 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-isolator" checked>
+                <label class="form-check-label fw-bold" for="check-isolator">
+                    <span class="badge bg-primary">隔离开关</span> 分合位状态识别
+                </label>
+            </div>
+            <div class="ms-4 mt-2" id="isolator-settings">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">置信度阈值</label>
+                        <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="isolator-confidence" value="0.60">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">识别方法</label>
+                        <select class="form-select form-control-sm" id="isolator-method">
+                            <option value="indicator">指示器</option>
+                            <option value="handle">刀闸</option>
+                            <option value="both">组合</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 接地开关状态 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-grounding" checked>
+                <label class="form-check-label fw-bold" for="check-grounding">
+                    <span class="badge bg-primary">接地开关</span> 分合位状态识别
+                </label>
+            </div>
+            <div class="ms-4 mt-2" id="grounding-settings">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted mb-1">置信度阈值</label>
+                        <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="grounding-confidence" value="0.60">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 五防逻辑校验 -->
+        <div class="border rounded p-3 bg-light">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="check-interlock" checked>
+                <label class="form-check-label fw-bold" for="check-interlock">
+                    <span class="badge bg-success">互锁逻辑</span> 五防逻辑校验
+                </label>
+            </div>
+            <div class="ms-4 mt-2">
+                <small class="text-muted">自动校验断路器、隔离开关、接地开关的逻辑关系</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 清晰度评价 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-image text-primary"></i> 清晰度评价</h5>
+    </div>
+    <div class="card-body">
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-clarity" checked>
+                <label class="form-check-label fw-bold" for="check-clarity">
+                    启用清晰度评价（用于自动调焦触发）
+                </label>
+            </div>
+            <div class="row g-2" id="clarity-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最小清晰度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="min-clarity-score" value="0.70">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">边缘能量权重</label>
+                    <input type="number" step="0.1" min="0" max="1" class="form-control form-control-sm" id="edge-energy-weight" value="0.5">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SF6表计读数（可选） -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-speedometer2 text-warning"></i> SF6表计读数 <small class="text-muted">(可选)</small></h5>
+    </div>
+    <div class="card-body">
+        <div class="border rounded p-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-sf6-reading">
+                <label class="form-check-label fw-bold" for="check-sf6-reading">
+                    启用SF6压力/密度表读数
+                </label>
+            </div>
+            <div class="row g-2 d-none" id="sf6-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">读数置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="sf6-confidence" value="0.60">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最大旋转角度(°)</label>
+                    <input type="number" step="5" min="0" max="45" class="form-control form-control-sm" id="sf6-max-rotation" value="30">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始检测
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>
+
+<script>
+// Switch Inspection 专属交互逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    // 启用/禁用设置区域
+    function toggleSettings(checkboxId, settingsId) {
+        const checkbox = document.getElementById(checkboxId);
+        const settings = document.getElementById(settingsId);
+        if (checkbox && settings) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    settings.classList.remove('d-none');
+                } else {
+                    settings.classList.add('d-none');
+                }
+            });
+        }
+    }
+
+    toggleSettings('check-sf6-reading', 'sf6-settings');
+});
+</script>

@@ -1,0 +1,153 @@
+{#
+训练入口组件（轻量版）
+用法: include 'components/training_entry.html'
+需要在页面中设置 module_id 变量
+
+这是一个轻量级的训练入口，只显示状态和入口按钮，
+完整的训练功能在独立的训练页面 /training
+#}
+
+<div class="card mb-3" id="training-entry">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cpu"></i> 模型训练</span>
+        <span class="badge" id="training-entry-badge">未训练</span>
+    </div>
+    <div class="card-body">
+        <!-- 当前模型状态 -->
+        <div id="training-model-status">
+            <div class="text-center text-muted py-2" id="no-model-info">
+                <i class="bi bi-info-circle"></i>
+                <span>当前配置暂无已训练模型</span>
+            </div>
+            <div id="has-model-info" style="display: none;">
+                <div class="d-flex align-items-center text-success">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <span>模型已就绪</span>
+                </div>
+                <div class="small text-muted mt-1">
+                    mAP50: <strong id="model-map">-</strong>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 数据集简要状态 -->
+        <div class="mt-2 mb-3 p-2 bg-light rounded" id="dataset-brief">
+            <div class="d-flex justify-content-between small">
+                <span>数据集:</span>
+                <span id="dataset-brief-status" class="text-muted">检查中...</span>
+            </div>
+            <div class="d-flex justify-content-between small">
+                <span>图像数量:</span>
+                <span id="dataset-brief-count">-</span>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="d-grid gap-2">
+            <a href="/training?plugin={{ module_id }}" class="btn btn-primary btn-sm">
+                <i class="bi bi-box-arrow-up-right"></i> 进入训练页面
+            </a>
+        </div>
+        
+        <!-- 训练中提示 -->
+        <div id="training-in-progress" style="display: none;" class="mt-2">
+            <div class="alert alert-info mb-0 py-2 small">
+                <i class="bi bi-hourglass-split"></i> 训练进行中...
+                <div class="progress mt-1" style="height: 5px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         id="training-mini-progress" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 训练入口组件脚本
+(function() {
+    const moduleId = '{{ module_id }}';
+    const defaultVoltage = 'HV_220kV';
+    
+    async function loadTrainingStatus() {
+        try {
+            const response = await fetch(`/api/training/status/${defaultVoltage}/${moduleId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                updateDisplay(data);
+            }
+        } catch (error) {
+            console.error('加载训练状态失败:', error);
+        }
+    }
+    
+    function updateDisplay(data) {
+        const badge = document.getElementById('training-entry-badge');
+        const noModelInfo = document.getElementById('no-model-info');
+        const hasModelInfo = document.getElementById('has-model-info');
+        const modelMap = document.getElementById('model-map');
+        const datasetStatus = document.getElementById('dataset-brief-status');
+        const datasetCount = document.getElementById('dataset-brief-count');
+        const trainingProgress = document.getElementById('training-in-progress');
+        const miniProgressBar = document.getElementById('training-mini-progress');
+        
+        // 更新数据集状态
+        if (data.dataset) {
+            const ds = data.dataset;
+            datasetCount.textContent = ds.total_count || 0;
+            
+            switch (ds.status) {
+                case 'ready':
+                    datasetStatus.textContent = '就绪';
+                    datasetStatus.className = 'text-success';
+                    break;
+                case 'downloaded':
+                    datasetStatus.textContent = '已下载';
+                    datasetStatus.className = 'text-info';
+                    break;
+                case 'placeholder':
+                    datasetStatus.textContent = '占位符';
+                    datasetStatus.className = 'text-warning';
+                    break;
+                default:
+                    datasetStatus.textContent = '未下载';
+                    datasetStatus.className = 'text-muted';
+            }
+        }
+        
+        // 更新模型状态
+        if (data.completed_model) {
+            badge.textContent = '已训练';
+            badge.className = 'badge bg-success';
+            noModelInfo.style.display = 'none';
+            hasModelInfo.style.display = 'block';
+            modelMap.textContent = data.completed_model.best_map50 
+                ? data.completed_model.best_map50.toFixed(4) : '-';
+        } else {
+            badge.textContent = '未训练';
+            badge.className = 'badge bg-secondary';
+            noModelInfo.style.display = 'block';
+            hasModelInfo.style.display = 'none';
+        }
+        
+        // 检查是否正在训练
+        if (data.task && ['training', 'preparing', 'downloading'].includes(data.task.status)) {
+            badge.textContent = '训练中';
+            badge.className = 'badge bg-warning';
+            trainingProgress.style.display = 'block';
+            miniProgressBar.style.width = `${data.task.progress || 0}%`;
+        } else {
+            trainingProgress.style.display = 'none';
+        }
+    }
+    
+    // 页面加载后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        if (moduleId) {
+            loadTrainingStatus();
+            // 每30秒刷新一次状态
+            setInterval(loadTrainingStatus, 30000);
+        }
+    });
+})();
+</script>

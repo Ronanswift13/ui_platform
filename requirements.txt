@@ -1,0 +1,108 @@
+# ========================================
+# 输变电激光星芒破夜绘明监测平台 - 依赖列表
+# ========================================
+
+# Web框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# 数据验证
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# 配置文件
+pyyaml>=6.0.1
+
+# 异步文件操作
+aiofiles>=23.2.0
+
+# HTTP客户端
+httpx>=0.25.0
+
+# 文件上传
+python-multipart>=0.0.6
+
+# 模板引擎
+jinja2>=3.1.2
+
+# 图像处理
+pillow>=10.1.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+
+# AI/ML 推理
+# ONNX Runtime - 用于深度学习模型推理
+onnxruntime>=1.16.0
+
+# 深度学习增强依赖 (全自动AI巡检)
+# ONNX Runtime GPU版本 (可选，需CUDA支持)
+# onnxruntime-gpu>=1.16.0
+
+# TensorRT加速 (可选)
+tensorrt>=8.6.0
+
+# OCR支持 (可选)
+ paddleocr>=2.7.0
+ easyocr>=1.7.0
+
+# 日志
+loguru>=0.7.2
+
+# 任务调度
+apscheduler>=3.10.4
+
+# 文件监控
+watchdog>=3.0.0
+
+# 打包工具
+pyinstaller>=6.2.0
+
+# 测试工具
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# =============================================================================
+# 破夜绘明激光监测平台 - 训练系统依赖
+# =============================================================================
+
+# 核心训练框架
+ultralytics>=8.0.0
+
+# 深度学习框架
+torch>=2.0.0
+torchvision>=0.15.0
+
+# 图像处理
+opencv-python>=4.8.0
+pillow>=10.0.0
+
+# 数据处理
+numpy>=1.24.0
+pandas>=2.0.0
+
+# 配置管理
+pyyaml>=6.0.0
+
+# 可视化
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# 进度条
+tqdm>=4.65.0
+
+# 日志
+loguru>=0.7.0
+
+# 数据集工具 (可选)
+# dataset-tools>=0.2.0  # 用于下载DatasetNinja数据集
+# supervisely>=6.0.0    # 用于Supervisely格式转换
+
+# 模型导出 (可选)
+# onnx>=1.14.0
+# onnxruntime>=1.15.0
+# coremltools>=7.0      # 仅Mac
+
+# 开发工具 (可选)
+# jupyter>=1.0.0
+# tensorboard>=2.14.0
+

@@ -1,0 +1,98 @@
+# =============================================================================
+# 鸟类监控插件 - 默认配置
+# 输变电激光星芒破夜绘明监测平台 (F组)
+# =============================================================================
+
+# 模型配置
+model:
+  path: "models/bird/bird_yolov8n.onnx"
+  device: "cpu"  # cpu 或 cuda
+  input_size: [640, 640]
+
+# 推理配置
+inference:
+  confidence_threshold: 0.5
+  nms_threshold: 0.45
+  tracking_enabled: true
+  max_track_age: 30  # 跟踪最大丢失帧数
+
+# 风险评估配置
+risk_assessment:
+  # 距离阈值(米)
+  safe_distance_m: 15.0
+  warning_distance_m: 10.0
+  danger_distance_m: 5.0
+  critical_distance_m: 2.0
+  
+  # 权重配置
+  distance_weight: 0.4
+  species_weight: 0.3
+  wingspan_weight: 0.2
+  behavior_weight: 0.1
+  
+  # 相间距参考值(米)
+  default_phase_spacing_m: 3.0
+
+# 驱鸟设备配置
+deterrent:
+  enabled: false
+  acoustic_enabled: true
+  laser_enabled: false
+  auto_trigger_level: "danger"  # warning, danger, critical
+  
+  # 声学驱鸟
+  acoustic:
+    device_ip: ""
+    device_port: 8080
+    duration_s: 5
+    interval_s: 30
+  
+  # 激光驱鸟
+  laser:
+    device_ip: ""
+    device_port: 8080
+    sweep_pattern: "random"  # random, linear, circular
+
+# 鸟类数据库配置
+bird_database:
+  enabled: true
+  database_path: "data/bird_database.yaml"
+  auto_update: false
+  
+  # 在线数据库(可选)
+  online_api:
+    enabled: false
+    url: ""
+    api_key: ""
+
+# 相机配置(用于3D估计)
+camera:
+  height_m: 15.0
+  fov_deg: 60.0
+  tilt_deg: 30.0
+
+# 告警配置
+alerting:
+  # 告警冷却时间(秒)
+  cooldown_s: 60
+  
+  # 告警级别映射
+  levels:
+    safe: "info"
+    warning: "warning"
+    danger: "error"
+    critical: "critical"
+  
+  # 通知配置
+  notifications:
+    sound_enabled: true
+    popup_enabled: true
+    sms_enabled: false
+    email_enabled: false
+
+# 日志配置
+logging:
+  level: "INFO"
+  save_detections: true
+  save_images: false
+  retention_days: 30

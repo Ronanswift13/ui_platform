@@ -1,0 +1,231 @@
+<!-- 表计无建模增强读数 - 专属控制面板 -->
+
+<!-- 表计读数 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-speedometer2 text-primary"></i> 表计读数</h5>
+    </div>
+    <div class="card-body">
+        <!-- 指针式读数 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input reading-type" type="checkbox" value="pointer" id="check-pointer" checked>
+                <label class="form-check-label" for="check-pointer">
+                    <span class="badge bg-primary">指针式读数</span> 基于角度读数
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="pointer-confidence" value="0.60">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">最大旋转角度(°)</label>
+                    <input type="number" step="5" min="0" max="45" class="form-control form-control-sm" id="pointer-max-rotation" value="30">
+                </div>
+                <div class="col-4">
+                    <label class="form-label small text-muted mb-1">重试次数</label>
+                    <input type="number" step="1" min="1" max="5" class="form-control form-control-sm" id="pointer-retry-count" value="3">
+                </div>
+            </div>
+        </div>
+
+        <!-- 数字式读数 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input reading-type" type="checkbox" value="digital" id="check-digital" checked>
+                <label class="form-check-label" for="check-digital">
+                    <span class="badge bg-primary">数字式读数</span> 基于OCR识别
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">OCR置信度阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="digital-confidence" value="0.70">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">重试次数</label>
+                    <input type="number" step="1" min="1" max="5" class="form-control form-control-sm" id="digital-retry-count" value="3">
+                </div>
+            </div>
+        </div>
+
+        <!-- 七段码识别 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input reading-type" type="checkbox" value="seven_segment" id="check-seven-segment">
+                <label class="form-check-label" for="check-seven-segment">
+                    <span class="badge bg-info">七段码识别</span> 基于形态学分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">识别阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="seven-segment-threshold" value="0.60">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">段数</label>
+                    <select class="form-select form-control-sm" id="seven-segment-digits">
+                        <option value="3">3位</option>
+                        <option value="4" selected>4位</option>
+                        <option value="5">5位</option>
+                        <option value="6">6位</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- LED显示读数 -->
+        <div class="border rounded p-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input reading-type" type="checkbox" value="led" id="check-led">
+                <label class="form-check-label" for="check-led">
+                    <span class="badge bg-secondary">LED显示读数</span> 基于亮度分析
+                </label>
+            </div>
+            <div class="row g-2 mt-2">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">亮度阈值</label>
+                    <input type="number" step="10" min="50" max="255" class="form-control form-control-sm" id="led-brightness-threshold" value="150">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">颜色</label>
+                    <select class="form-select form-control-sm" id="led-color">
+                        <option value="red" selected>红色</option>
+                        <option value="green">绿色</option>
+                        <option value="blue">蓝色</option>
+                        <option value="white">白色</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 读数质量评估 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-image text-info"></i> 读数质量评估</h5>
+    </div>
+    <div class="card-body">
+        <!-- 关键点检测 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-keypoint" checked>
+                <label class="form-check-label fw-bold" for="check-keypoint">
+                    启用关键点检测（表盘四角点）
+                </label>
+            </div>
+            <div class="row g-2" id="keypoint-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">检测置信度</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="keypoint-confidence" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">角点数量</label>
+                    <input type="number" step="1" min="4" max="8" class="form-control form-control-sm" id="keypoint-count" value="4">
+                </div>
+            </div>
+        </div>
+
+        <!-- 透视矫正 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-perspective" checked>
+                <label class="form-check-label fw-bold" for="check-perspective">
+                    启用透视矫正（任意角度支持）
+                </label>
+            </div>
+            <div class="row g-2" id="perspective-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">最大倾斜角度(°)</label>
+                    <input type="number" step="5" min="0" max="45" class="form-control form-control-sm" id="perspective-max-angle" value="45">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">输出尺寸(px)</label>
+                    <input type="number" step="64" min="128" max="1024" class="form-control form-control-sm" id="perspective-output-size" value="512">
+                </div>
+            </div>
+        </div>
+
+        <!-- 量程识别 -->
+        <div class="border rounded p-3 mb-3">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-range" checked>
+                <label class="form-check-label fw-bold" for="check-range">
+                    启用自动量程识别（刻度检测）
+                </label>
+            </div>
+            <div class="row g-2" id="range-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">OCR置信度</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="range-ocr-confidence" value="0.60">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">刻度间距(px)</label>
+                    <input type="number" step="5" min="5" max="100" class="form-control form-control-sm" id="range-scale-spacing" value="20">
+                </div>
+            </div>
+        </div>
+
+        <!-- 人工复核标记 -->
+        <div class="border rounded p-3 bg-light">
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="check-manual-review" checked>
+                <label class="form-check-label fw-bold" for="check-manual-review">
+                    启用人工复核标记（低置信度结果）
+                </label>
+            </div>
+            <div class="row g-2" id="manual-review-settings">
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">复核阈值</label>
+                    <input type="number" step="0.05" min="0" max="1" class="form-control form-control-sm" id="manual-review-threshold" value="0.50">
+                </div>
+                <div class="col-6">
+                    <label class="form-label small text-muted mb-1">历史参考窗口</label>
+                    <input type="number" step="1" min="1" max="10" class="form-control form-control-sm" id="manual-review-history-window" value="5">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 运行控制 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-play-fill"></i> 运行控制</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-primary w-100 mb-2" id="btn-detect" disabled>
+            <i class="bi bi-play-fill"></i> 开始读数
+        </button>
+        <button class="btn btn-outline-secondary w-100" id="btn-clear">
+            <i class="bi bi-trash"></i> 清除结果
+        </button>
+    </div>
+</div>
+
+<script>
+// Meter Reading 专属交互逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    // 启用/禁用设置区域
+    function toggleSettings(checkboxId, settingsId) {
+        const checkbox = document.getElementById(checkboxId);
+        const settings = document.getElementById(settingsId);
+        if (checkbox && settings) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    settings.classList.remove('d-none');
+                } else {
+                    settings.classList.add('d-none');
+                }
+            });
+        }
+    }
+
+    toggleSettings('check-keypoint', 'keypoint-settings');
+    toggleSettings('check-perspective', 'perspective-settings');
+    toggleSettings('check-range', 'range-settings');
+    toggleSettings('check-manual-review', 'manual-review-settings');
+});
+</script>

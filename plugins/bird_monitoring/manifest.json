@@ -1,0 +1,75 @@
+{
+    "id": "bird_monitoring",
+    "name": "鸟类监控插件",
+    "version": "1.0.0",
+    "description": "室外输电线路鸟类识别、鸟类数据库对比、风险评估和驱离告警",
+    "author": "F组",
+    "entrypoint": "plugin.py",
+    "plugin_class": "BirdMonitoringPlugin",
+    "capabilities": [
+        "bird_detection",
+        "species_identification",
+        "risk_assessment",
+        "deterrent_control"
+    ],
+    "device_types": [
+        "power_line",
+        "tower",
+        "insulator",
+        "outdoor_area"
+    ],
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"]},
+                    "input_size": {"type": "array", "items": {"type": "integer"}}
+                }
+            },
+            "inference": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+                    "tracking_enabled": {"type": "boolean"},
+                    "max_track_age": {"type": "integer"}
+                }
+            },
+            "risk_assessment": {
+                "type": "object",
+                "properties": {
+                    "safe_distance_m": {"type": "number"},
+                    "warning_distance_m": {"type": "number"},
+                    "danger_distance_m": {"type": "number"},
+                    "wingspan_factor_weight": {"type": "number"},
+                    "species_factor_weight": {"type": "number"}
+                }
+            },
+            "deterrent": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "acoustic_enabled": {"type": "boolean"},
+                    "laser_enabled": {"type": "boolean"},
+                    "auto_trigger_level": {"type": "string", "enum": ["warning", "danger", "critical"]}
+                }
+            },
+            "bird_database": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "database_path": {"type": "string"},
+                    "auto_update": {"type": "boolean"}
+                }
+            }
+        }
+    }
+}
