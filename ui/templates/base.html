@@ -49,6 +49,16 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'bird' %}active{% endif %}" href="/module/bird">
+                            <i class="bi bi-feather"></i> 鸟类监控
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'indoor_fence' %}active{% endif %}" href="/module/indoor_fence">
+                            <i class="bi bi-shield-shaded"></i> 室内围栏
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'replay' %}active{% endif %}" href="/replay">
                             <i class="bi bi-play-circle"></i> 回放
                         </a>
@@ -57,6 +67,23 @@
                         <a class="nav-link {% if active_tab == 'training' %}active{% endif %}" href="/training">
                             <i class="bi bi-cpu"></i> 模型训练
                         </a>
+                    </li>
+                    <!-- 高级监测插件菜单 -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if active_tab == 'advanced' %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-cpu-fill"></i> 高级监测
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li><a class="dropdown-item" href="/advanced-plugins"><i class="bi bi-grid-3x3-gap"></i> 插件管理</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/acoustic"><i class="bi bi-soundwave"></i> 声学监测</a></li>
+                            <li><a class="dropdown-item" href="/gas-detection"><i class="bi bi-cloud-haze2"></i> 气体检测</a></li>
+                            <li><a class="dropdown-item" href="/hyperspectral"><i class="bi bi-rainbow"></i> 高光谱检测</a></li>
+                            <li><a class="dropdown-item" href="/slam"><i class="bi bi-map"></i> SLAM建图</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/multimodal-fusion"><i class="bi bi-diagram-3"></i> 多模态融合</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="/settings">

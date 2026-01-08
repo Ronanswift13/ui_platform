@@ -1,0 +1,1327 @@
+{% extends "base.html" %}
+
+{% block title %}高级监测插件 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plugin-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #6c757d;
+    }
+    .plugin-card.loaded {
+        border-left-color: #28a745;
+    }
+    .plugin-card.error {
+        border-left-color: #dc3545;
+    }
+    .plugin-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .modality-tag {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        margin: 0.1rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+        background: #e9ecef;
+    }
+    .modality-tag.active {
+        background: #007bff;
+        color: white;
+    }
+    
+    .result-panel {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .result-json {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+        max-height: 300px;
+        overflow: auto;
+    }
+    
+    .alarm-item {
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .alarm-item.critical {
+        background: rgba(220, 53, 69, 0.1);
+        border-left: 4px solid #dc3545;
+    }
+    .alarm-item.alarm {
+        background: rgba(255, 193, 7, 0.1);
+        border-left: 4px solid #ffc107;
+    }
+    .alarm-item.warning {
+        background: rgba(255, 193, 7, 0.05);
+        border-left: 4px solid #fd7e14;
+    }
+    
+    .chart-container {
+        height: 250px;
+    }
+    
+    .tab-content > .tab-pane {
+        padding: 1.5rem 0;
+    }
+    
+    .loading-spinner {
+        display: none;
+    }
+    .loading .loading-spinner {
+        display: inline-block;
+    }
+    .loading .btn-text {
+        display: none;
+    }
+    
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+    .feature-list li {
+        padding: 0.25rem 0;
+    }
+    .feature-list li::before {
+        content: "✓";
+        color: #28a745;
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 页面标题 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2><i class="bi bi-cpu-fill"></i> 高级监测插件</h2>
+                <p class="text-muted mb-0">声学监测、气体检测、高光谱、SLAM建图、多模态融合</p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary" onclick="refreshPluginStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新状态
+                </button>
+            </div>
+        </div>
+        
+        <!-- 插件状态卡片 -->
+        <div class="row mb-4" id="plugin-cards">
+            <!-- 声学监测 -->
+            <div class="col-md-4 col-lg-2-4 mb-3">
+                <div class="card plugin-card h-100" id="card-acoustic">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <i class="bi bi-soundwave text-primary" style="font-size: 2rem;"></i>
+                            <span class="badge bg-secondary status-badge" id="status-acoustic">未加载</span>
+                        </div>
+                        <h5 class="card-title">声学监测</h5>
+                        <p class="card-text small text-muted">局部放电检测、声音异常分析</p>
+                        <ul class="feature-list small">
+                            <li>超声波检测</li>
+                            <li>频谱分析</li>
+                            <li>异常识别</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-sm btn-primary w-100" onclick="showPluginPanel('acoustic')">
+                            <i class="bi bi-play-fill"></i> 使用
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 气体检测 -->
+            <div class="col-md-4 col-lg-2-4 mb-3">
+                <div class="card plugin-card h-100" id="card-gas">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <i class="bi bi-cloud-haze2 text-warning" style="font-size: 2rem;"></i>
+                            <span class="badge bg-secondary status-badge" id="status-gas">未加载</span>
+                        </div>
+                        <h5 class="card-title">气体检测</h5>
+                        <p class="card-text small text-muted">SF6监测、DGA分析、趋势预测</p>
+                        <ul class="feature-list small">
+                            <li>多气体监测</li>
+                            <li>故障诊断</li>
+                            <li>趋势预测</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-sm btn-primary w-100" onclick="showPluginPanel('gas')">
+                            <i class="bi bi-play-fill"></i> 使用
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 高光谱检测 -->
+            <div class="col-md-4 col-lg-2-4 mb-3">
+                <div class="card plugin-card h-100" id="card-hyperspectral">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <i class="bi bi-rainbow text-info" style="font-size: 2rem;"></i>
+                            <span class="badge bg-secondary status-badge" id="status-hyperspectral">未加载</span>
+                        </div>
+                        <h5 class="card-title">高光谱检测</h5>
+                        <p class="card-text small text-muted">光谱分析、缺陷检测、材料识别</p>
+                        <ul class="feature-list small">
+                            <li>224波段分析</li>
+                            <li>缺陷识别</li>
+                            <li>污染检测</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-sm btn-primary w-100" onclick="showPluginPanel('hyperspectral')">
+                            <i class="bi bi-play-fill"></i> 使用
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SLAM建图 -->
+            <div class="col-md-4 col-lg-2-4 mb-3">
+                <div class="card plugin-card h-100" id="card-slam">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <i class="bi bi-map text-success" style="font-size: 2rem;"></i>
+                            <span class="badge bg-secondary status-badge" id="status-slam">未加载</span>
+                        </div>
+                        <h5 class="card-title">SLAM建图</h5>
+                        <p class="card-text small text-muted">激光雷达建图、定位导航</p>
+                        <ul class="feature-list small">
+                            <li>点云处理</li>
+                            <li>实时建图</li>
+                            <li>回环检测</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-sm btn-primary w-100" onclick="showPluginPanel('slam')">
+                            <i class="bi bi-play-fill"></i> 使用
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 多模态融合 -->
+            <div class="col-md-4 col-lg-2-4 mb-3">
+                <div class="card plugin-card h-100" id="card-fusion">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <i class="bi bi-diagram-3 text-danger" style="font-size: 2rem;"></i>
+                            <span class="badge bg-secondary status-badge" id="status-fusion">未加载</span>
+                        </div>
+                        <h5 class="card-title">多模态融合</h5>
+                        <p class="card-text small text-muted">综合诊断、关联分析、智能决策</p>
+                        <ul class="feature-list small">
+                            <li>注意力融合</li>
+                            <li>故障关联</li>
+                            <li>综合诊断</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-sm btn-primary w-100" onclick="showPluginPanel('fusion')">
+                            <i class="bi bi-play-fill"></i> 使用
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 功能操作区 -->
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="pluginTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="acoustic-tab" data-bs-toggle="tab" 
+                                data-bs-target="#acoustic-panel" type="button" role="tab">
+                            <i class="bi bi-soundwave"></i> 声学监测
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="gas-tab" data-bs-toggle="tab" 
+                                data-bs-target="#gas-panel" type="button" role="tab">
+                            <i class="bi bi-cloud-haze2"></i> 气体检测
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="hyperspectral-tab" data-bs-toggle="tab" 
+                                data-bs-target="#hyperspectral-panel" type="button" role="tab">
+                            <i class="bi bi-rainbow"></i> 高光谱
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="slam-tab" data-bs-toggle="tab" 
+                                data-bs-target="#slam-panel" type="button" role="tab">
+                            <i class="bi bi-map"></i> SLAM
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="fusion-tab" data-bs-toggle="tab" 
+                                data-bs-target="#fusion-panel" type="button" role="tab">
+                            <i class="bi bi-diagram-3"></i> 多模态融合
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class="card-body">
+                <div class="tab-content" id="pluginTabContent">
+                    <!-- 声学监测面板 -->
+                    <div class="tab-pane fade show active" id="acoustic-panel" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h5><i class="bi bi-sliders"></i> 声学分析参数</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">设备ID</label>
+                                    <input type="text" class="form-control" id="acoustic-device-id" 
+                                           value="T001" placeholder="输入设备ID">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">采样率 (Hz)</label>
+                                    <select class="form-select" id="acoustic-sample-rate">
+                                        <option value="16000">16000 Hz (标准)</option>
+                                        <option value="44100">44100 Hz (高质量)</option>
+                                        <option value="192000">192000 Hz (超声波)</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">分析类型</label>
+                                    <select class="form-select" id="acoustic-analysis-type">
+                                        <option value="full">完整分析</option>
+                                        <option value="pd_only">仅局放检测</option>
+                                        <option value="anomaly_only">仅异常检测</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary" onclick="runAcousticAnalysis()" id="btn-acoustic">
+                                    <span class="loading-spinner spinner-border spinner-border-sm"></span>
+                                    <span class="btn-text"><i class="bi bi-play-fill"></i> 执行分析</span>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="loadDemoAcousticData()">
+                                    <i class="bi bi-file-earmark-play"></i> 加载示例
+                                </button>
+                            </div>
+                            <div class="col-lg-6">
+                                <h5><i class="bi bi-card-text"></i> 分析结果</h5>
+                                <div class="result-panel" id="acoustic-result">
+                                    <p class="text-muted text-center">等待执行分析...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 气体检测面板 -->
+                    <div class="tab-pane fade" id="gas-panel" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h5><i class="bi bi-sliders"></i> 气体检测参数</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">设备ID</label>
+                                    <input type="text" class="form-control" id="gas-device-id" 
+                                           value="T001" placeholder="输入设备ID">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">SF6 (ppm)</label>
+                                        <input type="number" class="form-control" id="gas-sf6" value="850">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">H2 (ppm)</label>
+                                        <input type="number" class="form-control" id="gas-h2" value="50">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">CO (ppm)</label>
+                                        <input type="number" class="form-control" id="gas-co" value="100">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">CH4 (ppm)</label>
+                                        <input type="number" class="form-control" id="gas-ch4" value="20">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">温度 (°C)</label>
+                                        <input type="number" class="form-control" id="gas-temp" value="25">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">湿度 (%)</label>
+                                        <input type="number" class="form-control" id="gas-humidity" value="60">
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary" onclick="runGasAnalysis()" id="btn-gas">
+                                    <span class="loading-spinner spinner-border spinner-border-sm"></span>
+                                    <span class="btn-text"><i class="bi bi-play-fill"></i> 执行分析</span>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="viewGasHistory()">
+                                    <i class="bi bi-clock-history"></i> 查看历史
+                                </button>
+                            </div>
+                            <div class="col-lg-6">
+                                <h5><i class="bi bi-card-text"></i> 检测结果</h5>
+                                <div class="result-panel" id="gas-result">
+                                    <p class="text-muted text-center">等待执行分析...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 高光谱检测面板 -->
+                    <div class="tab-pane fade" id="hyperspectral-panel" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h5><i class="bi bi-sliders"></i> 高光谱分析参数</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">设备ID</label>
+                                    <input type="text" class="form-control" id="hs-device-id" 
+                                           value="T001" placeholder="输入设备ID">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">波长范围 (nm)</label>
+                                    <div class="row">
+                                        <div class="col">
+                                            <input type="number" class="form-control" id="hs-wl-min" value="400" placeholder="最小">
+                                        </div>
+                                        <div class="col-auto align-self-center">-</div>
+                                        <div class="col">
+                                            <input type="number" class="form-control" id="hs-wl-max" value="2500" placeholder="最大">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">分析类型</label>
+                                    <select class="form-select" id="hs-analysis-type">
+                                        <option value="defect">缺陷检测</option>
+                                        <option value="material">材料分析</option>
+                                        <option value="contamination">污染检测</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">上传高光谱图像</label>
+                                    <input type="file" class="form-control" id="hs-image" accept=".hdr,.dat,.tif">
+                                </div>
+                                <button class="btn btn-primary" onclick="runHyperspectralAnalysis()" id="btn-hs">
+                                    <span class="loading-spinner spinner-border spinner-border-sm"></span>
+                                    <span class="btn-text"><i class="bi bi-play-fill"></i> 执行分析</span>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="loadDemoHSData()">
+                                    <i class="bi bi-file-earmark-play"></i> 加载示例
+                                </button>
+                            </div>
+                            <div class="col-lg-6">
+                                <h5><i class="bi bi-card-text"></i> 分析结果</h5>
+                                <div class="result-panel" id="hs-result">
+                                    <p class="text-muted text-center">等待执行分析...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SLAM面板 -->
+                    <div class="tab-pane fade" id="slam-panel" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-4">
+                                <h5><i class="bi bi-sliders"></i> SLAM会话管理</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">会话ID</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="slam-session-id" 
+                                               value="session_001" placeholder="会话ID">
+                                        <button class="btn btn-outline-primary" onclick="createSlamSession()">
+                                            <i class="bi bi-plus"></i> 创建
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">当前会话列表</label>
+                                    <select class="form-select" id="slam-sessions" size="4">
+                                        <option disabled>无活动会话</option>
+                                    </select>
+                                </div>
+                                <div class="btn-group w-100 mb-3">
+                                    <button class="btn btn-outline-secondary" onclick="refreshSlamSessions()">
+                                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteSlamSession()">
+                                        <i class="bi bi-trash"></i> 删除
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <h5><i class="bi bi-geo-alt"></i> 点云处理</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">上传点云文件</label>
+                                    <input type="file" class="form-control" id="slam-pointcloud" accept=".pcd,.ply,.las">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">里程计数据 (可选)</label>
+                                    <div class="row g-2">
+                                        <div class="col-4">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   id="slam-odom-x" value="0" placeholder="X">
+                                        </div>
+                                        <div class="col-4">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   id="slam-odom-y" value="0" placeholder="Y">
+                                        </div>
+                                        <div class="col-4">
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   id="slam-odom-z" value="0" placeholder="Z">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary w-100" onclick="processSlamFrame()" id="btn-slam">
+                                    <span class="loading-spinner spinner-border spinner-border-sm"></span>
+                                    <span class="btn-text"><i class="bi bi-play-fill"></i> 处理帧</span>
+                                </button>
+                            </div>
+                            <div class="col-lg-4">
+                                <h5><i class="bi bi-map"></i> 地图信息</h5>
+                                <div class="result-panel" id="slam-result">
+                                    <p class="text-muted text-center">选择或创建会话开始建图...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 多模态融合面板 -->
+                    <div class="tab-pane fade" id="fusion-panel" role="tabpanel">
+                        <div class="row">
+                            <div class="col-lg-5">
+                                <h5><i class="bi bi-sliders"></i> 融合分析配置</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">设备ID</label>
+                                    <input type="text" class="form-control" id="fusion-device-id" 
+                                           value="T001" placeholder="输入设备ID">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">融合策略</label>
+                                    <select class="form-select" id="fusion-strategy">
+                                        <option value="hybrid">混合融合 (推荐)</option>
+                                        <option value="attention">注意力融合</option>
+                                        <option value="late">决策级融合</option>
+                                        <option value="early">特征级融合</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">选择模态数据</label>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="mod-visual" checked>
+                                            <label class="form-check-label" for="mod-visual">可见光</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="mod-thermal" checked>
+                                            <label class="form-check-label" for="mod-thermal">红外</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="mod-acoustic" checked>
+                                            <label class="form-check-label" for="mod-acoustic">声学</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="mod-gas">
+                                            <label class="form-check-label" for="mod-gas">气体</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="mod-hyperspectral">
+                                            <label class="form-check-label" for="mod-hyperspectral">高光谱</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary btn-lg w-100" onclick="runFusionAnalysis()" id="btn-fusion">
+                                    <span class="loading-spinner spinner-border spinner-border-sm"></span>
+                                    <span class="btn-text"><i class="bi bi-diagram-3"></i> 执行多模态融合</span>
+                                </button>
+                            </div>
+                            <div class="col-lg-7">
+                                <h5><i class="bi bi-card-text"></i> 融合诊断结果</h5>
+                                <div class="result-panel" id="fusion-result" style="max-height: 500px;">
+                                    <p class="text-muted text-center">等待执行融合分析...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 告警面板 -->
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-bell"></i> 实时告警</h5>
+                <span class="badge bg-danger" id="alarm-count">0</span>
+            </div>
+            <div class="card-body" style="max-height: 200px; overflow-y: auto;">
+                <div id="alarm-list">
+                    <p class="text-muted text-center">暂无告警</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // API基础URL
+    const API_BASE = '/api/advanced';
+    
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshPluginStatus();
+        refreshSlamSessions();
+    });
+    
+    // 刷新插件状态
+    async function refreshPluginStatus() {
+        try {
+            const response = await fetch(`${API_BASE}/plugins`);
+            const data = await response.json();
+            
+            if (data.success && data.plugins) {
+                data.plugins.forEach(plugin => {
+                    updatePluginCard(plugin);
+                });
+            }
+        } catch (error) {
+            console.error('刷新插件状态失败:', error);
+        }
+    }
+    
+    // 更新插件卡片
+    function updatePluginCard(plugin) {
+        // 映射插件ID到卡片ID
+        const cardMap = {
+            'acoustic_monitoring': 'acoustic',
+            'gas_detection': 'gas',
+            'hyperspectral_detection': 'hyperspectral',
+            'slam_mapping': 'slam',
+            'multimodal_fusion': 'fusion'
+        };
+        
+        const cardId = cardMap[plugin.plugin_id];
+        if (!cardId) return;
+        
+        const card = document.getElementById(`card-${cardId}`);
+        const statusBadge = document.getElementById(`status-${cardId}`);
+        
+        if (card && statusBadge) {
+            card.classList.remove('loaded', 'error');
+            
+            if (plugin.loaded) {
+                card.classList.add('loaded');
+                statusBadge.className = 'badge bg-success status-badge';
+                statusBadge.textContent = '已加载';
+            } else if (plugin.error) {
+                card.classList.add('error');
+                statusBadge.className = 'badge bg-danger status-badge';
+                statusBadge.textContent = '错误';
+            } else {
+                statusBadge.className = 'badge bg-secondary status-badge';
+                statusBadge.textContent = '未加载';
+            }
+        }
+    }
+    
+    // 显示插件面板
+    function showPluginPanel(pluginId) {
+        const tabMap = {
+            'acoustic': 'acoustic-tab',
+            'gas': 'gas-tab',
+            'hyperspectral': 'hyperspectral-tab',
+            'slam': 'slam-tab',
+            'fusion': 'fusion-tab'
+        };
+        
+        const tabId = tabMap[pluginId];
+        if (tabId) {
+            const tab = document.getElementById(tabId);
+            if (tab) {
+                bootstrap.Tab.getOrCreateInstance(tab).show();
+            }
+        }
+    }
+    
+    // ============== 声学监测 ==============
+    async function runAcousticAnalysis() {
+        const btn = document.getElementById('btn-acoustic');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`${API_BASE}/acoustic/analyze`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: document.getElementById('acoustic-device-id').value,
+                    sample_rate: parseInt(document.getElementById('acoustic-sample-rate').value),
+                    analysis_type: document.getElementById('acoustic-analysis-type').value
+                })
+            });
+            
+            const result = await response.json();
+            displayAcousticResult(result);
+            
+            // 处理告警
+            if (result.alarms && result.alarms.length > 0) {
+                result.alarms.forEach(addAlarm);
+            }
+        } catch (error) {
+            console.error('声学分析失败:', error);
+            document.getElementById('acoustic-result').innerHTML = 
+                `<div class="alert alert-danger">分析失败: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    function displayAcousticResult(result) {
+        const container = document.getElementById('acoustic-result');
+        
+        let html = `
+            <div class="mb-3">
+                <strong>处理状态:</strong> 
+                <span class="badge bg-${result.success ? 'success' : 'danger'}">
+                    ${result.success ? '成功' : '失败'}
+                </span>
+                <span class="text-muted ms-2">${result.processing_time_ms?.toFixed(2)} ms</span>
+            </div>
+        `;
+        
+        if (result.pd_detected !== undefined) {
+            html += `
+                <div class="mb-2">
+                    <strong>局放检测:</strong>
+                    <span class="badge bg-${result.pd_detected ? 'warning' : 'success'}">
+                        ${result.pd_detected ? '检测到局放' : '正常'}
+                    </span>
+                    <span class="text-muted">(等级: ${result.pd_level}, 置信度: ${(result.pd_confidence * 100).toFixed(1)}%)</span>
+                </div>
+            `;
+        }
+        
+        if (result.anomaly_detected !== undefined) {
+            html += `
+                <div class="mb-2">
+                    <strong>异常检测:</strong>
+                    <span class="badge bg-${result.anomaly_detected ? 'warning' : 'success'}">
+                        ${result.anomaly_detected ? result.anomaly_type || '异常' : '正常'}
+                    </span>
+                </div>
+            `;
+        }
+        
+        if (result.frequency_analysis && Object.keys(result.frequency_analysis).length > 0) {
+            html += `
+                <div class="mb-2">
+                    <strong>频谱分析:</strong>
+                    <pre class="result-json small">${JSON.stringify(result.frequency_analysis, null, 2)}</pre>
+                </div>
+            `;
+        }
+        
+        if (result.recommendations && result.recommendations.length > 0) {
+            html += `
+                <div class="mt-3">
+                    <strong>建议:</strong>
+                    <ul class="mb-0">
+                        ${result.recommendations.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    function loadDemoAcousticData() {
+        // 模拟加载示例数据
+        alert('已加载示例音频数据（模拟）');
+    }
+    
+    // ============== 气体检测 ==============
+    async function runGasAnalysis() {
+        const btn = document.getElementById('btn-gas');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`${API_BASE}/gas/analyze`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: document.getElementById('gas-device-id').value,
+                    gas_readings: {
+                        SF6: parseFloat(document.getElementById('gas-sf6').value),
+                        H2: parseFloat(document.getElementById('gas-h2').value),
+                        CO: parseFloat(document.getElementById('gas-co').value),
+                        CH4: parseFloat(document.getElementById('gas-ch4').value)
+                    },
+                    temperature: parseFloat(document.getElementById('gas-temp').value),
+                    humidity: parseFloat(document.getElementById('gas-humidity').value)
+                })
+            });
+            
+            const result = await response.json();
+            displayGasResult(result);
+            
+            if (result.alarms && result.alarms.length > 0) {
+                result.alarms.forEach(addAlarm);
+            }
+        } catch (error) {
+            console.error('气体分析失败:', error);
+            document.getElementById('gas-result').innerHTML = 
+                `<div class="alert alert-danger">分析失败: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    function displayGasResult(result) {
+        const container = document.getElementById('gas-result');
+        
+        const statusColors = {
+            'normal': 'success',
+            'attention': 'info',
+            'warning': 'warning',
+            'alarm': 'danger',
+            'critical': 'danger'
+        };
+        
+        let html = `
+            <div class="mb-3">
+                <strong>整体状态:</strong> 
+                <span class="badge bg-${statusColors[result.status] || 'secondary'}">
+                    ${result.status}
+                </span>
+                <span class="text-muted ms-2">健康指数: ${result.health_index?.toFixed(1)}</span>
+            </div>
+        `;
+        
+        if (result.gas_levels && Object.keys(result.gas_levels).length > 0) {
+            html += '<div class="mb-3"><strong>气体浓度:</strong><table class="table table-sm mt-2">';
+            html += '<thead><tr><th>气体</th><th>浓度</th><th>状态</th></tr></thead><tbody>';
+            
+            for (const [gas, info] of Object.entries(result.gas_levels)) {
+                html += `
+                    <tr>
+                        <td>${gas}</td>
+                        <td>${info.value} ${info.unit || 'ppm'}</td>
+                        <td><span class="badge bg-${statusColors[info.status] || 'secondary'}">${info.status}</span></td>
+                    </tr>
+                `;
+            }
+            
+            html += '</tbody></table></div>';
+        }
+        
+        if (result.dga_analysis) {
+            html += `
+                <div class="mb-3">
+                    <strong>DGA分析:</strong>
+                    <p class="mb-1">故障类型: <span class="badge bg-info">${result.dga_analysis.fault_type}</span></p>
+                    <p class="mb-0 small">置信度: ${(result.dga_analysis.confidence * 100).toFixed(1)}%</p>
+                </div>
+            `;
+        }
+        
+        if (result.recommendations && result.recommendations.length > 0) {
+            html += `
+                <div class="mt-3">
+                    <strong>建议:</strong>
+                    <ul class="mb-0">
+                        ${result.recommendations.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    async function viewGasHistory() {
+        const deviceId = document.getElementById('gas-device-id').value;
+        try {
+            const response = await fetch(`${API_BASE}/gas/history/${deviceId}?hours=24`);
+            const data = await response.json();
+            
+            // 简单显示历史数据
+            if (data.success && data.history) {
+                alert(`获取到 ${data.data_points} 条历史数据`);
+            }
+        } catch (error) {
+            console.error('获取历史失败:', error);
+        }
+    }
+    
+    // ============== 高光谱检测 ==============
+    async function runHyperspectralAnalysis() {
+        const btn = document.getElementById('btn-hs');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`${API_BASE}/hyperspectral/analyze`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: document.getElementById('hs-device-id').value,
+                    wavelength_range: [
+                        parseInt(document.getElementById('hs-wl-min').value),
+                        parseInt(document.getElementById('hs-wl-max').value)
+                    ],
+                    analysis_type: document.getElementById('hs-analysis-type').value
+                })
+            });
+            
+            const result = await response.json();
+            displayHSResult(result);
+            
+            if (result.alarms && result.alarms.length > 0) {
+                result.alarms.forEach(addAlarm);
+            }
+        } catch (error) {
+            console.error('高光谱分析失败:', error);
+            document.getElementById('hs-result').innerHTML = 
+                `<div class="alert alert-danger">分析失败: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    function displayHSResult(result) {
+        const container = document.getElementById('hs-result');
+        
+        let html = `
+            <div class="mb-3">
+                <strong>处理状态:</strong> 
+                <span class="badge bg-${result.success ? 'success' : 'danger'}">
+                    ${result.success ? '成功' : '失败'}
+                </span>
+                <span class="text-muted ms-2">${result.processing_time_ms?.toFixed(2)} ms</span>
+            </div>
+        `;
+        
+        if (result.defects_detected && result.defects_detected.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <strong>检测到缺陷:</strong> ${result.defects_detected.length} 个
+                    <pre class="result-json small mt-2">${JSON.stringify(result.defects_detected, null, 2)}</pre>
+                </div>
+            `;
+        } else {
+            html += `<div class="mb-3"><span class="badge bg-success">未检测到缺陷</span></div>`;
+        }
+        
+        if (result.material_analysis) {
+            html += `
+                <div class="mb-3">
+                    <strong>材料分析:</strong>
+                    <p class="mb-1">主要材料: <span class="badge bg-info">${result.material_analysis.primary_material}</span></p>
+                    <p class="mb-0 small">氧化程度: ${result.material_analysis.oxidation_level}</p>
+                </div>
+            `;
+        }
+        
+        if (result.recommendations && result.recommendations.length > 0) {
+            html += `
+                <div class="mt-3">
+                    <strong>建议:</strong>
+                    <ul class="mb-0">
+                        ${result.recommendations.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    function loadDemoHSData() {
+        alert('已加载示例高光谱数据（模拟）');
+    }
+    
+    // ============== SLAM ==============
+    async function createSlamSession() {
+        const sessionId = document.getElementById('slam-session-id').value;
+        
+        try {
+            const response = await fetch(`${API_BASE}/slam/session/create?session_id=${sessionId}`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`会话 ${sessionId} 创建成功`);
+                refreshSlamSessions();
+            } else {
+                alert(`创建失败: ${result.error || '未知错误'}`);
+            }
+        } catch (error) {
+            console.error('创建会话失败:', error);
+            alert('创建会话失败');
+        }
+    }
+    
+    async function refreshSlamSessions() {
+        try {
+            const response = await fetch(`${API_BASE}/slam/sessions`);
+            const data = await response.json();
+            
+            const select = document.getElementById('slam-sessions');
+            select.innerHTML = '';
+            
+            if (data.success && data.sessions && data.sessions.length > 0) {
+                data.sessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.session_id;
+                    option.textContent = `${session.session_id} (帧: ${session.frames_processed || 0})`;
+                    select.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.disabled = true;
+                option.textContent = '无活动会话';
+                select.appendChild(option);
+            }
+        } catch (error) {
+            console.error('刷新会话列表失败:', error);
+        }
+    }
+    
+    async function deleteSlamSession() {
+        const select = document.getElementById('slam-sessions');
+        const sessionId = select.value;
+        
+        if (!sessionId || select.selectedOptions[0].disabled) {
+            alert('请选择要删除的会话');
+            return;
+        }
+        
+        if (!confirm(`确定要删除会话 ${sessionId}?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE}/slam/session/${sessionId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('会话已删除');
+                refreshSlamSessions();
+            }
+        } catch (error) {
+            console.error('删除会话失败:', error);
+        }
+    }
+    
+    async function processSlamFrame() {
+        const btn = document.getElementById('btn-slam');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        const select = document.getElementById('slam-sessions');
+        let sessionId = select.value;
+        
+        if (!sessionId || select.selectedOptions[0]?.disabled) {
+            sessionId = document.getElementById('slam-session-id').value;
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE}/slam/process`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    odometry: {
+                        x: parseFloat(document.getElementById('slam-odom-x').value),
+                        y: parseFloat(document.getElementById('slam-odom-y').value),
+                        z: parseFloat(document.getElementById('slam-odom-z').value),
+                        roll: 0,
+                        pitch: 0,
+                        yaw: 0
+                    }
+                })
+            });
+            
+            const result = await response.json();
+            displaySlamResult(result);
+            refreshSlamSessions();
+        } catch (error) {
+            console.error('SLAM处理失败:', error);
+            document.getElementById('slam-result').innerHTML = 
+                `<div class="alert alert-danger">处理失败: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    function displaySlamResult(result) {
+        const container = document.getElementById('slam-result');
+        
+        let html = `
+            <div class="mb-2">
+                <strong>处理状态:</strong> 
+                <span class="badge bg-${result.success ? 'success' : 'danger'}">
+                    ${result.success ? '成功' : '失败'}
+                </span>
+            </div>
+            <div class="mb-2">
+                <strong>地图点数:</strong> ${result.map_points_count}
+            </div>
+        `;
+        
+        if (result.pose && Object.keys(result.pose).length > 0) {
+            html += `
+                <div class="mb-2">
+                    <strong>当前位姿:</strong>
+                    <pre class="result-json small">${JSON.stringify(result.pose, null, 2)}</pre>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="mb-2">
+                <span class="badge bg-${result.loop_closure_detected ? 'warning' : 'secondary'}">
+                    ${result.loop_closure_detected ? '检测到回环' : '无回环'}
+                </span>
+                <span class="badge bg-${result.keyframe_added ? 'info' : 'secondary'} ms-1">
+                    ${result.keyframe_added ? '已添加关键帧' : ''}
+                </span>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+    }
+    
+    // ============== 多模态融合 ==============
+    async function runFusionAnalysis() {
+        const btn = document.getElementById('btn-fusion');
+        btn.classList.add('loading');
+        btn.disabled = true;
+        
+        // 收集选中的模态
+        const modalities = {};
+        
+        if (document.getElementById('mod-visual').checked) {
+            modalities.visual = {
+                detections: [{type: 'normal', confidence: 0.9}],
+                features: [0.1, 0.2, 0.3]
+            };
+        }
+        
+        if (document.getElementById('mod-thermal').checked) {
+            modalities.thermal = {
+                max_temp: 65,
+                avg_temp: 45,
+                hotspots: []
+            };
+        }
+        
+        if (document.getElementById('mod-acoustic').checked) {
+            modalities.acoustic = {
+                pd_detected: false,
+                anomaly_detected: false,
+                confidence: 0.85
+            };
+        }
+        
+        if (document.getElementById('mod-gas').checked) {
+            modalities.gas = {
+                SF6: 850,
+                H2: 50,
+                status: 'normal'
+            };
+        }
+        
+        if (document.getElementById('mod-hyperspectral').checked) {
+            modalities.hyperspectral = {
+                defects: [],
+                material: 'copper'
+            };
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE}/fusion/analyze`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    device_id: document.getElementById('fusion-device-id').value,
+                    modalities: modalities,
+                    pre_processed: true,
+                    fusion_strategy: document.getElementById('fusion-strategy').value
+                })
+            });
+            
+            const result = await response.json();
+            displayFusionResult(result);
+            
+            if (result.alarms && result.alarms.length > 0) {
+                result.alarms.forEach(addAlarm);
+            }
+        } catch (error) {
+            console.error('融合分析失败:', error);
+            document.getElementById('fusion-result').innerHTML = 
+                `<div class="alert alert-danger">分析失败: ${error.message}</div>`;
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+    
+    function displayFusionResult(result) {
+        const container = document.getElementById('fusion-result');
+        
+        const statusColors = {
+            'normal': 'success',
+            'attention': 'info',
+            'warning': 'warning',
+            'alarm': 'danger',
+            'critical': 'danger'
+        };
+        
+        let html = `
+            <div class="row mb-3">
+                <div class="col-6">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">
+                                <span class="badge bg-${statusColors[result.overall_status] || 'secondary'} fs-4">
+                                    ${result.overall_status}
+                                </span>
+                            </h3>
+                            <small class="text-muted">整体状态</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="mb-1">${(result.confidence * 100).toFixed(1)}%</h3>
+                            <small class="text-muted">置信度</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // 模态贡献度
+        if (result.modality_contributions && Object.keys(result.modality_contributions).length > 0) {
+            html += '<div class="mb-3"><strong>模态贡献度:</strong><div class="mt-2">';
+            
+            for (const [modality, contribution] of Object.entries(result.modality_contributions)) {
+                const percent = (contribution * 100).toFixed(1);
+                html += `
+                    <div class="d-flex align-items-center mb-1">
+                        <span class="me-2" style="width: 80px;">${modality}</span>
+                        <div class="progress flex-grow-1" style="height: 20px;">
+                            <div class="progress-bar" style="width: ${percent}%">${percent}%</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div></div>';
+        }
+        
+        // 诊断报告
+        if (result.diagnostic_report) {
+            html += `
+                <div class="mb-3">
+                    <strong>诊断报告:</strong>
+                    <div class="card mt-2">
+                        <div class="card-body">
+                            <p class="mb-1"><strong>摘要:</strong> ${result.diagnostic_report.summary || '无'}</p>
+                            <p class="mb-0"><strong>风险等级:</strong> 
+                                <span class="badge bg-${result.diagnostic_report.risk_level === 'low' ? 'success' : 'warning'}">
+                                    ${result.diagnostic_report.risk_level || 'unknown'}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 融合检测结果
+        if (result.fused_detections && result.fused_detections.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <strong>融合检测结果:</strong>
+                    <pre class="result-json small mt-2">${JSON.stringify(result.fused_detections, null, 2)}</pre>
+                </div>
+            `;
+        }
+        
+        // 建议
+        if (result.recommendations && result.recommendations.length > 0) {
+            html += `
+                <div class="mt-3">
+                    <strong>处置建议:</strong>
+                    <ul class="mb-0">
+                        ${result.recommendations.map(r => `<li>${r}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    // ============== 告警管理 ==============
+    function addAlarm(alarm) {
+        const container = document.getElementById('alarm-list');
+        const countBadge = document.getElementById('alarm-count');
+        
+        // 清除"暂无告警"提示
+        if (container.querySelector('.text-muted')) {
+            container.innerHTML = '';
+        }
+        
+        const level = alarm.level || 'warning';
+        const alarmHtml = `
+            <div class="alarm-item ${level}">
+                <div class="d-flex justify-content-between">
+                    <span class="badge bg-${level === 'critical' ? 'danger' : level === 'alarm' ? 'danger' : 'warning'}">
+                        ${level.toUpperCase()}
+                    </span>
+                    <small class="text-muted">${new Date().toLocaleTimeString()}</small>
+                </div>
+                <p class="mb-1 mt-1">${alarm.message || alarm.type}</p>
+                ${alarm.device_id ? `<small class="text-muted">设备: ${alarm.device_id}</small>` : ''}
+            </div>
+        `;
+        
+        container.insertAdjacentHTML('afterbegin', alarmHtml);
+        
+        // 更新计数
+        const currentCount = parseInt(countBadge.textContent) || 0;
+        countBadge.textContent = currentCount + 1;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,131 @@
+# 透明变电站AI巡检系统 - 插件配置
+# Plugin Configuration for Transparent Substation AI Inspection System
+
+# 插件目录
+plugins_dir: /home/claude/plugins
+
+# 插件启用列表
+enabled_plugins:
+  # 核心监测插件
+  - acoustic_monitoring      # 声学监测
+  - gas_detection            # 气体检测
+  - hyperspectral_detection  # 高光谱检测
+  - slam_mapping             # SLAM建图
+  - multimodal_fusion        # 多模态融合
+  
+# 插件加载顺序(按依赖关系)
+load_order:
+  - acoustic_monitoring
+  - gas_detection
+  - hyperspectral_detection
+  - slam_mapping
+  - multimodal_fusion  # 依赖上述插件
+
+# 各插件配置
+plugin_configs:
+  # 声学监测配置
+  acoustic_monitoring:
+    sample_rate: 16000
+    frame_duration: 2.0
+    n_mels: 128
+    alarm_accumulator_threshold: 3
+    enable_ultrasonic: true
+    ultrasonic_sample_rate: 192000
+    detection_sensitivity: 0.7
+    
+  # 气体检测配置
+  gas_detection:
+    history_length: 168  # 小时
+    prediction_horizon: 24  # 小时
+    sample_interval_seconds: 3600
+    thresholds:
+      SF6:
+        attention: 100
+        warning: 500
+        alarm: 1000
+        critical: 2000
+      H2:
+        attention: 50
+        warning: 100
+        alarm: 300
+        critical: 500
+      CO:
+        attention: 100
+        warning: 300
+        alarm: 500
+        critical: 1000
+    leak_detection:
+      min_rate: 5.0  # ppm/hour
+      window_hours: 20
+      confidence_threshold: 0.7
+    enable_dga_analysis: true
+    
+  # 高光谱检测配置
+  hyperspectral_detection:
+    spectral_bands: 224
+    wavelength_range: [400, 2500]
+    spatial_resolution: [256, 256]
+    confidence_threshold: 0.6
+    pca_components: 30
+    defect_types:
+      - overheating
+      - corrosion
+      - insulation_aging
+      - oil_leakage
+      - surface_damage
+      - paint_peeling
+      - moisture_ingress
+    min_defect_area_pixels: 100
+    
+  # SLAM建图配置
+  slam_mapping:
+    point_cloud:
+      voxel_size: 0.05
+      max_range: 50.0
+      min_range: 0.3
+    feature_extraction:
+      max_features: 1000
+      quality_level: 0.01
+    loop_closure:
+      min_interval: 10
+      similarity_threshold: 0.85
+    map_update_interval: 5
+    enable_visualization: true
+    output_formats:
+      - pcd
+      - ply
+      - png_2d
+      
+  # 多模态融合配置
+  multimodal_fusion:
+    fusion_strategy: hybrid  # early, late, attention, hybrid
+    modality_weights:
+      visual: 0.25
+      acoustic: 0.20
+      gas: 0.20
+      hyperspectral: 0.20
+      thermal: 0.15
+    alarm_threshold: 3
+    max_history_length: 100
+    enable_deep_learning_fusion: true
+
+# 报警配置
+alarm:
+  max_history: 10000
+  dedup_window_seconds: 300
+  escalation_threshold: 3
+  push_enabled: true
+  push_targets:
+    - type: websocket
+      url: ws://localhost:8080/alarm
+    - type: http
+      url: http://localhost:8081/api/alarm
+      method: POST
+
+# 日志配置
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: /var/log/substation_ai/plugins.log
+  max_size_mb: 100
+  backup_count: 5

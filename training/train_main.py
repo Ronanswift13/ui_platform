@@ -76,6 +76,11 @@ try:
     logger.info(f"✅ PyTorch {torch.__version__} 已加载")
 except ImportError as e:
     TORCH_AVAILABLE = False
+    torch = None
+    nn = None
+    optim = None
+    Dataset = object
+    DataLoader = None
     logger.error(f"❌ PyTorch未安装: {e}")
 
 # ONNX导入
@@ -144,169 +149,171 @@ def get_device():
 # =============================================================================
 # 模型定义 (简化版，确保能运行)
 # =============================================================================
-class SimpleDetectionModel(nn.Module):
-    """简化的检测模型"""
-    def __init__(self, num_classes=10, input_size=(640, 640)):
-        super().__init__()
-        self.num_classes = num_classes
-        
-        self.backbone = nn.Sequential(
-            nn.Conv2d(3, 32, 3, stride=2, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 64, 3, stride=2, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(128, 256, 3, stride=2, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d(1)
-        )
-        
-        self.head = nn.Linear(256, num_classes)
-    
-    def forward(self, x):
-        x = self.backbone(x)
-        x = x.view(x.size(0), -1)
-        x = self.head(x)
-        return x
+if TORCH_AVAILABLE:
+    class SimpleDetectionModel(nn.Module):
+        """简化的检测模型"""
+        def __init__(self, num_classes=10, input_size=(640, 640)):
+            super().__init__()
+            self.num_classes = num_classes
+
+            self.backbone = nn.Sequential(
+                nn.Conv2d(3, 32, 3, stride=2, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(32, 64, 3, stride=2, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(64, 128, 3, stride=2, padding=1),
+                nn.BatchNorm2d(128),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(128, 256, 3, stride=2, padding=1),
+                nn.BatchNorm2d(256),
+                nn.ReLU(inplace=True),
+                nn.AdaptiveAvgPool2d(1)
+            )
+
+            self.head = nn.Linear(256, num_classes)
+
+        def forward(self, x):
+            x = self.backbone(x)
+            x = x.view(x.size(0), -1)
+            x = self.head(x)
+            return x
 
 
-class SimpleSegmentationModel(nn.Module):
-    """简化的分割模型"""
-    def __init__(self, num_classes=2):
-        super().__init__()
-        
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 64, 3, padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
-        )
-        
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(128, 64, 2, stride=2),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(64, 32, 2, stride=2),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, num_classes, 1)
-        )
-    
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
+    class SimpleSegmentationModel(nn.Module):
+        """简化的分割模型"""
+        def __init__(self, num_classes=2):
+            super().__init__()
+
+            self.encoder = nn.Sequential(
+                nn.Conv2d(3, 64, 3, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(2),
+                nn.Conv2d(64, 128, 3, padding=1),
+                nn.BatchNorm2d(128),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(2),
+            )
+
+            self.decoder = nn.Sequential(
+                nn.ConvTranspose2d(128, 64, 2, stride=2),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(64, 32, 2, stride=2),
+                nn.BatchNorm2d(32),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(32, num_classes, 1)
+            )
+
+        def forward(self, x):
+            x = self.encoder(x)
+            x = self.decoder(x)
+            return x
 
 
-class SimpleClassificationModel(nn.Module):
-    """简化的分类模型"""
-    def __init__(self, num_classes=4):
-        super().__init__()
-        
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 32, 3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 64, 3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d(1)
-        )
-        
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(128, 64),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
-            nn.Linear(64, num_classes)
-        )
-    
-    def forward(self, x):
-        x = self.features(x)
-        x = self.classifier(x)
-        return x
+    class SimpleClassificationModel(nn.Module):
+        """简化的分类模型"""
+        def __init__(self, num_classes=4):
+            super().__init__()
+
+            self.features = nn.Sequential(
+                nn.Conv2d(3, 32, 3, stride=2, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(32, 64, 3, stride=2, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(64, 128, 3, stride=2, padding=1),
+                nn.ReLU(inplace=True),
+                nn.AdaptiveAvgPool2d(1)
+            )
+
+            self.classifier = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(128, 64),
+                nn.ReLU(inplace=True),
+                nn.Dropout(0.5),
+                nn.Linear(64, num_classes)
+            )
+
+        def forward(self, x):
+            x = self.features(x)
+            x = self.classifier(x)
+            return x
 
 
 # =============================================================================
 # 数据集 (修复版)
 # =============================================================================
-class SimulatedDataset(Dataset):
-    """模拟数据集 - 确保生成有效数据"""
-    
-    def __init__(self, num_samples=500, input_size=(224, 224), 
-                 num_classes=10, task="classification"):
-        self.num_samples = num_samples
-        self.input_size = input_size
-        self.num_classes = num_classes
-        self.task = task
-        
-        # 预生成所有数据以确保一致性
-        logger.info(f"生成模拟数据集: {num_samples} 样本, {task}任务, {num_classes}类")
-        
-        self.images = []
-        self.labels = []
-        
-        for i in range(num_samples):
-            # 生成带模式的图像 (不是纯随机噪声)
-            img = self._generate_patterned_image(i)
-            label = i % num_classes
-            
-            self.images.append(img)
-            self.labels.append(label)
-        
-        logger.info(f"✅ 数据集生成完成")
-    
-    def _generate_patterned_image(self, seed):
-        """生成带模式的图像"""
-        np.random.seed(seed)
-        
-        # 基础图像
-        img = np.random.randint(50, 200, (*self.input_size, 3), dtype=np.uint8)
-        
-        # 添加一些模式使其有区分度
-        class_id = seed % self.num_classes
-        
-        # 根据类别添加不同的形状
-        h, w = self.input_size
-        center_x, center_y = w // 2, h // 2
-        radius = min(h, w) // 4
-        
-        # 简单的圆形/方形模式
-        for y in range(h):
-            for x in range(w):
-                dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
-                if dist < radius * (0.5 + 0.1 * class_id):
-                    img[y, x] = [50 + class_id * 20, 100, 150]
-        
-        # 归一化到 [0, 1]
-        img = img.astype(np.float32) / 255.0
-        
-        # 标准化
-        mean = np.array([0.485, 0.456, 0.406])
-        std = np.array([0.229, 0.224, 0.225])
-        img = (img - mean) / std
-        
-        # 转换为 CHW 格式
-        img = img.transpose(2, 0, 1)
-        
-        return img.astype(np.float32)
-    
-    def __len__(self):
-        return self.num_samples
-    
-    def __getitem__(self, idx):
-        image = torch.from_numpy(self.images[idx])
-        label = torch.tensor(self.labels[idx], dtype=torch.long)
-        return image, label
+if TORCH_AVAILABLE:
+    class SimulatedDataset(Dataset):
+        """模拟数据集 - 确保生成有效数据"""
+
+        def __init__(self, num_samples=500, input_size=(224, 224),
+                     num_classes=10, task="classification"):
+            self.num_samples = num_samples
+            self.input_size = input_size
+            self.num_classes = num_classes
+            self.task = task
+
+            # 预生成所有数据以确保一致性
+            logger.info(f"生成模拟数据集: {num_samples} 样本, {task}任务, {num_classes}类")
+
+            self.images = []
+            self.labels = []
+
+            for i in range(num_samples):
+                # 生成带模式的图像 (不是纯随机噪声)
+                img = self._generate_patterned_image(i)
+                label = i % num_classes
+
+                self.images.append(img)
+                self.labels.append(label)
+
+            logger.info(f"✅ 数据集生成完成")
+
+        def _generate_patterned_image(self, seed):
+            """生成带模式的图像"""
+            np.random.seed(seed)
+
+            # 基础图像
+            img = np.random.randint(50, 200, (*self.input_size, 3), dtype=np.uint8)
+
+            # 添加一些模式使其有区分度
+            class_id = seed % self.num_classes
+
+            # 根据类别添加不同的形状
+            h, w = self.input_size
+            center_x, center_y = w // 2, h // 2
+            radius = min(h, w) // 4
+
+            # 简单的圆形/方形模式
+            for y in range(h):
+                for x in range(w):
+                    dist = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+                    if dist < radius * (0.5 + 0.1 * class_id):
+                        img[y, x] = [50 + class_id * 20, 100, 150]
+
+            # 归一化到 [0, 1]
+            img = img.astype(np.float32) / 255.0
+
+            # 标准化
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            img = (img - mean) / std
+
+            # 转换为 CHW 格式
+            img = img.transpose(2, 0, 1)
+
+            return img.astype(np.float32)
+
+        def __len__(self):
+            return self.num_samples
+
+        def __getitem__(self, idx):
+            image = torch.from_numpy(self.images[idx])
+            label = torch.tensor(self.labels[idx], dtype=torch.long)
+            return image, label
 
 
 # =============================================================================

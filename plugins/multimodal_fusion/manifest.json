@@ -1,0 +1,156 @@
+{
+    "id": "multimodal_fusion",
+    "name": "多模态融合诊断",
+    "version": "1.0.0",
+    "description": "整合声学、视觉、气体、高光谱等多种传感器数据进行综合故障诊断，支持特征级融合和决策级融合",
+    "author": "AI巡检系统",
+    "category": "fusion",
+    "enabled": true,
+    
+    "entrypoint": "plugin.py",
+    "plugin_class": "MultimodalFusionPlugin",
+    
+    "capabilities": [
+        "multimodal_data_fusion",
+        "defect_detection"
+    ],
+    
+    "models_required": [
+        {
+            "model_id": "multimodal_fusion",
+            "model_path": "models/fusion/multimodal_fusion.onnx",
+            "description": "多模态融合深度学习模型",
+            "required": false
+        }
+    ],
+    
+    "supported_modalities": [
+        {
+            "type": "visual",
+            "description": "可见光图像",
+            "plugin_dependency": "transformer_monitoring"
+        },
+        {
+            "type": "thermal",
+            "description": "红外热成像",
+            "plugin_dependency": "transformer_monitoring"
+        },
+        {
+            "type": "acoustic",
+            "description": "声学信号",
+            "plugin_dependency": "acoustic_monitoring"
+        },
+        {
+            "type": "ultrasonic",
+            "description": "超声波信号",
+            "plugin_dependency": "acoustic_monitoring"
+        },
+        {
+            "type": "gas",
+            "description": "气体传感数据",
+            "plugin_dependency": "gas_detection"
+        },
+        {
+            "type": "hyperspectral",
+            "description": "高光谱成像",
+            "plugin_dependency": "hyperspectral_detection"
+        },
+        {
+            "type": "vibration",
+            "description": "振动信号",
+            "plugin_dependency": null
+        }
+    ],
+    
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "device_id": {
+                "type": "string",
+                "description": "设备ID"
+            },
+            "timestamp": {
+                "type": "number",
+                "description": "Unix时间戳"
+            },
+            "modalities": {
+                "type": "object",
+                "description": "各模态原始数据"
+            },
+            "pre_processed": {
+                "type": "boolean",
+                "description": "是否已预处理"
+            },
+            "modality_results": {
+                "type": "object",
+                "description": "预处理的模态结果"
+            }
+        },
+        "required": ["device_id"]
+    },
+    
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "success": {"type": "boolean"},
+            "device_id": {"type": "string"},
+            "timestamp": {"type": "number"},
+            "overall_status": {
+                "type": "string",
+                "enum": ["normal", "attention", "warning", "alarm", "critical"]
+            },
+            "confidence": {"type": "number"},
+            "detections": {"type": "array"},
+            "modality_contributions": {"type": "object"},
+            "diagnostic_report": {"type": "object"},
+            "recommendations": {"type": "array"},
+            "alarms": {"type": "array"}
+        }
+    },
+    
+    "default_config": {
+        "fusion_strategy": "hybrid",
+        "max_history_length": 100,
+        "alarm_threshold": 3,
+        "modality_dims": {
+            "visual": 512,
+            "thermal": 256,
+            "acoustic": 256,
+            "ultrasonic": 128,
+            "gas": 64,
+            "hyperspectral": 224,
+            "vibration": 128
+        }
+    },
+    
+    "diagnostic_rules": [
+        {
+            "name": "变压器综合过热诊断",
+            "conditions": ["visual:overheating", "gas:dga_fault"],
+            "priority": "critical"
+        },
+        {
+            "name": "绝缘劣化诊断",
+            "conditions": ["acoustic:partial_discharge", "hyperspectral:insulation_aging"],
+            "priority": "alarm"
+        },
+        {
+            "name": "接触电阻升高",
+            "conditions": ["acoustic:poor_contact", "visual:overheating"],
+            "priority": "warning"
+        }
+    ],
+    
+    "dependencies": [
+        "numpy",
+        "onnxruntime"
+    ],
+    
+    "plugin_dependencies": [
+        "acoustic_monitoring",
+        "gas_detection",
+        "hyperspectral_detection"
+    ],
+    
+    "tags": ["fusion", "multimodal", "diagnosis", "comprehensive", "ai"]
+}

@@ -1,0 +1,30 @@
+{
+    "id": "hyperspectral_detection",
+    "name": "高光谱缺陷检测",
+    "version": "1.0.0",
+    "description": "高光谱缺陷检测插件 - 使用高光谱成像分析锈蚀、腐蚀、油漆剥落和局部发热等细微异常",
+    "author": "Substation AI Team",
+    "category": "defect_detection",
+    "enabled": true,
+    "entrypoint": "plugin.py",
+    "plugin_class": "HyperspectralDetectionPlugin",
+    "capabilities": [
+        "hyperspectral_analysis",
+        "defect_detection"
+    ],
+    "dependencies": [
+        "numpy",
+        "scipy",
+        "scikit-learn",
+        "onnxruntime"
+    ],
+    "default_config": {
+        "spectral_bands": 224,
+        "wavelength_start_nm": 400,
+        "wavelength_end_nm": 2500,
+        "pca_components": 30,
+        "confidence_threshold": 0.6
+    },
+    "supported_voltage_levels": ["all"],
+    "tags": ["hyperspectral", "defect_detection", "material_analysis"]
+}

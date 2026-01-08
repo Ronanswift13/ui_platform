@@ -29,6 +29,7 @@ jinja2>=3.1.2
 pillow>=10.1.0
 opencv-python-headless>=4.8.0
 numpy>=1.24.0
+scipy>=1.11.0
 
 # AI/ML 推理
 # ONNX Runtime - 用于深度学习模型推理

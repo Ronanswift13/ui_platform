@@ -14,6 +14,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
+# 高级插件集成
+try:
+    from apps.ui_integration import integrate_all_advanced_features
+    ADVANCED_PLUGINS_AVAILABLE = True
+except ImportError:
+    ADVANCED_PLUGINS_AVAILABLE = False
+    print("⚠ 高级插件模块未找到")
+
 # 添加项目根目录到路径
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -219,6 +227,14 @@ def create_app() -> FastAPI:
                 "version": "2.0.0",
             },
         )
+
+    # ============== 集成高级插件 ==============
+    if ADVANCED_PLUGINS_AVAILABLE:
+        try:
+            integrate_all_advanced_features(app, templates)
+            print("✓ 高级插件功能已集成")
+        except Exception as e:
+            print(f"✗ 高级插件集成失败: {e}")
 
     return app
 

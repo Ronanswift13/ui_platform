@@ -1,0 +1,95 @@
+{
+    "id": "acoustic_monitoring",
+    "name": "声学监测",
+    "version": "1.0.0",
+    "description": "基于深度学习的声学异常检测，支持局部放电、电晕放电、接触不良、轴承故障等多种异常类型检测",
+    "author": "AI巡检系统",
+    "category": "monitoring",
+    "enabled": true,
+    
+    "entrypoint": "plugin.py",
+    "plugin_class": "AcousticMonitoringPlugin",
+    
+    "capabilities": [
+        "partial_discharge_detection",
+        "acoustic_monitoring"
+    ],
+    
+    "models_required": [
+        {
+            "model_id": "audio_anomaly_transformer",
+            "model_path": "models/audio/anomaly_transformer.onnx",
+            "description": "Transformer声学异常检测模型",
+            "required": true
+        },
+        {
+            "model_id": "ultrasonic_pd_detector",
+            "model_path": "models/audio/ultrasonic_pd.onnx",
+            "description": "超声波局部放电检测模型",
+            "required": false
+        }
+    ],
+    
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "audio": {
+                "type": "array",
+                "description": "音频波形数据"
+            },
+            "sample_rate": {
+                "type": "integer",
+                "default": 16000,
+                "description": "采样率"
+            },
+            "device_id": {
+                "type": "string",
+                "description": "设备ID"
+            },
+            "roi_id": {
+                "type": "string",
+                "description": "ROI标识"
+            }
+        },
+        "required": ["audio"]
+    },
+    
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "success": {"type": "boolean"},
+            "anomaly_detected": {"type": "boolean"},
+            "anomaly_type": {"type": "string"},
+            "anomaly_score": {"type": "number"},
+            "confidence": {"type": "number"},
+            "severity": {"type": "string"},
+            "alarms": {"type": "array"}
+        }
+    },
+    
+    "default_config": {
+        "sample_rate": 16000,
+        "audio_duration": 2.0,
+        "n_mels": 128,
+        "n_fft": 2048,
+        "hop_length": 512,
+        "anomaly_threshold": 0.5,
+        "alarm_accumulation_count": 3
+    },
+    
+    "supported_voltage_levels": ["all"],
+    
+    "hardware_requirements": {
+        "microphone": true,
+        "min_sample_rate": 16000,
+        "recommended_sample_rate": 48000,
+        "ultrasonic_sample_rate": 192000
+    },
+    
+    "dependencies": [
+        "numpy",
+        "onnxruntime"
+    ],
+    
+    "tags": ["acoustic", "monitoring", "anomaly_detection", "partial_discharge", "deep_learning"]
+}

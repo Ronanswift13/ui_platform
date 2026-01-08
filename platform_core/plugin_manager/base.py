@@ -47,6 +47,19 @@ class PluginCapability(str, Enum):
     ZONE_INTRUSION = "zone_intrusion"  # 区域入侵
     AUTHORIZATION_CHECK = "authorization_check"  # 授权校验
     LIDAR_FENCE = "lidar_fence"  # 激光围栏
+    # 声学监测
+    PARTIAL_DISCHARGE_DETECTION = "partial_discharge_detection"
+    ACOUSTIC_MONITORING = "acoustic_monitoring"
+    # 气体检测
+    GAS_CONCENTRATION_MONITORING = "gas_concentration_monitoring"
+    LEAKAGE_DETECTION = "leakage_detection"
+    # 高光谱检测
+    HYPERSPECTRAL_ANALYSIS = "hyperspectral_analysis"
+    # SLAM建图
+    POINT_CLOUD_PROCESSING = "point_cloud_processing"
+    PATH_PLANNING = "path_planning"
+    # 多模态融合
+    MULTIMODAL_DATA_FUSION = "multimodal_data_fusion"
 
 
 class PluginStatus(str, Enum):

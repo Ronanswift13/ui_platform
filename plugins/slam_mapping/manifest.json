@@ -1,0 +1,26 @@
+{
+    "id": "slam_mapping",
+    "name": "SLAM三维建图",
+    "version": "1.0.0",
+    "description": "SLAM三维建图插件 - 利用LiDAR/雷达数据构建站区三维地图，实现设备定位、路径规划和地面沉降监测",
+    "author": "Substation AI Team",
+    "category": "mapping",
+    "enabled": true,
+    "entrypoint": "plugin.py",
+    "plugin_class": "SLAMMappingPlugin",
+    "capabilities": [
+        "point_cloud_processing",
+        "path_planning"
+    ],
+    "dependencies": [
+        "numpy",
+        "scipy"
+    ],
+    "default_config": {
+        "voxel_size": 0.1,
+        "max_range": 100.0,
+        "min_range": 0.5
+    },
+    "supported_voltage_levels": ["all"],
+    "tags": ["slam", "mapping", "lidar", "3d"]
+}
