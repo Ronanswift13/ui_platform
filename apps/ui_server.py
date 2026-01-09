@@ -9,22 +9,22 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# 添加项目根目录到路径 (必须在其他导入之前)
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
-# 高级插件集成
+# 高级插件集成 (在路径设置之后导入)
 try:
     from apps.ui_integration import integrate_all_advanced_features
     ADVANCED_PLUGINS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     ADVANCED_PLUGINS_AVAILABLE = False
-    print("⚠ 高级插件模块未找到")
-
-# 添加项目根目录到路径
-PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+    print(f"⚠ 高级插件模块未找到: {e}")
 
 # 模板和静态文件目录
 TEMPLATES_DIR = PROJECT_ROOT / "ui" / "templates"

@@ -201,29 +201,49 @@ if FASTAPI_AVAILABLE:
 # =============================================================================
 class AdvancedPluginManager:
     """高级插件管理器"""
-    
+
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            cls._instance._manager_initialized = False
         return cls._instance
-    
+
     def __init__(self):
-        if self._initialized:
+        if self._manager_initialized:
             return
-            
+
         self._plugins = {}
         self._model_registry = None
         self._alarm_handlers = []
-        self._initialized = True
-        
+        self._plugins_initialized = False  # 插件是否已初始化
+        self._manager_initialized = True
+
         logger.info("高级插件管理器初始化完成")
-    
-    def initialize_plugins(self):
-        """初始化所有高级插件"""
+
+    def reset_plugins(self):
+        """重置插件状态，允许重新加载"""
+        self._plugins = {}
+        self._plugins_initialized = False
+        logger.info("插件状态已重置")
+
+    def initialize_plugins(self, force_reload: bool = False):
+        """初始化所有高级插件
+
+        Args:
+            force_reload: 是否强制重新加载所有插件（包括已成功加载的）
+        """
         try:
+            # 确保项目根目录在 sys.path 中
+            import sys
+            from pathlib import Path
+            project_root = Path(__file__).parent.parent
+            project_root_str = str(project_root)
+            if project_root_str not in sys.path:
+                sys.path.insert(0, project_root_str)
+                logger.info(f"已添加项目根目录到 sys.path: {project_root_str}")
+
             # 尝试导入各个插件
             plugins_to_load = [
                 ("acoustic_monitoring", "plugins.acoustic_monitoring.plugin", "AcousticMonitoringPlugin"),
@@ -233,7 +253,17 @@ class AdvancedPluginManager:
                 ("multimodal_fusion", "plugins.multimodal_fusion.plugin", "MultimodalFusionPlugin"),
             ]
 
+            # 如果强制重新加载，清空现有插件
+            if force_reload:
+                self._plugins = {}
+                self._plugins_initialized = False
+
             for plugin_id, module_path, class_name in plugins_to_load:
+                # 跳过已成功加载的插件（除非强制重新加载）
+                existing = self._plugins.get(plugin_id)
+                if existing and existing.get('loaded') and not force_reload:
+                    logger.debug(f"插件 {plugin_id} 已加载，跳过")
+                    continue
                 try:
                     import importlib
                     module = importlib.import_module(module_path)
@@ -354,27 +384,50 @@ class AdvancedPluginManager:
             return {
                 'plugin_id': plugin_id,
                 'loaded': False,
-                'error': '插件未注册'
+                'error': '插件未注册',
+                'name': plugin_id,
+                'version': '0.0.0',
+                'status': 'unloaded',
+                'initialized': False
             }
-        
+
         plugin_info = self._plugins[plugin_id]
         plugin = plugin_info['instance']
-        
+
+        # 基础状态 - 确保 error 字段正确
+        # 如果 loaded 为 True，error 应该为 None 而不是空字符串
+        error_value = plugin_info.get('error')
+        if plugin_info['loaded'] and not error_value:
+            error_value = None  # 确保成功加载时 error 为 None
+
         status = {
             'plugin_id': plugin_id,
             'loaded': plugin_info['loaded'],
-            'error': plugin_info['error']
+            'error': error_value,
+            'name': plugin_id,
+            'version': '1.0.0',
+            'status': 'ready' if plugin_info['loaded'] else 'error',
+            'initialized': plugin_info['loaded']
         }
-        
+
+        # 从插件实例获取详细状态
         if plugin and hasattr(plugin, 'get_plugin_status'):
-            status.update(plugin.get_plugin_status())
+            try:
+                plugin_status = plugin.get_plugin_status()
+                status.update(plugin_status)
+                # 确保 loaded 和 error 不被覆盖为错误值
+                status['loaded'] = plugin_info['loaded']
+                if plugin_info['loaded']:
+                    status['error'] = None
+            except Exception as e:
+                logger.warning(f"获取插件 {plugin_id} 状态失败: {e}")
         elif plugin:
             status.update({
-                'plugin_name': getattr(plugin, 'PLUGIN_NAME', plugin_id),
-                'version': getattr(plugin, 'VERSION', '1.0.0'),
-                'initialized': getattr(plugin, 'initialized', False)
+                'name': getattr(plugin, 'PLUGIN_NAME', plugin_id),
+                'version': getattr(plugin, 'PLUGIN_VERSION', '1.0.0'),
+                'initialized': getattr(plugin, '_is_initialized', plugin_info['loaded'])
             })
-        
+
         return status
     
     def list_plugins(self) -> List[Dict]:
@@ -485,7 +538,7 @@ def create_advanced_plugins_router() -> APIRouter:
         plugin = plugin_manager.get_plugin(plugin_id)
         if plugin is None:
             raise HTTPException(status_code=404, detail=f"插件 {plugin_id} 不存在")
-        
+
         try:
             if hasattr(plugin, 'init'):
                 result = plugin.init()
@@ -493,7 +546,22 @@ def create_advanced_plugins_router() -> APIRouter:
             return {"success": True, "message": "插件无需初始化"}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-    
+
+    @router.post("/plugins/reload", summary="重新加载所有插件")
+    async def reload_all_plugins():
+        """强制重新加载所有高级插件"""
+        try:
+            plugin_manager.reset_plugins()
+            plugin_manager.initialize_plugins(force_reload=True)
+            return {
+                "success": True,
+                "message": "所有插件已重新加载",
+                "plugins": plugin_manager.list_plugins()
+            }
+        except Exception as e:
+            logger.error(f"重新加载插件失败: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
     # ========================= 声学监测 =========================
     
     @router.post("/acoustic/analyze", response_model=AcousticResult, summary="声学分析")
@@ -1137,20 +1205,53 @@ def create_advanced_plugins_router() -> APIRouter:
 def integrate_advanced_plugins_routes(app):
     """
     将高级插件路由集成到FastAPI应用
-    
+
     Args:
         app: FastAPI应用实例
     """
     if not FASTAPI_AVAILABLE:
         raise ImportError("FastAPI未安装")
-    
+
+    # === 修复: 注入模型注册器 (根据 README_FIX.md) ===
+    try:
+        from platform_core.model_registry_manager import ModelRegistryManager
+
+        # 优先尝试扩展模型配置
+        config_paths = [
+            "configs/extended_models_config.yaml",
+            "configs/models_config.yaml"
+        ]
+
+        registry_initialized = False
+        for config_path in config_paths:
+            try:
+                import os
+                if os.path.exists(config_path):
+                    manager = ModelRegistryManager(config_path)
+                    if manager.initialize():
+                        plugin_manager._model_registry = manager.get_registry()
+                        registry_initialized = True
+                        logger.info(f"模型注册器已注入 (配置: {config_path})")
+                        break
+            except Exception as cfg_err:
+                logger.debug(f"尝试配置 {config_path} 失败: {cfg_err}")
+                continue
+
+        if not registry_initialized:
+            logger.warning("模型注册器初始化失败，插件将使用模拟/传统算法模式")
+
+    except ImportError as ie:
+        logger.warning(f"模型注册器模块不可用: {ie}，插件将使用模拟模式")
+    except Exception as e:
+        logger.warning(f"模型注册器注入失败 (非致命): {e}，插件将使用模拟模式")
+
     # 初始化插件
     plugin_manager.initialize_plugins()
-    
+
     # 创建并注册路由
     router = create_advanced_plugins_router()
     app.include_router(router)
-    
+
     logger.info("高级插件API路由已集成")
 
 

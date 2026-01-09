@@ -117,8 +117,11 @@
                 <p class="text-muted mb-0">声学监测、气体检测、高光谱、SLAM建图、多模态融合</p>
             </div>
             <div>
-                <button class="btn btn-outline-primary" onclick="refreshPluginStatus()">
+                <button class="btn btn-outline-primary me-2" onclick="refreshPluginStatus()">
                     <i class="bi bi-arrow-clockwise"></i> 刷新状态
+                </button>
+                <button class="btn btn-outline-warning" onclick="reloadAllPlugins()">
+                    <i class="bi bi-arrow-repeat"></i> 重新加载
                 </button>
             </div>
         </div>
@@ -599,7 +602,7 @@
         try {
             const response = await fetch(`${API_BASE}/plugins`);
             const data = await response.json();
-            
+
             if (data.success && data.plugins) {
                 data.plugins.forEach(plugin => {
                     updatePluginCard(plugin);
@@ -607,6 +610,41 @@
             }
         } catch (error) {
             console.error('刷新插件状态失败:', error);
+        }
+    }
+
+    // 重新加载所有插件
+    async function reloadAllPlugins() {
+        const btn = event.target.closest('button');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 加载中...';
+
+        try {
+            const response = await fetch(`${API_BASE}/plugins/reload`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                // 更新所有插件卡片状态
+                if (data.plugins) {
+                    data.plugins.forEach(plugin => {
+                        updatePluginCard(plugin);
+                    });
+                }
+                console.log('所有插件已重新加载');
+            } else {
+                console.error('重新加载失败:', data.error || '未知错误');
+                alert('重新加载失败: ' + (data.error || '未知错误'));
+            }
+        } catch (error) {
+            console.error('重新加载插件失败:', error);
+            alert('重新加载插件失败: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     }
     
@@ -620,25 +658,37 @@
             'slam_mapping': 'slam',
             'multimodal_fusion': 'fusion'
         };
-        
+
         const cardId = cardMap[plugin.plugin_id];
         if (!cardId) return;
-        
+
         const card = document.getElementById(`card-${cardId}`);
         const statusBadge = document.getElementById(`status-${cardId}`);
-        
+
         if (card && statusBadge) {
             card.classList.remove('loaded', 'error');
-            
-            if (plugin.loaded) {
+
+            // 判断逻辑优化：
+            // 1. loaded === true 且 (error 为 null/undefined/空字符串) -> 已加载
+            // 2. loaded === false 且 error 存在且不为空 -> 错误
+            // 3. 其他情况 -> 未加载
+
+            const isLoaded = plugin.loaded === true;
+            const hasError = plugin.error && plugin.error !== '' && plugin.error !== null;
+
+            if (isLoaded) {
+                // 成功加载
                 card.classList.add('loaded');
                 statusBadge.className = 'badge bg-success status-badge';
                 statusBadge.textContent = '已加载';
-            } else if (plugin.error) {
+            } else if (hasError) {
+                // 加载失败有错误
                 card.classList.add('error');
                 statusBadge.className = 'badge bg-danger status-badge';
                 statusBadge.textContent = '错误';
+                console.warn(`插件 ${plugin.plugin_id} 错误: ${plugin.error}`);
             } else {
+                // 未加载
                 statusBadge.className = 'badge bg-secondary status-badge';
                 statusBadge.textContent = '未加载';
             }
