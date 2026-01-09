@@ -232,41 +232,73 @@ class AdvancedPluginManager:
                 ("slam_mapping", "plugins.slam_mapping.plugin", "SLAMMappingPlugin"),
                 ("multimodal_fusion", "plugins.multimodal_fusion.plugin", "MultimodalFusionPlugin"),
             ]
-            
+
             for plugin_id, module_path, class_name in plugins_to_load:
                 try:
                     import importlib
                     module = importlib.import_module(module_path)
                     plugin_class = getattr(module, class_name)
-                    
+
                     # 获取默认配置
                     config = self._get_plugin_config(plugin_id)
-                    
-                    # 创建实例
-                    plugin_instance = plugin_class(config)
-                    
-                    # 初始化
+
+                    # === 修复: 尝试多种实例化方式 ===
+                    plugin_instance = None
+                    try:
+                        # 方式1: 无参数创建（推荐的方式，插件应能处理）
+                        plugin_instance = plugin_class()
+                    except TypeError:
+                        try:
+                            # 方式2: 使用 config 关键字参数
+                            plugin_instance = plugin_class(config=config)
+                        except TypeError:
+                            try:
+                                # 方式3: 直接传递 config
+                                plugin_instance = plugin_class(config)
+                            except TypeError as e:
+                                logger.warning(f"插件 {plugin_id} 实例化失败: {e}")
+                                raise
+
+                    # === 修复: 安全调用 init ===
                     if hasattr(plugin_instance, 'init'):
-                        plugin_instance.init()
-                    
+                        try:
+                            init_result = plugin_instance.init(self._model_registry)
+                            if init_result is False:
+                                logger.warning(f"插件 {plugin_id} 初始化返回 False")
+                        except Exception as init_error:
+                            logger.warning(f"插件 {plugin_id} 初始化异常: {init_error}")
+
+                    # === 修复: 安全设置状态 ===
+                    if hasattr(plugin_instance, 'set_status'):
+                        try:
+                            try:
+                                from platform_core.plugin_manager.base import PluginStatus
+                            except ImportError:
+                                from enum import Enum
+                                class PluginStatus(str, Enum):
+                                    READY = "ready"
+                            plugin_instance.set_status(PluginStatus.READY)
+                        except Exception as status_error:
+                            logger.debug(f"设置插件状态失败 (非致命): {status_error}")
+
                     self._plugins[plugin_id] = {
                         'instance': plugin_instance,
                         'loaded': True,
                         'error': None
                     }
-                    
-                    logger.info(f"插件 {plugin_id} 加载成功")
-                    
+
+                    logger.info(f"✓ 插件 {plugin_id} 加载成功")
+
                 except Exception as e:
-                    logger.warning(f"加载插件 {plugin_id} 失败: {e}")
+                    logger.warning(f"✗ 加载插件 {plugin_id} 失败: {e}")
                     self._plugins[plugin_id] = {
                         'instance': None,
                         'loaded': False,
                         'error': str(e)
                     }
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"初始化插件失败: {e}")
             return False

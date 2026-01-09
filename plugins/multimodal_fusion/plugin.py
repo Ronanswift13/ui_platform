@@ -13,6 +13,53 @@ from collections import defaultdict
 import json
 from pathlib import Path
 
+# 导入插件状态混入类
+try:
+    from platform_core.plugin_mixin import PluginStatusMixin, PluginStatus
+except ImportError:
+    from enum import Enum
+
+    class PluginStatus(str, Enum):
+        UNLOADED = "unloaded"
+        LOADING = "loading"
+        READY = "ready"
+        RUNNING = "running"
+        ERROR = "error"
+        DISABLED = "disabled"
+
+    class PluginStatusMixin:
+        def __init_status__(self):
+            self._status = PluginStatus.UNLOADED
+            self._last_error = ""
+
+        @property
+        def status(self):
+            return getattr(self, '_status', PluginStatus.UNLOADED)
+
+        @status.setter
+        def status(self, value):
+            self._status = value
+
+        def set_status(self, status, error: str = ""):
+            if isinstance(status, str):
+                try:
+                    status = PluginStatus(status)
+                except ValueError:
+                    status = PluginStatus.ERROR
+            self._status = status
+            if error:
+                self._last_error = error
+
+        def get_plugin_status(self) -> dict:
+            return {
+                'plugin_id': getattr(self, 'PLUGIN_ID', 'unknown'),
+                'name': getattr(self, 'PLUGIN_NAME', 'Unknown'),
+                'version': getattr(self, 'PLUGIN_VERSION', '0.0.0'),
+                'status': self._status.value if hasattr(self, '_status') else 'unknown',
+                'initialized': getattr(self, '_is_initialized', False),
+                'last_error': getattr(self, '_last_error', '')
+            }
+
 # 处理相对导入（支持作为包导入和直接加载两种方式）
 try:
     from .fusion_engine import (
@@ -38,10 +85,10 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class MultimodalFusionPlugin:
+class MultimodalFusionPlugin(PluginStatusMixin):
     """
     多模态融合插件
-    
+
     功能:
     1. 整合多种传感器数据
     2. 特征级融合(注意力机制)
@@ -49,11 +96,12 @@ class MultimodalFusionPlugin:
     4. 综合故障诊断
     5. 生成处置建议
     """
-    
+
     PLUGIN_ID = 'multimodal_fusion'
     PLUGIN_NAME = '多模态融合诊断'
+    PLUGIN_VERSION = '1.0.0'
     VERSION = '1.0.0'
-    
+
     # 支持的模态类型
     SUPPORTED_MODALITIES = [
         'visual',           # 可见光图像
@@ -64,7 +112,7 @@ class MultimodalFusionPlugin:
         'hyperspectral',    # 高光谱成像
         'vibration'         # 振动信号
     ]
-    
+
     def __init__(self, manifest=None, plugin_dir=None):
         """
         初始化多模态融合插件
@@ -73,8 +121,12 @@ class MultimodalFusionPlugin:
             manifest: 插件清单 (PluginManifest)
             plugin_dir: 插件目录 (Path)
         """
+        # 初始化状态管理
+        self.__init_status__()
+
         self.manifest = manifest
         self.plugin_dir = plugin_dir
+        self._is_initialized = False
 
         # 从 manifest 获取配置或使用默认值
         config = {}

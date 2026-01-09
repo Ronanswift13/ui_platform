@@ -19,6 +19,53 @@ from datetime import datetime
 from collections import deque
 import json
 
+# 导入插件状态混入类
+try:
+    from platform_core.plugin_mixin import PluginStatusMixin, PluginStatus
+except ImportError:
+    from enum import Enum
+
+    class PluginStatus(str, Enum):
+        UNLOADED = "unloaded"
+        LOADING = "loading"
+        READY = "ready"
+        RUNNING = "running"
+        ERROR = "error"
+        DISABLED = "disabled"
+
+    class PluginStatusMixin:
+        def __init_status__(self):
+            self._status = PluginStatus.UNLOADED
+            self._last_error = ""
+
+        @property
+        def status(self):
+            return getattr(self, '_status', PluginStatus.UNLOADED)
+
+        @status.setter
+        def status(self, value):
+            self._status = value
+
+        def set_status(self, status, error: str = ""):
+            if isinstance(status, str):
+                try:
+                    status = PluginStatus(status)
+                except ValueError:
+                    status = PluginStatus.ERROR
+            self._status = status
+            if error:
+                self._last_error = error
+
+        def get_plugin_status(self) -> dict:
+            return {
+                'plugin_id': getattr(self, 'PLUGIN_ID', 'unknown'),
+                'name': getattr(self, 'PLUGIN_NAME', 'Unknown'),
+                'version': getattr(self, 'PLUGIN_VERSION', '0.0.0'),
+                'status': self._status.value if hasattr(self, '_status') else 'unknown',
+                'initialized': getattr(self, '_is_initialized', False),
+                'last_error': getattr(self, '_last_error', '')
+            }
+
 logger = logging.getLogger(__name__)
 
 
@@ -697,8 +744,12 @@ class SubsidenceMonitor:
         }
 
 
-class SLAMMappingPlugin:
+class SLAMMappingPlugin(PluginStatusMixin):
     """SLAM三维建图插件"""
+
+    PLUGIN_ID = "slam_mapping"
+    PLUGIN_NAME = "SLAM建图"
+    PLUGIN_VERSION = "1.0.0"
 
     def __init__(self, manifest=None, plugin_dir=None):
         """
@@ -708,6 +759,9 @@ class SLAMMappingPlugin:
             manifest: 插件清单 (PluginManifest)
             plugin_dir: 插件目录 (Path)
         """
+        # 初始化状态管理
+        self.__init_status__()
+
         self.manifest = manifest
         self.plugin_dir = plugin_dir
 
@@ -719,6 +773,7 @@ class SLAMMappingPlugin:
 
         self.name = "slam_mapping"
         self.version = "1.0.0"
+        self._is_initialized = False
         
         # 初始化组件
         self.point_processor = PointCloudProcessor(self.config)
@@ -770,8 +825,11 @@ class SLAMMappingPlugin:
         self.dl_enabled = True
         logger.info("SLAM插件已连接模型注册表，启用深度学习功能")
     
-    def init(self):
+    def init(self, model_registry=None):
         """初始化插件"""
+        if model_registry:
+            self.set_model_registry(model_registry)
+        self._is_initialized = True
         logger.info("SLAM建图插件启动")
         return True
     

@@ -18,6 +18,54 @@ from collections import deque
 import time
 import numpy as np
 
+# 导入插件状态混入类
+try:
+    from platform_core.plugin_mixin import PluginStatusMixin, PluginStatus
+except ImportError:
+    # 如果导入失败，内联定义
+    from enum import Enum
+
+    class PluginStatus(str, Enum):
+        UNLOADED = "unloaded"
+        LOADING = "loading"
+        READY = "ready"
+        RUNNING = "running"
+        ERROR = "error"
+        DISABLED = "disabled"
+
+    class PluginStatusMixin:
+        def __init_status__(self):
+            self._status = PluginStatus.UNLOADED
+            self._last_error = ""
+
+        @property
+        def status(self):
+            return getattr(self, '_status', PluginStatus.UNLOADED)
+
+        @status.setter
+        def status(self, value):
+            self._status = value
+
+        def set_status(self, status, error: str = ""):
+            if isinstance(status, str):
+                try:
+                    status = PluginStatus(status)
+                except ValueError:
+                    status = PluginStatus.ERROR
+            self._status = status
+            if error:
+                self._last_error = error
+
+        def get_plugin_status(self) -> dict:
+            return {
+                'plugin_id': getattr(self, 'PLUGIN_ID', 'unknown'),
+                'name': getattr(self, 'PLUGIN_NAME', 'Unknown'),
+                'version': getattr(self, 'PLUGIN_VERSION', '0.0.0'),
+                'status': self._status.value if hasattr(self, '_status') else 'unknown',
+                'initialized': getattr(self, '_is_initialized', False),
+                'last_error': getattr(self, '_last_error', '')
+            }
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,7 +141,7 @@ class GasDetectionConfig:
 # =============================================================================
 # 气体泄漏检测插件
 # =============================================================================
-class GasDetectionPlugin:
+class GasDetectionPlugin(PluginStatusMixin):
     """
     气体泄漏检测插件
 
@@ -116,6 +164,9 @@ class GasDetectionPlugin:
             manifest: 插件清单 (PluginManifest)
             plugin_dir: 插件目录 (Path)
         """
+        # 初始化状态管理
+        self.__init_status__()
+
         self.manifest = manifest
         self.plugin_dir = plugin_dir
 

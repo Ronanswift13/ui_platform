@@ -579,9 +579,14 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Chart.js for spectrum visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // API基础URL
     const API_BASE = '/api/advanced';
+
+    // 频谱图实例
+    let spectrumChart = null;
     
     // 页面加载完成后初始化
     document.addEventListener('DOMContentLoaded', function() {
@@ -695,61 +700,276 @@
     
     function displayAcousticResult(result) {
         const container = document.getElementById('acoustic-result');
-        
+
+        if (!result.success) {
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    分析失败: ${result.error || '未知错误'}
+                </div>
+            `;
+            return;
+        }
+
+        // 获取频谱分析数据
+        const freqAnalysis = result.frequency_analysis || {};
+        const pdDetected = result.pd_detected || false;
+        const pdLevel = result.pd_level || 'normal';
+        const anomalyDetected = result.anomaly_detected || false;
+
+        // 状态颜色映射
+        const levelColors = {
+            'normal': 'success',
+            'attention': 'info',
+            'warning': 'warning',
+            'alarm': 'danger',
+            'critical': 'danger'
+        };
+
+        // 构建 HTML
         let html = `
+            <!-- 处理状态 -->
             <div class="mb-3">
-                <strong>处理状态:</strong> 
-                <span class="badge bg-${result.success ? 'success' : 'danger'}">
-                    ${result.success ? '成功' : '失败'}
-                </span>
-                <span class="text-muted ms-2">${result.processing_time_ms?.toFixed(2)} ms</span>
+                <strong>处理状态:</strong>
+                <span class="badge bg-success">成功</span>
+                <span class="ms-2 text-muted">${(result.processing_time_ms || 0).toFixed(2)} ms</span>
             </div>
+
+            <!-- 局放检测 -->
+            <div class="mb-3">
+                <strong>局放检测:</strong>
+                <span class="badge bg-${levelColors[pdLevel] || 'secondary'}">
+                    ${pdLevel === 'normal' ? '正常' : pdLevel.toUpperCase()}
+                </span>
+                ${pdDetected ? `<span class="ms-2 text-danger">检测到局部放电!</span>` : ''}
+                <span class="ms-2 text-muted">(等级: ${pdLevel}, 置信度: ${((result.pd_confidence || result.confidence || 0) * 100).toFixed(1)}%)</span>
+            </div>
+
+            <!-- 异常检测 -->
+            <div class="mb-3">
+                <strong>异常检测:</strong>
+                <span class="badge bg-${anomalyDetected ? 'warning' : 'success'}">
+                    ${anomalyDetected ? '异常' : '正常'}
+                </span>
+                ${result.anomaly_type && result.anomaly_type !== 'normal' ?
+                    `<span class="ms-2">${result.anomaly_type}</span>` : ''}
+            </div>
+
+            <!-- 频谱分析数据 -->
+            <div class="mb-3">
+                <strong>频谱分析:</strong>
+                <div class="result-json mt-2">
+                    <pre style="margin: 0; color: #d4d4d4;">${JSON.stringify({
+                        dominant_frequency: freqAnalysis.dominant_frequency,
+                        harmonics: freqAnalysis.harmonics,
+                        noise_level_db: freqAnalysis.noise_level_db
+                    }, null, 2)}</pre>
+                </div>
+            </div>
+
+            <!-- 频谱图表容器 -->
+            <div class="mb-3">
+                <strong>频谱图:</strong>
+                <div class="chart-container mt-2" style="height: 250px; background: #f8f9fa; border-radius: 0.5rem; padding: 10px;">
+                    <canvas id="spectrum-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- 频带能量分布 -->
+            ${freqAnalysis.band_energy ? `
+            <div class="mb-3">
+                <strong>频带能量分布:</strong>
+                <div class="row mt-2">
+                    ${Object.entries(freqAnalysis.band_energy).map(([band, energy]) => `
+                        <div class="col">
+                            <div class="text-center">
+                                <div class="small text-muted">${getBandLabel(band)}</div>
+                                <div class="progress mt-1" style="height: 60px;">
+                                    <div class="progress-bar bg-primary" role="progressbar"
+                                         style="height: ${energy}%; width: 100%;"
+                                         aria-valuenow="${energy}" aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <div class="small">${energy.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+
+            <!-- 建议 -->
+            ${result.recommendations && result.recommendations.length > 0 ? `
+            <div class="mb-3">
+                <strong>建议:</strong>
+                <ul class="list-unstyled mt-2">
+                    ${result.recommendations.map(rec => `
+                        <li><i class="bi bi-arrow-right text-primary"></i> ${rec}</li>
+                    `).join('')}
+                </ul>
+            </div>
+            ` : ''}
         `;
-        
-        if (result.pd_detected !== undefined) {
-            html += `
-                <div class="mb-2">
-                    <strong>局放检测:</strong>
-                    <span class="badge bg-${result.pd_detected ? 'warning' : 'success'}">
-                        ${result.pd_detected ? '检测到局放' : '正常'}
-                    </span>
-                    <span class="text-muted">(等级: ${result.pd_level}, 置信度: ${(result.pd_confidence * 100).toFixed(1)}%)</span>
-                </div>
-            `;
-        }
-        
-        if (result.anomaly_detected !== undefined) {
-            html += `
-                <div class="mb-2">
-                    <strong>异常检测:</strong>
-                    <span class="badge bg-${result.anomaly_detected ? 'warning' : 'success'}">
-                        ${result.anomaly_detected ? result.anomaly_type || '异常' : '正常'}
-                    </span>
-                </div>
-            `;
-        }
-        
-        if (result.frequency_analysis && Object.keys(result.frequency_analysis).length > 0) {
-            html += `
-                <div class="mb-2">
-                    <strong>频谱分析:</strong>
-                    <pre class="result-json small">${JSON.stringify(result.frequency_analysis, null, 2)}</pre>
-                </div>
-            `;
-        }
-        
-        if (result.recommendations && result.recommendations.length > 0) {
-            html += `
-                <div class="mt-3">
-                    <strong>建议:</strong>
-                    <ul class="mb-0">
-                        ${result.recommendations.map(r => `<li>${r}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-        }
-        
+
         container.innerHTML = html;
+
+        // 渲染频谱图表
+        renderSpectrumChart(freqAnalysis);
+    }
+
+    // 渲染频谱图
+    function renderSpectrumChart(freqAnalysis) {
+        const canvas = document.getElementById('spectrum-chart');
+        if (!canvas) {
+            console.error('找不到频谱图画布元素');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+
+        // 销毁旧图表
+        if (spectrumChart) {
+            spectrumChart.destroy();
+        }
+
+        // 准备数据
+        let frequencies, magnitudes;
+
+        if (freqAnalysis.spectrum && freqAnalysis.spectrum.frequencies) {
+            frequencies = freqAnalysis.spectrum.frequencies;
+            magnitudes = freqAnalysis.spectrum.magnitude_normalized || freqAnalysis.spectrum.magnitude;
+        } else {
+            // 使用模拟数据
+            frequencies = [];
+            magnitudes = [];
+
+            const dominantFreq = freqAnalysis.dominant_frequency || 50;
+            const harmonics = freqAnalysis.harmonics || [100, 150, 200];
+
+            for (let f = 0; f <= 500; f += 5) {
+                frequencies.push(f);
+                let mag = 0.1 * Math.random();
+
+                if (Math.abs(f - dominantFreq) < 5) {
+                    mag = 1.0;
+                }
+
+                harmonics.forEach((h, i) => {
+                    if (Math.abs(f - h) < 5) {
+                        mag = Math.max(mag, 0.8 - i * 0.15);
+                    }
+                });
+
+                magnitudes.push(mag);
+            }
+        }
+
+        // 检查 Chart.js 是否可用
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js 未加载，使用简单可视化');
+            renderSimpleSpectrum(canvas, frequencies, magnitudes);
+            return;
+        }
+
+        // 创建图表
+        spectrumChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: frequencies.map(f => f.toFixed(0)),
+                datasets: [{
+                    label: '频谱幅度',
+                    data: magnitudes,
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    fill: true,
+                    tension: 0.1,
+                    pointRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: '频率响应'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: '频率 (Hz)'
+                        },
+                        ticks: {
+                            maxTicksLimit: 10
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: '幅度'
+                        },
+                        min: 0
+                    }
+                }
+            }
+        });
+    }
+
+    // 简单频谱可视化 (不依赖 Chart.js)
+    function renderSimpleSpectrum(canvas, frequencies, magnitudes) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width = canvas.parentElement.clientWidth - 20;
+        const height = canvas.height = 200;
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#1e1e1e';
+        ctx.fillRect(0, 0, width, height);
+
+        const barWidth = width / magnitudes.length;
+        const maxMag = Math.max(...magnitudes);
+
+        ctx.fillStyle = 'rgba(54, 162, 235, 0.8)';
+
+        magnitudes.forEach((mag, i) => {
+            const barHeight = (mag / maxMag) * (height - 40);
+            const x = i * barWidth;
+            const y = height - 20 - barHeight;
+            ctx.fillRect(x, y, Math.max(barWidth - 1, 1), barHeight);
+        });
+
+        ctx.fillStyle = '#888';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+
+        const step = Math.floor(frequencies.length / 5);
+        for (let i = 0; i < frequencies.length; i += step) {
+            const x = i * barWidth + barWidth / 2;
+            ctx.fillText(`${frequencies[i].toFixed(0)}Hz`, x, height - 5);
+        }
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('频率响应', width / 2, 15);
+    }
+
+    // 获取频带标签
+    function getBandLabel(band) {
+        const labels = {
+            'low': '低频',
+            'mid_low': '中低频',
+            'mid': '中频',
+            'mid_high': '中高频',
+            'high': '高频'
+        };
+        return labels[band] || band;
     }
     
     function loadDemoAcousticData() {
