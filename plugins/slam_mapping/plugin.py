@@ -818,7 +818,29 @@ class SLAMMappingPlugin(PluginStatusMixin):
             'subsidence_alert_mm': 10.0,
             'subsidence_warning_mm': 5.0
         }
-    
+
+    # =========================================================================
+    # 关键属性 (兼容 platform_core.plugin_manager)
+    # =========================================================================
+
+    @property
+    def id(self) -> str:
+        """插件ID - 兼容 platform_core.plugin_manager"""
+        if self.manifest and hasattr(self.manifest, 'id'):
+            return self.manifest.id
+        return self.PLUGIN_ID
+
+    @property
+    def code_hash(self) -> str:
+        """代码哈希"""
+        import hashlib
+        from pathlib import Path
+        h = hashlib.sha256()
+        plugin_file = Path(__file__).parent / "plugin.py"
+        if plugin_file.exists():
+            h.update(plugin_file.read_bytes())
+        return f"sha256:{h.hexdigest()[:12]}"
+
     def set_model_registry(self, registry):
         """设置模型注册表"""
         self.model_registry = registry
