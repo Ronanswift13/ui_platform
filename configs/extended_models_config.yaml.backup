@@ -1,0 +1,519 @@
+# =============================================================================
+# 变电站AI自主巡检系统 - 扩展模型配置
+# Extended Models Configuration for Substation AI Inspection System
+# Version: 2.0.0
+# =============================================================================
+
+version: "2.0.0"
+description: "多模态AI推理引擎配置 - 支持点云/声学/时序/高光谱/融合模型"
+
+# =============================================================================
+# 全局设置
+# =============================================================================
+global_settings:
+  # 默认推理后端: onnx_cpu, onnx_cuda, tensorrt
+  default_backend: "onnx_cpu"
+  # GPU设备ID (CUDA后端使用)
+  device_id: 0
+  # 启用FP16推理加速 (需要GPU支持)
+  enable_fp16: false
+  # 最大并发推理任务数
+  max_concurrent_tasks: 4
+  # 模型缓存大小 (MB)
+  model_cache_size_mb: 2048
+  # 启用模型预热
+  enable_warmup: true
+  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  log_level: "INFO"
+
+# =============================================================================
+# 模型配置
+# =============================================================================
+models:
+  # ---------------------------------------------------------------------------
+  # 点云处理模型组 (3D LiDAR)
+  # ---------------------------------------------------------------------------
+  pointcloud_inspection:
+    # SLAM定位建图模型
+    lidar_slam:
+      model_path: "models/pointcloud/slam_loam.onnx"
+      model_type: "point_cloud_slam"
+      description: "LOAM风格SLAM模型，用于实时定位与建图"
+      enabled: true
+      # 点云输入格式: xyz, xyzrgb, xyzi (intensity)
+      point_cloud_format: "xyzi"
+      # 最大点数限制
+      max_points: 100000
+      # 体素降采样大小 (米)
+      voxel_size: 0.05
+      # 输入维度 [批次, 点数, 特征]
+      input_shape: [1, 100000, 4]
+      # 输出: 6DoF位姿 [x, y, z, roll, pitch, yaw]
+      output_shape: [1, 6]
+      # 推理参数
+      inference:
+        batch_size: 1
+        timeout_ms: 100
+        
+    # 点云语义分割模型
+    point_segmentation:
+      model_path: "models/pointcloud/pointnet2_seg.onnx"
+      model_type: "point_cloud_seg"
+      description: "PointNet++语义分割，识别设备/道路/障碍物"
+      enabled: true
+      point_cloud_format: "xyz"
+      max_points: 50000
+      voxel_size: 0.1
+      input_shape: [1, 50000, 3]
+      # 分类数量
+      num_classes: 8
+      # 类别定义
+      classes:
+        - "ground"        # 地面
+        - "road"          # 道路
+        - "obstacle"      # 障碍物
+        - "transformer"   # 变压器
+        - "switch"        # 开关柜
+        - "cable"         # 电缆
+        - "structure"     # 支撑结构
+        - "other"         # 其他
+      inference:
+        batch_size: 1
+        timeout_ms: 200
+
+    # 点云目标检测模型
+    point_detection:
+      model_path: "models/pointcloud/pointpillars_det.onnx"
+      model_type: "point_cloud"
+      description: "PointPillars 3D目标检测"
+      enabled: false
+      point_cloud_format: "xyzi"
+      max_points: 100000
+      voxel_size: 0.2
+      # 检测范围 (米)
+      detection_range:
+        x: [-50, 50]
+        y: [-50, 50]
+        z: [-3, 5]
+      inference:
+        batch_size: 1
+        timeout_ms: 150
+        confidence_threshold: 0.5
+        nms_threshold: 0.3
+
+  # ---------------------------------------------------------------------------
+  # 声学监测模型组 (Acoustic)
+  # ---------------------------------------------------------------------------
+  audio_inspection:
+    # 声学异常检测模型 (Transformer)
+    audio_anomaly_transformer:
+      model_path: "models/audio/anomaly_transformer.onnx"
+      model_type: "audio_anomaly"
+      description: "基于Transformer的声学异常检测"
+      enabled: true
+      # 采样率 (Hz)
+      sample_rate: 16000
+      # Mel频谱参数
+      n_mels: 128
+      n_fft: 2048
+      hop_length: 512
+      # 音频片段时长 (秒)
+      audio_duration: 2.0
+      # 输入格式: mel_spectrogram, raw_waveform
+      input_format: "mel_spectrogram"
+      # 输入形状 [批次, 通道, Mel频带, 时间帧]
+      input_shape: [1, 1, 128, 63]
+      # 异常类型
+      anomaly_types:
+        - "normal"              # 正常
+        - "partial_discharge"   # 局部放电
+        - "corona_discharge"    # 电晕放电
+        - "transformer_hum"     # 变压器异常嗡鸣
+        - "mechanical_fault"    # 机械故障
+        - "cooling_fan_fault"   # 冷却风扇故障
+      inference:
+        batch_size: 1
+        timeout_ms: 50
+        anomaly_threshold: 0.5
+        
+    # 超声波局放检测模型
+    ultrasonic_pd_detector:
+      model_path: "models/audio/ultrasonic_pd.onnx"
+      model_type: "audio_anomaly"
+      description: "超声波频段局部放电专用检测"
+      enabled: true
+      sample_rate: 192000  # 高采样率用于超声波
+      n_mels: 256
+      n_fft: 4096
+      hop_length: 1024
+      audio_duration: 1.0
+      input_format: "mel_spectrogram"
+      input_shape: [1, 1, 256, 188]
+      # 频率范围限制 (Hz)
+      frequency_range:
+        min: 20000
+        max: 100000
+      inference:
+        batch_size: 1
+        timeout_ms: 30
+        anomaly_threshold: 0.3
+
+  # ---------------------------------------------------------------------------
+  # 时序预测模型组 (Time Series)
+  # ---------------------------------------------------------------------------
+  timeseries_inspection:
+    # SF6气体浓度预测
+    sf6_forecast:
+      model_path: "models/timeseries/lstm_sf6_forecast.onnx"
+      model_type: "time_series_forecast"
+      description: "LSTM SF6气体浓度预测模型"
+      enabled: true
+      # 历史序列长度
+      sequence_length: 100
+      # 输入特征数 (SF6浓度 + 温度 + 湿度 + 压力)
+      input_features: 4
+      # 预测时间步数
+      prediction_horizon: 24
+      # 输入形状 [批次, 序列长度, 特征数]
+      input_shape: [1, 100, 4]
+      # 输出形状 [批次, 预测步数]
+      output_shape: [1, 24]
+      # 归一化参数
+      normalization:
+        type: "zscore"  # zscore, minmax
+        # 训练集统计量 (需要根据实际数据更新)
+        mean: [100.0, 25.0, 50.0, 101.3]
+        std: [20.0, 5.0, 15.0, 5.0]
+      inference:
+        batch_size: 1
+        timeout_ms: 20
+        
+    # 多气体综合预测
+    multi_gas_forecast:
+      model_path: "models/timeseries/transformer_gas_forecast.onnx"
+      model_type: "time_series_forecast"
+      description: "Transformer多气体综合预测 (SF6/H2/CO/C2H2)"
+      enabled: true
+      sequence_length: 168  # 7天 * 24小时
+      input_features: 8     # 4种气体 + 4种环境参数
+      prediction_horizon: 48  # 预测未来48小时
+      input_shape: [1, 168, 8]
+      output_shape: [1, 48, 4]
+      # 气体类型
+      gas_types:
+        - name: "SF6"
+          unit: "ppm"
+          warning_threshold: 1000
+          alarm_threshold: 2000
+        - name: "H2"
+          unit: "ppm"
+          warning_threshold: 150
+          alarm_threshold: 500
+        - name: "CO"
+          unit: "ppm"
+          warning_threshold: 300
+          alarm_threshold: 1000
+        - name: "C2H2"
+          unit: "ppm"
+          warning_threshold: 5
+          alarm_threshold: 20
+      inference:
+        batch_size: 1
+        timeout_ms: 50
+
+    # 设备健康趋势预测
+    equipment_health_trend:
+      model_path: "models/timeseries/health_trend.onnx"
+      model_type: "time_series_forecast"
+      description: "设备健康指数趋势预测"
+      enabled: true
+      sequence_length: 720  # 30天历史
+      input_features: 16    # 多维健康指标
+      prediction_horizon: 168  # 预测未来7天
+      input_shape: [1, 720, 16]
+      output_shape: [1, 168]
+      inference:
+        batch_size: 1
+        timeout_ms: 100
+
+  # ---------------------------------------------------------------------------
+  # 高光谱检测模型组 (Hyperspectral)
+  # ---------------------------------------------------------------------------
+  hyperspectral_inspection:
+    # 高光谱缺陷检测
+    hyperspectral_defect:
+      model_path: "models/hyperspectral/defect_detection.onnx"
+      model_type: "hyperspectral"
+      description: "高光谱图像缺陷检测 (过热/腐蚀/绝缘老化)"
+      enabled: true
+      # 光谱波段数
+      num_bands: 224
+      # 波长范围 (nm)
+      wavelength_range:
+        min: 400
+        max: 2500
+      # 空间分辨率
+      spatial_resolution: [256, 256]
+      # 输入形状 [批次, 波段, 高, 宽]
+      input_shape: [1, 224, 256, 256]
+      # 缺陷类型
+      defect_types:
+        - "normal"
+        - "overheating"        # 过热
+        - "corrosion"          # 腐蚀
+        - "insulation_aging"   # 绝缘老化
+        - "oil_leakage"        # 油泄漏
+        - "surface_damage"     # 表面损伤
+      inference:
+        batch_size: 1
+        timeout_ms: 300
+        confidence_threshold: 0.6
+
+  # ---------------------------------------------------------------------------
+  # 多模态融合模型组 (Multimodal Fusion)
+  # ---------------------------------------------------------------------------
+  multimodal_inspection:
+    # 综合状态评估融合模型
+    comprehensive_fusion:
+      model_path: "models/multimodal/attention_fusion.onnx"
+      model_type: "multimodal"
+      description: "多模态注意力融合综合状态评估"
+      enabled: true
+      # 融合类型: early, late, attention, hybrid
+      fusion_type: "attention"
+      # 输入模态
+      modalities:
+        - name: "visual"
+          feature_dim: 512
+          weight: 0.3
+        - name: "pointcloud"
+          feature_dim: 256
+          weight: 0.25
+        - name: "audio"
+          feature_dim: 128
+          weight: 0.2
+        - name: "thermal"
+          feature_dim: 128
+          weight: 0.15
+        - name: "timeseries"
+          feature_dim: 64
+          weight: 0.1
+      # 融合后特征维度
+      fusion_feature_dim: 1024
+      # 输出: 综合健康评分 [0-100]
+      output_type: "health_score"
+      inference:
+        batch_size: 1
+        timeout_ms: 100
+
+    # 故障诊断融合模型
+    fault_diagnosis_fusion:
+      model_path: "models/multimodal/fault_diagnosis.onnx"
+      model_type: "multimodal"
+      description: "多模态故障诊断与根因分析"
+      enabled: true
+      fusion_type: "hybrid"
+      modalities:
+        - name: "visual"
+          feature_dim: 512
+        - name: "audio"
+          feature_dim: 128
+        - name: "gas"
+          feature_dim: 32
+        - name: "electrical"
+          feature_dim: 64
+      # 故障类型
+      fault_types:
+        - "normal"
+        - "transformer_fault"
+        - "switch_fault"
+        - "insulation_fault"
+        - "connection_fault"
+        - "cooling_fault"
+      inference:
+        batch_size: 1
+        timeout_ms: 150
+        confidence_threshold: 0.7
+
+# =============================================================================
+# 插件配置
+# =============================================================================
+plugins:
+  # SLAM建图与导航插件
+  slam_mapping:
+    enabled: true
+    # 使用的模型
+    models:
+      - "pointcloud_inspection.lidar_slam"
+      - "pointcloud_inspection.point_segmentation"
+    # SLAM算法参数
+    slam_params:
+      # 关键帧距离阈值 (米)
+      keyframe_distance: 1.0
+      # 关键帧角度阈值 (弧度)
+      keyframe_angle: 0.2
+      # 全局地图体素大小 (米)
+      global_map_voxel_size: 0.1
+      # 最大地图点数
+      max_map_points: 5000000
+      # 回环检测启用
+      enable_loop_closure: true
+    # 路径规划参数
+    path_planning:
+      # 栅格分辨率 (米)
+      grid_resolution: 0.5
+      # 机器人半径 (米)
+      robot_radius: 0.5
+      # 安全边距 (米)
+      safety_margin: 0.3
+      # 规划算法: astar, rrt, hybrid_astar
+      algorithm: "astar"
+
+  # 声学监测插件
+  acoustic_monitoring:
+    enabled: true
+    models:
+      - "audio_inspection.audio_anomaly_transformer"
+      - "audio_inspection.ultrasonic_pd_detector"
+    # 检测参数
+    detection_params:
+      # 默认采样率
+      default_sample_rate: 16000
+      # 连续监测窗口 (秒)
+      monitoring_window: 2.0
+      # 滑动步长 (秒)
+      hop_size: 0.5
+      # 告警累积阈值
+      alarm_accumulation_count: 3
+    # 频段配置
+    frequency_bands:
+      ultrasonic:
+        min: 20000
+        max: 100000
+      audible:
+        min: 20
+        max: 20000
+      infrasonic:
+        min: 1
+        max: 20
+
+  # 气体检测插件
+  gas_detection:
+    enabled: true
+    models:
+      - "timeseries_inspection.sf6_forecast"
+      - "timeseries_inspection.multi_gas_forecast"
+    # 气体阈值配置
+    thresholds:
+      SF6:
+        attention: 800
+        warning: 1000
+        alarm: 1500
+        critical: 2000
+      H2:
+        attention: 100
+        warning: 150
+        alarm: 300
+        critical: 500
+      CO:
+        attention: 200
+        warning: 300
+        alarm: 600
+        critical: 1000
+      C2H2:
+        attention: 3
+        warning: 5
+        alarm: 10
+        critical: 20
+    # 泄漏检测参数
+    leakage_detection:
+      # 最小泄漏率报警阈值 (ppm/hour)
+      min_leak_rate: 5.0
+      # 历史数据点数
+      history_points: 20
+      # 置信度阈值
+      confidence_threshold: 0.7
+
+  # 高光谱检测插件
+  hyperspectral_detection:
+    enabled: true
+    models:
+      - "hyperspectral_inspection.hyperspectral_defect"
+    # 检测参数
+    detection_params:
+      # 空间分辨率
+      spatial_resolution: [256, 256]
+      # 光谱预处理
+      preprocessing:
+        - "dark_current_subtraction"
+        - "flat_field_correction"
+        - "atmospheric_correction"
+      # 特征提取方法
+      feature_extraction: "pca"  # pca, ica, mnf
+      # PCA保留成分数
+      pca_components: 30
+
+  # 多模态融合插件
+  multimodal_fusion:
+    enabled: true
+    models:
+      - "multimodal_inspection.comprehensive_fusion"
+      - "multimodal_inspection.fault_diagnosis_fusion"
+    # 融合参数
+    fusion_params:
+      # 时间同步窗口 (毫秒)
+      time_sync_window_ms: 100
+      # 缺失模态处理策略: skip, zero_fill, last_value
+      missing_modality_strategy: "last_value"
+      # 融合频率 (Hz)
+      fusion_frequency: 10
+
+# =============================================================================
+# 异步推理队列配置
+# =============================================================================
+async_inference:
+  # 工作线程数
+  num_workers: 4
+  # 任务队列大小
+  queue_size: 100
+  # 任务超时 (秒)
+  task_timeout: 30
+  # 优先级级别数
+  priority_levels: 3
+  # 结果缓存大小
+  result_cache_size: 1000
+
+# =============================================================================
+# 健康监控配置
+# =============================================================================
+health_monitoring:
+  # 启用健康检查
+  enabled: true
+  # 检查间隔 (秒)
+  check_interval: 60
+  # 推理延迟阈值 (毫秒)
+  latency_threshold_ms: 500
+  # 内存使用阈值 (%)
+  memory_threshold_percent: 80
+  # 错误率阈值 (%)
+  error_rate_threshold_percent: 5
+  # 自动重启故障模型
+  auto_restart_failed_models: true
+
+# =============================================================================
+# 日志与监控
+# =============================================================================
+logging:
+  # 日志目录
+  log_dir: "logs/inference"
+  # 日志级别
+  level: "INFO"
+  # 日志轮转
+  rotation:
+    max_size_mb: 100
+    backup_count: 10
+  # 推理统计导出
+  export_stats:
+    enabled: true
+    interval_seconds: 300
+    format: "prometheus"  # prometheus, json

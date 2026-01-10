@@ -40,6 +40,21 @@ try:
 except ImportError:
     FASTAPI_AVAILABLE = False
 
+# 导入插件兼容性修复模块
+try:
+    from platform_core.plugin_compatibility_fix import (
+        PluginLoader,
+        PluginManagerEnhanced,
+        patch_existing_plugin,
+        create_plugin_manifest,
+        PluginStatus as CompatPluginStatus,
+        PluginManifest
+    )
+    COMPAT_FIX_AVAILABLE = True
+except ImportError as e:
+    COMPAT_FIX_AVAILABLE = False
+    logging.getLogger(__name__).debug(f"插件兼容性修复模块不可用: {e}")
+
 logger = logging.getLogger(__name__)
 
 
@@ -288,6 +303,14 @@ class AdvancedPluginManager:
                             except TypeError as e:
                                 logger.warning(f"插件 {plugin_id} 实例化失败: {e}")
                                 raise
+
+                    # === 使用兼容性修复模块修补插件 ===
+                    if COMPAT_FIX_AVAILABLE:
+                        try:
+                            plugin_instance = patch_existing_plugin(plugin_instance)
+                            logger.debug(f"插件 {plugin_id} 已应用兼容性修复")
+                        except Exception as patch_error:
+                            logger.debug(f"应用兼容性修复失败 (非致命): {patch_error}")
 
                     # === 修复: 安全调用 init ===
                     if hasattr(plugin_instance, 'init'):

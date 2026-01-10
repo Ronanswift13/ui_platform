@@ -1,4 +1,4 @@
-current_category: 中压
-current_voltage_level: 66kV
-current_voltage_level_display: MV_66kV
+current_category: 超高压
+current_voltage_level: 500kV_AC
+current_voltage_level_display: EHV_500kV
 last_updated: /Users/ronan/Desktop/破夜绘明激光监测平台
