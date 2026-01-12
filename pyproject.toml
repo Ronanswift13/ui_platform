@@ -1,14 +1,14 @@
 [project]
 name = "powerstation-monitor"
-version = "1.0.0"
-description = "输变电激光星芒破夜绘明监测平台"
+version = "2.0.0"
+description = "输变电激光星芒破夜绘明监测平台 - 透明变电站"
 readme = "README.md"
 requires-python = ">=3.10,<3.12"
 license = {text = "Proprietary"}
 authors = [
-    {name = "Power Station Team", email = "team@example.com"}
+    {name = "破夜绘明团队", email = "team@example.com"}
 ]
-keywords = ["power-station", "monitoring", "ai", "computer-vision"]
+keywords = ["power-station", "monitoring", "ai", "computer-vision", "transparent-substation"]
 
 dependencies = [
     "fastapi>=0.104.0",
@@ -26,12 +26,22 @@ dependencies = [
     "loguru>=0.7.2",
     "apscheduler>=3.10.4",
     "watchdog>=3.0.0",
+    "websockets>=12.0",
 ]
 
 [project.optional-dependencies]
 gpu = [
     "torch>=2.1.0",
     "torchvision>=0.16.0",
+]
+advanced = [
+    # 声学监测
+    "librosa>=0.10.0",
+    "soundfile>=0.12.0",
+    # 高光谱处理
+    "spectral>=0.23.0",
+    # SLAM
+    "open3d>=0.17.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -51,6 +61,7 @@ build = [
 powerstation = "apps.main:main"
 powerstation-api = "apps.api_server:main"
 powerstation-ui = "apps.ui_server:main"
+powerstation-dashboard = "apps.dashboard_server:main"
 
 [build-system]
 requires = ["hatchling"]
