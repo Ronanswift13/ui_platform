@@ -25,7 +25,7 @@ lidar:
   scan_rate_hz: 10
   angle_offset_deg: 0
   
-  # 安装参数 (基于文档方案)
+  # 安装参数 
   install:
     height_m: 2.5           # 安装高度
     tilt_deg: 20            # 向下倾斜角度

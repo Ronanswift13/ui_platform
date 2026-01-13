@@ -1,5 +1,5 @@
 """
-室内电子围栏插件 - 完整实现
+室内电子围栏插件 V2.0 - 多人安全监测系统
 输变电激光星芒破夜绘明监测平台 (G组)
 
 功能范围:
@@ -8,13 +8,19 @@
 - 黄线越界检测: 实时监测人员与警戒线距离
 - 机柜授权校验: 验证人员操作授权状态
 
+算法五层架构:
+1. 传感器适配层 (Adapters)
+2. 地面投影层 (Ground Projection)
+3. 多目标跟踪与融合层 (Tracking & Fusion)
+4. 区域逻辑与状态机层 (Zone Logic & State Machine)
+5. 输出与控制层 (Output & Control)
+
 性能指标:
-- 检测延迟: <100ms (融合延迟)
+- 检测延迟: <100ms
 - 多目标容量: 10人/过道
 - 定位精度: ±0.1m
 - 告警响应: <50ms
 
-基于《变电站多目标操作安全监测系统》方案实现
 """
 
 from __future__ import annotations
@@ -24,12 +30,61 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
-import importlib.util
-import sys
-import numpy as np
-import yaml
+import time
 import threading
 from collections import deque
+import json
+import sys
+import importlib.util
+import numpy as np
+
+# =============================================================================
+# 动态加载支持 - 确保子模块可被正确导入
+# =============================================================================
+def _ensure_package_registered():
+    """确保包和子模块在sys.modules中正确注册，以支持PluginManager的动态加载"""
+    plugin_dir = Path(__file__).parent
+    package_name = "plugins.indoor_fence"
+
+    # 如果包已正确注册且有__path__属性，则跳过
+    if package_name in sys.modules:
+        pkg = sys.modules[package_name]
+        if hasattr(pkg, '__path__'):
+            return
+
+    # 注册包本身
+    init_path = plugin_dir / "__init__.py"
+    if init_path.exists():
+        spec = importlib.util.spec_from_file_location(
+            package_name,
+            init_path,
+            submodule_search_locations=[str(plugin_dir)]
+        )
+        if spec:
+            pkg_module = importlib.util.module_from_spec(spec)
+            pkg_module.__path__ = [str(plugin_dir)]
+            sys.modules[package_name] = pkg_module
+
+    # 注册子包
+    for subpkg in ["core", "adapters"]:
+        subpkg_dir = plugin_dir / subpkg
+        subpkg_name = f"{package_name}.{subpkg}"
+        if subpkg_dir.is_dir() and subpkg_name not in sys.modules:
+            subpkg_init = subpkg_dir / "__init__.py"
+            if subpkg_init.exists():
+                spec = importlib.util.spec_from_file_location(
+                    subpkg_name,
+                    subpkg_init,
+                    submodule_search_locations=[str(subpkg_dir)]
+                )
+                if spec:
+                    subpkg_module = importlib.util.module_from_spec(spec)
+                    subpkg_module.__path__ = [str(subpkg_dir)]
+                    sys.modules[subpkg_name] = subpkg_module
+                    if spec.loader:
+                        spec.loader.exec_module(subpkg_module)
+
+_ensure_package_registered()
 
 from platform_core.plugin_manager.base import (
     BasePlugin,
@@ -47,251 +102,287 @@ from platform_core.schema.models import (
     BoundingBox,
 )
 
+# 导入v2核心模块 (使用绝对导入以支持动态加载)
+from plugins.indoor_fence.core import (
+    Point2D, Polygon,
+    ZoneConfiguration, ZoneConfigLoader, ZoneType, AlertLevel,
+    PersonState, GlobalAlarmLevel, PersonStateResult, GlobalStateResult, StateMachine,
+    Detection, Track, MultiTargetTracker,
+    VisualDetection, LidarDetection, FusedDetection, SensorFusion, FusedTracker,
+)
+
+# 导入适配器 (使用绝对导入以支持动态加载)
+from plugins.indoor_fence.adapters import (
+    BaseAdapter, AdapterStatus,
+    CameraAdapter, CameraConfig, PersonDetection,
+    LidarAdapter, LidarConfig, LidarScan, LidarCluster,
+    LightAdapter, LightColor, LightConfig, LightState,
+)
+
 
 # =============================================================================
-# 状态定义 (基于文档方案)
+# 审计日志
 # =============================================================================
-class PersonState(str, Enum):
-    """人员状态枚举"""
-    SAFE_AUTH = "SAFE_AUTH"           # 授权且安全
-    SAFE_UNAUTH = "SAFE_UNAUTH"       # 未授权但几何安全
-    DANGER_LINE = "DANGER_LINE"       # 越线危险
-    VISION_ONLY = "VISION_ONLY"       # 仅视觉模式
-    LIDAR_ONLY = "LIDAR_ONLY"         # 仅雷达模式
+
+class AuditLogger:
+    """审计日志记录器"""
+
+    def __init__(self, config: Dict):
+        self.enabled = config.get("enabled", True)
+        self.log_dir = Path(config.get("log_dir", "logs/indoor_fence"))
+        self.log_level = config.get("log_level", "event")
+
+        # 创建日志目录
+        if self.enabled:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+
+        # 内存缓存
+        self._frame_logs: deque = deque(maxlen=1000)
+        self._event_logs: deque = deque(maxlen=1000)
+
+        # 当日文件
+        self._current_date = datetime.now().strftime("%Y-%m-%d")
+        self._file_handle = None
+
+    def log_frame(self, frame_data: Dict):
+        """记录帧级数据"""
+        if not self.enabled or self.log_level != "frame":
+            return
+
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "type": "frame",
+            "data": frame_data,
+        }
+        self._frame_logs.append(entry)
+        self._write_to_file(entry)
+
+    def log_event(self, event_type: str, event_data: Dict):
+        """记录事件"""
+        if not self.enabled:
+            return
+
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "type": event_type,
+            "data": event_data,
+        }
+        self._event_logs.append(entry)
+        self._write_to_file(entry)
+
+    def log_state_change(self, person_id: str, old_state: str, new_state: str, details: Dict = None):
+        """记录状态变化"""
+        self.log_event("state_change", {
+            "person_id": person_id,
+            "old_state": old_state,
+            "new_state": new_state,
+            "details": details or {},
+            "message": f"人员{person_id}: {old_state} -> {new_state}",
+        })
+
+    def log_alarm(self, alarm_level: str, message: str, details: Dict = None):
+        """记录告警"""
+        self.log_event("alarm", {
+            "level": alarm_level,
+            "message": message,
+            "details": details or {},
+        })
+
+    def log_violation(self, violation_type: str, details: Dict):
+        """记录违规"""
+        self.log_event("violation", {
+            "violation_type": violation_type,
+            **details,
+        })
+
+    def _write_to_file(self, entry: Dict):
+        """写入文件"""
+        try:
+            # 检查日期是否变化
+            today = datetime.now().strftime("%Y-%m-%d")
+            if today != self._current_date:
+                self._current_date = today
+                if self._file_handle:
+                    self._file_handle.close()
+                    self._file_handle = None
+
+            # 打开文件
+            if self._file_handle is None:
+                log_file = self.log_dir / f"audit_{self._current_date}.jsonl"
+                self._file_handle = open(log_file, "a", encoding="utf-8")
+
+            # 写入
+            self._file_handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            self._file_handle.flush()
+
+        except Exception as e:
+            pass  # 静默处理日志写入错误
+
+    def get_recent_events(self, limit: int = 100) -> List[Dict]:
+        """获取最近事件"""
+        return list(self._event_logs)[-limit:]
+
+    def close(self):
+        """关闭日志"""
+        if self._file_handle:
+            self._file_handle.close()
+            self._file_handle = None
 
 
-@dataclass
-class PersonTracking:
-    """人员跟踪数据"""
-    person_id: str
-    name: str = ""
-    
-    # 视觉数据
-    visual_bbox: Optional[Dict[str, float]] = None
-    visual_confidence: float = 0.0
-    zone_visual: int = 0  # 视觉识别的机柜编号
-    
-    # 雷达数据
-    lidar_distance: float = 0.0
-    lidar_angle: float = 0.0
-    zone_lidar: int = 0  # 雷达推算的机柜区间
-    
-    # 融合数据
-    fused_position: Optional[Dict[str, float]] = None
-    distance_to_line: float = 0.0
-    cabinet_id: int = 0
-    
-    # 状态
-    state: PersonState = PersonState.SAFE_AUTH
-    authorized: bool = False
-    visual_valid: bool = True
-    lidar_valid: bool = True
-    
-    # 时间戳
-    timestamp: datetime = field(default_factory=datetime.now)
-    last_update: datetime = field(default_factory=datetime.now)
-
-
-@dataclass 
-class CabinetInfo:
-    """机柜信息"""
-    id: int
-    name: str
-    x_start: float  # 归一化起始X坐标
-    x_end: float    # 归一化结束X坐标
-    authorized: bool = False
-    status: str = "idle"  # idle, occupied, alert
-    occupants: List[str] = field(default_factory=list)
-
-
-@dataclass
-class LidarScan:
-    """雷达扫描数据"""
-    timestamp: datetime
-    angles: np.ndarray  # 角度数组 (度)
-    distances: np.ndarray  # 距离数组 (米)
-    scan_rate_hz: float = 10.0
-
-
-def _load_detector_class():
-    """动态加载检测器类"""
-    detector_path = Path(__file__).parent / "detector_enhanced.py"
-    if not detector_path.exists():
-        detector_path = Path(__file__).parent / "detector.py"
-
-    if not detector_path.exists():
-        return None
-
-    spec = importlib.util.spec_from_file_location("indoor_detector", detector_path)
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["indoor_detector"] = module
-    spec.loader.exec_module(module)
-
-    if hasattr(module, 'IndoorDetectorEnhanced'):
-        return module.IndoorDetectorEnhanced
-    if hasattr(module, 'IndoorDetector'):
-        return module.IndoorDetector
-    return None
-
-
-_IndoorDetector = None
-
-def get_detector_class():
-    global _IndoorDetector
-    if _IndoorDetector is None:
-        _IndoorDetector = _load_detector_class()
-    return _IndoorDetector
-
+# =============================================================================
+# 主插件类
+# =============================================================================
 
 class IndoorFencePlugin(BasePlugin):
     """
-    室内电子围栏插件
-    
+    室内电子围栏插件 V2.0
+
     实现基于视觉+2D激光雷达融合的安全监测系统
+    使用五层算法架构
     """
-    
+
     # 告警级别映射
     ALARM_LEVELS = {
-        PersonState.SAFE_AUTH: AlarmLevel.INFO,
-        PersonState.SAFE_UNAUTH: AlarmLevel.WARNING,
-        PersonState.DANGER_LINE: AlarmLevel.CRITICAL,
-        PersonState.VISION_ONLY: AlarmLevel.WARNING,
-        PersonState.LIDAR_ONLY: AlarmLevel.WARNING,
+        PersonState.NORMAL: AlarmLevel.INFO,
+        PersonState.ON_LINE: AlarmLevel.WARNING,
+        PersonState.CROSS_LINE: AlarmLevel.CRITICAL,
+        PersonState.MISPLACED: AlarmLevel.WARNING,
+        PersonState.HIGH_RISK: AlarmLevel.CRITICAL,
     }
-    
+
     # 标签名称
     LABEL_NAMES = {
         "line_cross": "越线告警",
         "unauthorized": "未授权操作",
         "multi_person": "同柜多人",
         "safe": "安全状态",
-        "degraded": "降级模式",
+        "on_line": "压线警告",
+        "high_risk": "高风险",
     }
-    
+
     def __init__(self, manifest: PluginManifest, plugin_dir: Path):
         """初始化插件"""
         super().__init__(manifest, plugin_dir)
         self._config: Dict[str, Any] = {}
         self._initialized = False
-        self._detector = None
-        
-        # 人员跟踪
-        self._tracked_persons: Dict[str, PersonTracking] = {}
-        self._next_person_id = 1
-        
-        # 机柜配置
-        self._cabinets: Dict[int, CabinetInfo] = {}
+
+        # V2 核心组件
+        self._zone_config: Optional[ZoneConfiguration] = None
+        self._state_machine: Optional[StateMachine] = None
+        self._fused_tracker: Optional[FusedTracker] = None
+
+        # 适配器
+        self._camera_adapter: Optional[CameraAdapter] = None
+        self._lidar_adapter: Optional[LidarAdapter] = None
+        self._light_adapter: Optional[LightAdapter] = None
+
+        # 审计日志
+        self._audit_logger: Optional[AuditLogger] = None
+
+        # 运行时状态
+        self._frame_count = 0
+        self._last_process_time = 0.0
+        self._last_global_state: Optional[GlobalStateResult] = None
+        self._person_state_cache: Dict[str, PersonState] = {}
+
+        # 授权管理
         self._allow_list: List[int] = []
-        
-        # 雷达数据缓冲
-        self._lidar_buffer: deque = deque(maxlen=10)
-        self._lidar_lock = threading.Lock()
-        
-        # 安全参数
-        self._yellow_line_distance = 0.5  # 黄线安全距离(米)
-        self._warning_distance = 0.3      # 警告距离
-        self._danger_distance = 0.1       # 危险距离
-        
-        # 融合参数
-        self._max_time_diff_ms = 50       # 最大时间差
-        self._angle_threshold = 5.0       # 角度匹配阈值(度)
-        
-        # 统计
-        self._inference_count = 0
+
+        # 告警计数
         self._alert_count = 0
-        self._last_inference_time: Optional[datetime] = None
-        
+
+        # 线程锁
+        self._lock = threading.RLock()
+
         # 代码哈希
         self._code_hash = self._calculate_code_hash()
-    
+
     def _calculate_code_hash(self) -> str:
         """计算代码版本hash"""
         h = hashlib.sha256()
-        files_to_hash = ["plugin.py", "detector.py", "detector_enhanced.py"]
+        files_to_hash = ["plugin.py"]
         for fname in files_to_hash:
             fpath = self.plugin_dir / fname
             if fpath.exists():
                 h.update(fpath.read_bytes())
         return f"sha256:{h.hexdigest()[:12]}"
-    
+
     @property
     def code_hash(self) -> str:
         """返回代码版本hash"""
         return self._code_hash
-    
-    def _load_default_config(self) -> Dict[str, Any]:
-        """加载默认配置"""
-        config_path = self.plugin_dir / "configs" / "default.yaml"
-        if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        return {}
-    
-    def _merge_config(self, base: Dict, override: Dict) -> Dict:
-        """递归合并配置"""
-        result = base.copy()
-        for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-                result[key] = self._merge_config(result[key], value)
-            else:
-                result[key] = value
-        return result
-    
+
     def init(self, config: dict[str, Any] | None = None) -> bool:
         """
         初始化插件
-        
+
         Args:
             config: 运行时配置
-            
+
         Returns:
             是否成功初始化
         """
         config = config or {}
-        
+
         try:
-            # 加载配置
-            default_config = self._load_default_config()
-            self._config = self._merge_config(default_config, config)
-            
-            # 加载安全参数
-            safety_config = self._config.get("safety_zone", {})
-            self._yellow_line_distance = safety_config.get("yellow_line_distance_m", 0.5)
-            self._warning_distance = safety_config.get("warning_distance_m", 0.3)
-            self._danger_distance = safety_config.get("danger_distance_m", 0.1)
-            
-            # 加载授权配置
-            auth_config = self._config.get("cabinet_authorization", {})
-            self._allow_list = auth_config.get("allow_list", [])
-            
-            # 初始化机柜
-            self._init_cabinets()
-            
-            # 加载检测器
-            detector_class = get_detector_class()
-            if detector_class:
-                self._detector = detector_class(self._config)
-                print(f"[{self.id}] 检测器加载成功")
+            self._config = config
+
+            # 1. 加载区域配置
+            zone_config_path = config.get("zone_config_path")
+            if zone_config_path:
+                loader = ZoneConfigLoader(Path(zone_config_path))
+                self._zone_config = loader.load()
             else:
-                print(f"[{self.id}] 检测器未找到，使用模拟模式")
-            
-            # 加载融合参数
-            fusion_config = self._config.get("fusion", {})
-            self._max_time_diff_ms = fusion_config.get("max_time_diff_ms", 50)
-            self._angle_threshold = fusion_config.get("angle_match_threshold_deg", 5.0)
-            
+                loader = ZoneConfigLoader()
+                self._zone_config = loader.load()
+
+            print(f"[{self.id}] 区域配置已加载: "
+                  f"{len(self._zone_config.zones)}个区域, "
+                  f"{len(self._zone_config.cabinets)}个机柜")
+
+            # 2. 初始化状态机
+            self._state_machine = StateMachine(self._zone_config)
+
+            # 配置阈值
+            safety_config = config.get("safety_zone", {})
+            self._state_machine.on_line_threshold = safety_config.get("warning_distance_m", 0.3)
+            self._state_machine.cross_line_threshold = safety_config.get("danger_distance_m", 0.0)
+
+            # 3. 初始化融合跟踪器
+            fusion_config = {
+                "max_time_diff_ms": config.get("fusion", {}).get("max_time_diff_ms", 100),
+                "distance_match_threshold_m": config.get("fusion", {}).get("distance_match_threshold_m", 0.5),
+            }
+            tracker_config = {
+                "max_age": config.get("tracking", {}).get("max_age", 30),
+                "min_hits": config.get("tracking", {}).get("min_hits", 3),
+                "distance_threshold": config.get("tracking", {}).get("distance_threshold", 1.0),
+                "use_kalman": config.get("tracking", {}).get("use_kalman", True),
+            }
+            self._fused_tracker = FusedTracker(
+                fusion_config=fusion_config,
+                tracker_config=tracker_config,
+            )
+
+            # 4. 初始化适配器
+            self._init_adapters(config)
+
+            # 5. 初始化审计日志
+            audit_config = config.get("audit", {"enabled": True, "log_level": "event"})
+            self._audit_logger = AuditLogger(audit_config)
+
+            # 6. 设置授权列表
+            auth_config = config.get("cabinet_authorization", {})
+            self._allow_list = auth_config.get("allow_list", [])
+
             self._initialized = True
             self.status = PluginStatus.READY
-            
-            print(f"[{self.id}] 插件初始化成功")
-            print(f"[{self.id}] 机柜数量: {len(self._cabinets)}")
+
+            print(f"[{self.id}] 插件初始化成功 (V2.0)")
             print(f"[{self.id}] 授权机柜: {self._allow_list}")
-            print(f"[{self.id}] 黄线距离: {self._yellow_line_distance}m")
-            
+
             return True
-            
+
         except Exception as e:
             self.status = PluginStatus.ERROR
             self._last_error = str(e)
@@ -299,24 +390,46 @@ class IndoorFencePlugin(BasePlugin):
             import traceback
             traceback.print_exc()
             return False
-    
-    def _init_cabinets(self):
-        """初始化机柜配置"""
-        cabinet_config = self._config.get("cabinets", {})
-        num_cabinets = cabinet_config.get("count", 6)
-        
-        for i in range(1, num_cabinets + 1):
-            x_start = (i - 1) / num_cabinets
-            x_end = i / num_cabinets
-            
-            self._cabinets[i] = CabinetInfo(
-                id=i,
-                name=f"机柜-{i:02d}",
-                x_start=x_start,
-                x_end=x_end,
-                authorized=(i in self._allow_list),
+
+    def _init_adapters(self, config: Dict):
+        """初始化适配器"""
+        # 相机适配器
+        cam_config = config.get("camera", {})
+        if cam_config.get("enabled", True):
+            camera_config = CameraConfig(
+                source=str(cam_config.get("source", "0")),
+                resolution=tuple(cam_config.get("resolution", [640, 480])),
+                fps=cam_config.get("fps", 30),
+                confidence_threshold=cam_config.get("confidence_threshold", 0.5),
+                model_path=cam_config.get("model_path", ""),
             )
-    
+            camera_config.device_id = "camera_main"
+            self._camera_adapter = CameraAdapter(camera_config)
+            self._camera_adapter.connect()
+
+        # 雷达适配器
+        lidar_config = config.get("lidar", {})
+        if lidar_config.get("enabled", True):
+            lidar_cfg = LidarConfig(
+                device_ip=lidar_config.get("device_ip", "192.168.1.100"),
+                device_port=lidar_config.get("device_port", 2368),
+                scan_rate_hz=lidar_config.get("scan_rate_hz", 10),
+                angle_min_deg=lidar_config.get("angle_min_deg", -45),
+                angle_max_deg=lidar_config.get("angle_max_deg", 45),
+            )
+            lidar_cfg.device_id = "lidar_main"
+            self._lidar_adapter = LidarAdapter(lidar_cfg)
+            self._lidar_adapter.connect()
+
+        # 灯光适配器
+        light_config = config.get("light", {})
+        if light_config.get("enabled", True):
+            light_cfg = LightConfig(
+                output_type=light_config.get("output_type", "simulate"),
+            )
+            self._light_adapter = LightAdapter(light_cfg)
+            self._light_adapter.connect()
+
     def infer(
         self,
         frame: np.ndarray,
@@ -324,15 +437,7 @@ class IndoorFencePlugin(BasePlugin):
         context: PluginContext,
     ) -> list[RecognitionResult]:
         """
-        执行推理
-        
-        Args:
-            frame: 输入图像帧 (BGR格式)
-            rois: 识别区域列表
-            context: 运行上下文
-            
-        Returns:
-            识别结果列表
+        执行推理 - 实现五层算法架构
         """
         if not self._initialized:
             return [RecognitionResult(
@@ -349,392 +454,266 @@ class IndoorFencePlugin(BasePlugin):
                 failure_reason="9000",
                 metadata={"error": "插件未初始化"}
             ) for roi in rois]
-        
+
+        start_time = time.time()
+        self._frame_count += 1
         self.status = PluginStatus.RUNNING
-        self._last_inference_time = datetime.now()
-        self._inference_count += 1
-        
+
         results: list[RecognitionResult] = []
-        
-        # 1. 视觉检测
-        visual_detections = self._detect_persons_visual(frame)
-        
-        # 2. 获取雷达数据
-        lidar_scan = self._get_latest_lidar_scan()
-        lidar_clusters = self._cluster_lidar_points(lidar_scan) if lidar_scan else []
-        
-        # 3. 视觉-雷达融合
-        fused_persons = self._fuse_visual_lidar(visual_detections, lidar_clusters)
-        
-        # 4. 更新跟踪和状态
-        for person in fused_persons:
-            # 确定机柜区域
-            person.cabinet_id = self._determine_cabinet(person)
-            person.authorized = person.cabinet_id in self._allow_list
-            
-            # 计算与黄线距离
-            person.distance_to_line = self._calculate_line_distance(person)
-            
-            # 评估状态
-            person.state = self._evaluate_state(person)
-            
-            # 更新跟踪
-            self._tracked_persons[person.person_id] = person
-            
-            # 更新机柜占用状态
-            self._update_cabinet_status(person)
-        
-        # 5. 检查同柜多人
-        default_bbox = rois[0].bbox if rois else BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0)
-        multi_person_alerts = self._check_multi_person(context, default_bbox)
-        
-        # 6. 生成结果
-        for roi in rois:
-            for person in fused_persons:
-                result = self._create_result(roi, person, context)
-                results.append(result)
-            
-            # 添加多人告警
-            for alert in multi_person_alerts:
-                results.append(alert)
-            
-            # 如果没有检测到人
-            if not fused_persons:
-                results.append(RecognitionResult(
+
+        with self._lock:
+            try:
+                # ===== 第1层: 传感器适配 =====
+                visual_detections = self._get_visual_detections(frame)
+                lidar_detections = self._get_lidar_detections()
+
+                # ===== 第2-3层: 融合与跟踪 =====
+                tracks = self._fused_tracker.update(visual_detections, lidar_detections)
+
+                # 获取跟踪位置
+                person_positions = {}
+                person_metadata = {}
+
+                for track in tracks:
+                    person_positions[track.track_id] = track.position
+                    person_metadata[track.track_id] = {
+                        "confidence": track.confidence,
+                        "velocity": track.velocity,
+                        "last_detection": track.last_detection,
+                    }
+
+                # ===== 第4层: 状态机评估 =====
+                # 设置授权
+                for person_id in person_positions.keys():
+                    # 根据allow_list设置授权
+                    self._state_machine.set_authorization(person_id, self._allow_list)
+
+                global_state = self._state_machine.evaluate_global(
+                    person_positions,
+                    person_metadata
+                )
+
+                # 检查多人违规
+                violations = self._state_machine.check_multi_person_violation(
+                    global_state.person_states
+                )
+
+                # 记录状态变化
+                self._check_state_changes(global_state.person_states)
+
+                # ===== 第5层: 输出与控制 =====
+                # 更新灯光
+                if self._light_adapter:
+                    self._light_adapter.set_from_alarm_level(
+                        global_state.light_color,
+                        global_state.status_message
+                    )
+
+                # 记录告警
+                if global_state.alarm_level != GlobalAlarmLevel.GREEN:
+                    self._audit_logger.log_alarm(
+                        global_state.light_color,
+                        global_state.status_message,
+                        {"active_alarms": global_state.active_alarms}
+                    )
+
+                # 记录违规
+                for violation in violations:
+                    self._audit_logger.log_violation(
+                        violation["type"],
+                        violation
+                    )
+
+                # 保存状态
+                self._last_global_state = global_state
+                self._last_process_time = time.time() - start_time
+
+                # 生成结果
+                default_bbox = rois[0].bbox if rois else BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0)
+
+                for roi in rois:
+                    # 为每个人员生成结果
+                    for ps in global_state.person_states:
+                        result = self._create_result(roi, ps, context)
+                        results.append(result)
+
+                    # 添加多人违规告警
+                    for violation in violations:
+                        results.append(RecognitionResult(
+                            task_id=context.task_id,
+                            site_id=context.site_id,
+                            device_id=context.device_id,
+                            component_id=context.component_id,
+                            roi_id=f"cab_{violation.get('cabinet_id', 0)}",
+                            bbox=default_bbox,
+                            label="multi_person",
+                            confidence=1.0,
+                            value=violation.get("message", ""),
+                            model_version=self.version,
+                            code_version=self.code_hash,
+                            metadata=violation
+                        ))
+
+                    # 如果没有检测到人
+                    if not global_state.person_states:
+                        results.append(RecognitionResult(
+                            task_id=context.task_id,
+                            site_id=context.site_id,
+                            device_id=context.device_id,
+                            component_id=context.component_id,
+                            roi_id=roi.id,
+                            bbox=roi.bbox,
+                            label="no_person",
+                            confidence=1.0,
+                            value="区域空闲",
+                            model_version=self.version,
+                            code_version=self.code_hash,
+                            metadata={"message": "未检测到人员"}
+                        ))
+
+                self.status = PluginStatus.READY
+                return results
+
+            except Exception as e:
+                self.status = PluginStatus.ERROR
+                import traceback
+                traceback.print_exc()
+                return [RecognitionResult(
                     task_id=context.task_id,
                     site_id=context.site_id,
                     device_id=context.device_id,
                     component_id=context.component_id,
                     roi_id=roi.id,
                     bbox=roi.bbox,
-                    label="no_person",
-                    confidence=1.0,
-                    value="区域空闲",
+                    label="error",
+                    confidence=0.0,
                     model_version=self.version,
                     code_version=self.code_hash,
-                    metadata={"message": "未检测到人员"}
-                ))
-        
-        self.status = PluginStatus.READY
-        return results
-    
-    def _detect_persons_visual(self, frame: np.ndarray) -> List[Dict]:
-        """视觉检测人员"""
-        if self._detector:
-            return self._detector.detect_persons(frame)
-        return []
-    
-    def _get_latest_lidar_scan(self) -> Optional[LidarScan]:
-        """获取最新雷达扫描数据"""
-        with self._lidar_lock:
-            if self._lidar_buffer:
-                return self._lidar_buffer[-1]
-        return None
-    
-    def _cluster_lidar_points(self, scan: LidarScan) -> List[Dict]:
-        """
-        雷达点云聚类
-        
-        基于文档方案: 识别距离突变点，聚类为独立目标
-        """
-        clusters = []
-        
-        if scan is None or len(scan.distances) == 0:
-            return clusters
-        
-        # 背景距离估计 (取远距离的中位数)
-        bg_distance = np.median(scan.distances[scan.distances > 3.0]) if np.any(scan.distances > 3.0) else 10.0
-        
-        # 前景提取: 距离明显小于背景的点
-        fg_mask = scan.distances < (bg_distance - 0.5)
-        
-        if not np.any(fg_mask):
-            return clusters
-        
-        # 角度连续性聚类
-        fg_indices = np.where(fg_mask)[0]
-        
-        current_cluster = []
-        for i, idx in enumerate(fg_indices):
-            if not current_cluster:
-                current_cluster.append(idx)
-            else:
-                # 检查角度连续性
-                if idx - current_cluster[-1] <= 3:  # 允许3个点的间隔
-                    current_cluster.append(idx)
-                else:
-                    # 保存当前簇
-                    if len(current_cluster) >= 3:  # 至少3个点
-                        clusters.append(self._create_cluster(scan, current_cluster))
-                    current_cluster = [idx]
-        
-        # 处理最后一个簇
-        if len(current_cluster) >= 3:
-            clusters.append(self._create_cluster(scan, current_cluster))
-        
-        return clusters
-    
-    def _create_cluster(self, scan: LidarScan, indices: List[int]) -> Dict:
-        """创建点云簇"""
-        angles = scan.angles[indices]
-        distances = scan.distances[indices]
-        
-        return {
-            "center_angle": float(np.mean(angles)),
-            "center_distance": float(np.mean(distances)),
-            "min_distance": float(np.min(distances)),
-            "angle_span": float(np.max(angles) - np.min(angles)),
-            "point_count": len(indices),
-        }
-    
-    def _fuse_visual_lidar(
-        self, 
-        visual_detections: List[Dict], 
-        lidar_clusters: List[Dict]
-    ) -> List[PersonTracking]:
-        """
-        视觉-雷达数据融合
-        
-        基于文档方案: 角度匹配融合
-        """
-        fused_persons = []
-        used_clusters = set()
-        
-        # 相机参数
-        camera_cx = self._config.get("camera", {}).get("cx", 320)
-        camera_fx = self._config.get("camera", {}).get("fx", 500)
-        
-        for vis_det in visual_detections:
-            # 计算视觉目标的方位角
-            bbox = vis_det.get("bbox", {})
-            center_x = bbox.get("x", 0) + bbox.get("width", 0) / 2
-            alpha_img = np.degrees(np.arctan2(center_x - camera_cx / 640, camera_fx / 640))
-            
-            # 在雷达数据中寻找最佳匹配
-            best_match = None
-            min_angle_diff = self._angle_threshold
-            
-            for i, cluster in enumerate(lidar_clusters):
-                if i in used_clusters:
-                    continue
-                
-                angle_diff = abs(alpha_img - cluster["center_angle"])
-                if angle_diff < min_angle_diff:
-                    min_angle_diff = angle_diff
-                    best_match = (i, cluster)
-            
-            # 创建融合跟踪数据
-            person = PersonTracking(
-                person_id=f"P{self._next_person_id:03d}",
-                visual_bbox=bbox,
-                visual_confidence=vis_det.get("confidence", 0.0),
-                zone_visual=self._get_zone_from_bbox(bbox),
-                visual_valid=True,
-            )
-            self._next_person_id += 1
-            
-            if best_match:
-                idx, cluster = best_match
-                used_clusters.add(idx)
-                
-                person.lidar_distance = cluster["center_distance"]
-                person.lidar_angle = cluster["center_angle"]
-                person.zone_lidar = self._get_zone_from_angle(cluster["center_angle"])
-                person.lidar_valid = True
-                
-                # 融合位置 (使用雷达距离 + 视觉横向位置)
-                person.fused_position = {
-                    "x": center_x,
-                    "y": bbox.get("y", 0) + bbox.get("height", 0),
-                    "distance": cluster["center_distance"],
-                }
-            else:
-                person.lidar_valid = False
-            
-            fused_persons.append(person)
-        
-        return fused_persons
-    
-    def _get_zone_from_bbox(self, bbox: Dict) -> int:
-        """从边界框获取机柜区域"""
-        center_x = bbox.get("x", 0) + bbox.get("width", 0) / 2
-        
-        for cab_id, cab in self._cabinets.items():
-            if cab.x_start <= center_x < cab.x_end:
-                return cab_id
-        
-        return 0
-    
-    def _get_zone_from_angle(self, angle: float) -> int:
-        """从雷达角度获取机柜区域"""
-        # 简化映射: 假设角度范围-45到45度对应机柜1-6
-        normalized = (angle + 45) / 90  # 归一化到0-1
-        cab_id = int(normalized * len(self._cabinets)) + 1
-        return max(1, min(len(self._cabinets), cab_id))
-    
-    def _determine_cabinet(self, person: PersonTracking) -> int:
-        """确定人员所在机柜"""
-        if person.zone_visual == person.zone_lidar and person.zone_visual > 0:
-            return person.zone_visual
-        
-        # 优先使用视觉结果
-        if person.visual_valid and person.zone_visual > 0:
-            return person.zone_visual
-        
-        # 退化使用雷达结果
-        if person.lidar_valid and person.zone_lidar > 0:
-            return person.zone_lidar
-        
-        return 0
-    
-    def _calculate_line_distance(self, person: PersonTracking) -> float:
-        """计算人员与黄线的距离"""
-        if person.lidar_valid:
-            # 使用雷达测量的距离
-            # 假设黄线位置在距离雷达2米处
-            yellow_line_position = self._config.get("yellow_line_position_m", 2.0)
-            return abs(person.lidar_distance - yellow_line_position)
-        
-        # 无雷达数据时返回默认安全距离
-        return self._yellow_line_distance + 0.1
-    
-    def _evaluate_state(self, person: PersonTracking) -> PersonState:
-        """
-        评估人员状态
-        
-        基于文档方案的状态定义
-        """
-        # 降级模式检查
-        if not person.visual_valid:
-            return PersonState.LIDAR_ONLY
-        if not person.lidar_valid:
-            return PersonState.VISION_ONLY
-        
-        # 越线检查 (最高优先级)
-        if person.distance_to_line < self._danger_distance:
-            return PersonState.DANGER_LINE
-        
-        # 授权检查
-        if person.distance_to_line >= self._yellow_line_distance:
-            if person.authorized:
-                return PersonState.SAFE_AUTH
-            else:
-                return PersonState.SAFE_UNAUTH
-        else:
-            # 在警告区域
-            if person.authorized:
-                return PersonState.SAFE_AUTH
-            else:
-                return PersonState.SAFE_UNAUTH
-    
-    def _update_cabinet_status(self, person: PersonTracking):
-        """更新机柜状态"""
-        cab_id = person.cabinet_id
-        if cab_id in self._cabinets:
-            cab = self._cabinets[cab_id]
-            
-            if person.person_id not in cab.occupants:
-                cab.occupants.append(person.person_id)
-            
-            if person.state == PersonState.DANGER_LINE:
-                cab.status = "alert"
-            elif len(cab.occupants) > 0:
-                cab.status = "occupied"
-    
-    def _check_multi_person(
-        self,
-        context: PluginContext,
-        default_bbox: BoundingBox,
-    ) -> List[RecognitionResult]:
-        """检查同柜多人情况"""
-        alerts = []
-        max_per_cab = self._config.get("cabinet_authorization", {}).get("max_persons_per_cabinet", 1)
-        
-        for cab_id, cab in self._cabinets.items():
-            if len(cab.occupants) > max_per_cab:
-                self._alert_count += 1
-                alerts.append(RecognitionResult(
-                    task_id=context.task_id,
-                    site_id=context.site_id,
-                    device_id=context.device_id,
-                    component_id=context.component_id,
-                    roi_id=f"cab_{cab_id}",
-                    bbox=default_bbox,
-                    label="multi_person",
-                    confidence=1.0,
-                    value=f"机柜{cab_id}前有{len(cab.occupants)}人",
-                    model_version=self.version,
-                    code_version=self.code_hash,
-                    metadata={
-                        "cabinet_id": cab_id,
-                        "person_count": len(cab.occupants),
-                        "persons": cab.occupants,
+                    failure_reason="9001",
+                    metadata={"error": str(e)}
+                ) for roi in rois]
+
+    def _get_visual_detections(self, frame: Optional[np.ndarray]) -> List[VisualDetection]:
+        """获取视觉检测结果"""
+        detections = []
+
+        if self._camera_adapter and self._camera_adapter.is_connected:
+            person_detections = self._camera_adapter.get_person_detections(frame)
+
+            if person_detections:
+                for pd in person_detections:
+                    vis_det = VisualDetection(
+                        detection_id=pd.detection_id,
+                        bbox=pd.bbox,
+                        foot_pixel=pd.foot_pixel,
+                        confidence=pd.confidence,
+                        timestamp=pd.timestamp,
+                        track_id=pd.track_id,
+                    )
+                    detections.append(vis_det)
+
+        return detections
+
+    def _get_lidar_detections(self) -> List[LidarDetection]:
+        """获取雷达检测结果"""
+        detections = []
+
+        if self._lidar_adapter and self._lidar_adapter.is_connected:
+            scan = self._lidar_adapter.get_scan()
+
+            if scan:
+                clusters = self._lidar_adapter.get_clusters(scan)
+
+                for cluster in clusters:
+                    lid_det = LidarDetection(
+                        cluster_id=cluster.cluster_id,
+                        center_distance=cluster.center_distance,
+                        center_angle=cluster.center_angle,
+                        point_count=cluster.point_count,
+                        confidence=cluster.confidence,
+                    )
+                    detections.append(lid_det)
+
+        return detections
+
+    def _check_state_changes(self, person_states: List[PersonStateResult]):
+        """检查并记录状态变化"""
+        for ps in person_states:
+            old_state = self._person_state_cache.get(ps.person_id)
+            new_state = ps.state
+
+            if old_state != new_state:
+                self._audit_logger.log_state_change(
+                    ps.person_id,
+                    old_state.value if old_state else "none",
+                    new_state.value,
+                    {
+                        "zone": ps.current_zone,
+                        "cabinet": ps.current_cabinet,
+                        "distance_to_line": ps.distance_to_yellow_line,
+                        "authorized": ps.is_authorized,
                     }
-                ))
-        
-        return alerts
-    
+                )
+                self._person_state_cache[ps.person_id] = new_state
+
     def _create_result(
         self,
         roi: ROI,
-        person: PersonTracking,
+        person_state: PersonStateResult,
         context: PluginContext,
     ) -> RecognitionResult:
         """创建识别结果"""
-        if person.state == PersonState.DANGER_LINE:
+        state = person_state.state
+
+        if state in (PersonState.CROSS_LINE, PersonState.HIGH_RISK):
             self._alert_count += 1
 
-        bbox = roi.bbox
-        if person.visual_bbox:
-            try:
-                bbox = BoundingBox(**person.visual_bbox)
-            except Exception:
-                bbox = roi.bbox
-        
-        # 状态标签
+        # 状态标签映射
         label_map = {
-            PersonState.SAFE_AUTH: "safe_auth",
-            PersonState.SAFE_UNAUTH: "unauthorized",
-            PersonState.DANGER_LINE: "line_cross",
-            PersonState.VISION_ONLY: "degraded",
-            PersonState.LIDAR_ONLY: "degraded",
+            PersonState.NORMAL: "safe",
+            PersonState.ON_LINE: "on_line",
+            PersonState.CROSS_LINE: "line_cross",
+            PersonState.MISPLACED: "unauthorized",
+            PersonState.HIGH_RISK: "high_risk",
         }
-        
+
         label_name_map = {
-            PersonState.SAFE_AUTH: "授权安全",
-            PersonState.SAFE_UNAUTH: "未授权操作",
-            PersonState.DANGER_LINE: "越线危险",
-            PersonState.VISION_ONLY: "降级模式(仅视觉)",
-            PersonState.LIDAR_ONLY: "降级模式(仅雷达)",
+            PersonState.NORMAL: "安全状态",
+            PersonState.ON_LINE: "压线警告",
+            PersonState.CROSS_LINE: "越线危险",
+            PersonState.MISPLACED: "未授权操作",
+            PersonState.HIGH_RISK: "高风险区域",
         }
-        
+
+        # 计算边界框
+        bbox = roi.bbox
+
         return RecognitionResult(
             task_id=context.task_id,
             site_id=context.site_id,
             device_id=context.device_id,
             component_id=context.component_id,
             roi_id=roi.id,
-            label=label_map.get(person.state, "unknown"),
-            confidence=person.visual_confidence,
-            value=f"机柜{person.cabinet_id} · {person.distance_to_line:.2f}m",
+            label=label_map.get(state, "unknown"),
+            confidence=1.0,
+            value=f"机柜{person_state.current_cabinet or 0} · {person_state.distance_to_yellow_line:.2f}m",
             bbox=bbox,
             model_version=self.version,
             code_version=self.code_hash,
             metadata={
-                "person_id": person.person_id,
-                "state": person.state.value,
-                "label_name": label_name_map.get(person.state, "未知"),
-                "cabinet_id": person.cabinet_id,
-                "authorized": person.authorized,
-                "distance_to_line_m": person.distance_to_line,
-                "lidar_distance_m": person.lidar_distance,
-                "zone_visual": person.zone_visual,
-                "zone_lidar": person.zone_lidar,
-                "visual_valid": person.visual_valid,
-                "lidar_valid": person.lidar_valid,
+                "person_id": person_state.person_id,
+                "state": state.value,
+                "label_name": label_name_map.get(state, "未知"),
+                "cabinet_id": person_state.current_cabinet,
+                "zone_id": person_state.current_zone,
+                "authorized": person_state.is_authorized,
+                "distance_to_line_m": person_state.distance_to_yellow_line,
+                "position": {"x": person_state.position.x, "y": person_state.position.y},
+                "alert_level": person_state.alert_level.value,
+                "alert_message": person_state.alert_message,
             }
         )
-    
+
     def postprocess(
         self,
         results: list[RecognitionResult],
@@ -760,9 +739,21 @@ class IndoorFencePlugin(BasePlugin):
                     device_id=result.device_id,
                     component_id=result.component_id,
                 ))
-                continue
 
-            if result.label == "unauthorized":
+            elif result.label == "high_risk":
+                person_id = result.metadata.get("person_id", "人员")
+                alarms.append(Alarm(
+                    task_id=result.task_id,
+                    result_id=None,
+                    level=AlarmLevel.CRITICAL,
+                    title=self.LABEL_NAMES.get("high_risk", "高风险"),
+                    message=f"{person_id}进入高风险区域！",
+                    site_id=result.site_id,
+                    device_id=result.device_id,
+                    component_id=result.component_id,
+                ))
+
+            elif result.label == "unauthorized":
                 person_id = result.metadata.get("person_id", "人员")
                 cabinet_id = result.metadata.get("cabinet_id")
                 cabinet_text = f"机柜{cabinet_id}" if cabinet_id is not None else "未授权区域"
@@ -776,11 +767,24 @@ class IndoorFencePlugin(BasePlugin):
                     device_id=result.device_id,
                     component_id=result.component_id,
                 ))
-                continue
 
-            if result.label == "multi_person":
+            elif result.label == "on_line":
+                person_id = result.metadata.get("person_id", "人员")
+                distance = result.metadata.get("distance_to_line_m")
+                alarms.append(Alarm(
+                    task_id=result.task_id,
+                    result_id=None,
+                    level=AlarmLevel.WARNING,
+                    title=self.LABEL_NAMES.get("on_line", "压线警告"),
+                    message=f"{person_id}接近黄线，距离{distance:.2f}m",
+                    site_id=result.site_id,
+                    device_id=result.device_id,
+                    component_id=result.component_id,
+                ))
+
+            elif result.label == "multi_person":
                 cabinet_id = result.metadata.get("cabinet_id")
-                person_count = result.metadata.get("person_count")
+                person_count = result.metadata.get("current_count")
                 cabinet_text = f"机柜{cabinet_id}" if cabinet_id is not None else "机柜区域"
                 count_text = f"{person_count}人" if person_count is not None else "多人"
                 alarms.append(Alarm(
@@ -804,97 +808,142 @@ class IndoorFencePlugin(BasePlugin):
                 message="插件未初始化",
                 details={"status": "not_initialized"},
             )
-        
-        lidar_ok = len(self._lidar_buffer) > 0
-        
+
+        # 检查适配器状态
+        adapters_ok = True
+        adapter_details = {}
+
+        if self._camera_adapter:
+            adapter_details["camera"] = self._camera_adapter.status.value
+            if not self._camera_adapter.is_connected:
+                adapters_ok = False
+
+        if self._lidar_adapter:
+            adapter_details["lidar"] = self._lidar_adapter.status.value
+            if not self._lidar_adapter.is_connected:
+                adapters_ok = False
+
+        if self._light_adapter:
+            adapter_details["light"] = self._light_adapter.status.value
+
+        # 检查处理时间
+        latency_ok = self._last_process_time < 0.2  # < 200ms
+
+        person_count = len(self._last_global_state.person_states) if self._last_global_state else 0
+        cabinet_count = len(self._zone_config.cabinets) if self._zone_config else 0
+
         return HealthStatus(
-            healthy=True,
-            message=f"室内监控就绪，{len(self._cabinets)}个机柜，{len(self._tracked_persons)}人跟踪中",
+            healthy=adapters_ok and latency_ok,
+            message=f"室内监控就绪 V2.0，{cabinet_count}个机柜，{person_count}人跟踪中",
             details={
                 "status": "ready",
-                "inference_count": self._inference_count,
+                "version": "2.0.0",
+                "frame_count": self._frame_count,
                 "alert_count": self._alert_count,
-                "tracked_persons": len(self._tracked_persons),
-                "cabinet_count": len(self._cabinets),
+                "tracked_persons": person_count,
+                "cabinet_count": cabinet_count,
                 "allow_list": self._allow_list,
-                "lidar_connected": lidar_ok,
-                "last_inference": self._last_inference_time.isoformat() if self._last_inference_time else None,
+                "adapters": adapter_details,
+                "last_process_time_ms": self._last_process_time * 1000,
+                "last_alarm_level": self._last_global_state.light_color if self._last_global_state else "green",
             }
         )
-    
+
     def cleanup(self) -> None:
         """清理资源"""
-        self._tracked_persons.clear()
-        self._lidar_buffer.clear()
-        for cab in self._cabinets.values():
-            cab.occupants.clear()
-            cab.status = "idle"
-        
-        if self._detector and hasattr(self._detector, 'cleanup'):
-            self._detector.cleanup()
-        
+        # 断开适配器
+        if self._camera_adapter:
+            self._camera_adapter.disconnect()
+        if self._lidar_adapter:
+            self._lidar_adapter.disconnect()
+        if self._light_adapter:
+            self._light_adapter.all_off()
+            self._light_adapter.disconnect()
+
+        # 关闭审计日志
+        if self._audit_logger:
+            self._audit_logger.close()
+
+        # 重置状态
+        self._person_state_cache.clear()
+
         self._initialized = False
         self.status = PluginStatus.UNLOADED
         print(f"[{self.id}] 插件已清理")
-    
-    # ==================== 雷达数据接口 ====================
-    
-    def feed_lidar_scan(self, scan_data: Dict):
-        """
-        接收雷达扫描数据
-        
-        Args:
-            scan_data: {
-                "angles": List[float],
-                "distances": List[float],
-                "timestamp": datetime or str
-            }
-        """
-        scan = LidarScan(
-            timestamp=datetime.fromisoformat(scan_data["timestamp"]) if isinstance(scan_data["timestamp"], str) else scan_data["timestamp"],
-            angles=np.array(scan_data["angles"]),
-            distances=np.array(scan_data["distances"]),
-        )
-        
-        with self._lidar_lock:
-            self._lidar_buffer.append(scan)
-    
-    # ==================== 授权管理接口 ====================
-    
+
+    # ==================== 扩展API接口 ====================
+
     def update_allow_list(self, cabinet_ids: List[int]):
         """更新授权机柜列表"""
         self._allow_list = cabinet_ids
-        for cab_id, cab in self._cabinets.items():
-            cab.authorized = cab_id in self._allow_list
+        if self._audit_logger:
+            self._audit_logger.log_event("config_change", {
+                "key": "allow_list",
+                "value": cabinet_ids,
+            })
         print(f"[{self.id}] 授权列表已更新: {self._allow_list}")
-    
+
+    def set_authorization(self, person_id: str, cabinet_ids: List[int]):
+        """设置人员授权"""
+        if self._state_machine:
+            self._state_machine.set_authorization(person_id, cabinet_ids)
+            if self._audit_logger:
+                self._audit_logger.log_event("authorization", {
+                    "person_id": person_id,
+                    "cabinet_ids": cabinet_ids,
+                    "message": f"设置授权: {person_id} -> 机柜{cabinet_ids}",
+                })
+
+    def clear_authorization(self, person_id: str):
+        """清除人员授权"""
+        if self._state_machine:
+            self._state_machine.clear_authorization(person_id)
+            if self._audit_logger:
+                self._audit_logger.log_event("authorization", {
+                    "person_id": person_id,
+                    "action": "clear",
+                    "message": f"清除授权: {person_id}",
+                })
+
     def get_cabinet_status(self) -> Dict[int, Dict]:
         """获取所有机柜状态"""
+        if not self._zone_config:
+            return {}
+
         return {
             cab_id: {
-                "id": cab.id,
+                "id": cab_id,
                 "name": cab.name,
-                "authorized": cab.authorized,
                 "status": cab.status,
-                "occupants": cab.occupants.copy(),
+                "occupants": cab.current_occupants,
+                "authorized": cab.is_authorized,
             }
-            for cab_id, cab in self._cabinets.items()
+            for cab_id, cab in self._zone_config.cabinets.items()
         }
-    
+
     def get_tracked_persons(self) -> List[Dict]:
         """获取跟踪人员列表"""
+        if not self._last_global_state:
+            return []
+
         return [
             {
-                "person_id": p.person_id,
-                "state": p.state.value,
-                "cabinet_id": p.cabinet_id,
-                "authorized": p.authorized,
-                "distance_to_line_m": p.distance_to_line,
-                "timestamp": p.timestamp.isoformat(),
+                "person_id": ps.person_id,
+                "state": ps.state.value,
+                "position": {"x": ps.position.x, "y": ps.position.y},
+                "cabinet_id": ps.current_cabinet,
+                "authorized": ps.is_authorized,
+                "distance_to_line_m": ps.distance_to_yellow_line,
             }
-            for p in self._tracked_persons.values()
+            for ps in self._last_global_state.person_states
         ]
-    
+
+    def get_recent_events(self, limit: int = 100) -> List[Dict]:
+        """获取最近事件"""
+        if self._audit_logger:
+            return self._audit_logger.get_recent_events(limit)
+        return []
+
     def get_ui_config(self) -> Dict[str, Any]:
         """获取UI配置"""
         return {
@@ -904,8 +953,38 @@ class IndoorFencePlugin(BasePlugin):
                 {"id": "auth_check", "name": "授权校验", "default": True},
                 {"id": "multi_person", "name": "多人检测", "default": True},
             ],
-            "cabinet_count": len(self._cabinets),
+            "cabinet_count": len(self._zone_config.cabinets) if self._zone_config else 0,
             "allow_list": self._allow_list,
-            "yellow_line_distance_m": self._yellow_line_distance,
+            "yellow_line_distance_m": self._config.get("safety_zone", {}).get("yellow_line_distance_m", 0.5),
             "lidar_enabled": self._config.get("lidar", {}).get("enabled", False),
+            "camera_enabled": self._config.get("camera", {}).get("enabled", False),
+            "version": "2.0.0",
+        }
+
+    def get_zone_config(self) -> Dict:
+        """获取区域配置"""
+        if not self._zone_config:
+            return {}
+
+        return {
+            "id": self._zone_config.config_id,
+            "name": self._zone_config.config_name,
+            "zones": [
+                {
+                    "id": z.zone_id,
+                    "name": z.name,
+                    "type": z.zone_type.value,
+                    "vertices": [(v.x, v.y) for v in z.polygon.vertices],
+                }
+                for z in self._zone_config.zones.values()
+            ],
+            "cabinets": [
+                {
+                    "id": c.cabinet_id,
+                    "name": c.name,
+                    "x_start": c.x_start,
+                    "x_end": c.x_end,
+                }
+                for c in self._zone_config.cabinets.values()
+            ],
         }

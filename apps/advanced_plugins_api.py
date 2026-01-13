@@ -252,12 +252,19 @@ class AdvancedPluginManager:
         try:
             # 确保项目根目录在 sys.path 中
             import sys
+            import importlib
             from pathlib import Path
             project_root = Path(__file__).parent.parent
             project_root_str = str(project_root)
-            if project_root_str not in sys.path:
-                sys.path.insert(0, project_root_str)
-                logger.info(f"已添加项目根目录到 sys.path: {project_root_str}")
+
+            # === 修复: 确保项目根目录在 sys.path 最前面 ===
+            if project_root_str in sys.path:
+                sys.path.remove(project_root_str)
+            sys.path.insert(0, project_root_str)
+            logger.debug(f"项目根目录已设置到 sys.path 首位: {project_root_str}")
+
+            # === 修复: 强制刷新模块缓存 ===
+            importlib.invalidate_caches()
 
             # 尝试导入各个插件
             plugins_to_load = [
@@ -268,10 +275,16 @@ class AdvancedPluginManager:
                 ("multimodal_fusion", "plugins.multimodal_fusion.plugin", "MultimodalFusionPlugin"),
             ]
 
-            # 如果强制重新加载，清空现有插件
+            # 如果强制重新加载，清空现有插件并清理模块缓存
             if force_reload:
                 self._plugins = {}
                 self._plugins_initialized = False
+                # === 修复: 清理 sys.modules 中的旧条目 ===
+                modules_to_remove = [k for k in sys.modules.keys() if k.startswith('plugins.')]
+                for mod_name in modules_to_remove:
+                    del sys.modules[mod_name]
+                logger.debug(f"已清理 {len(modules_to_remove)} 个插件模块缓存")
+                importlib.invalidate_caches()
 
             for plugin_id, module_path, class_name in plugins_to_load:
                 # 跳过已成功加载的插件（除非强制重新加载）
@@ -280,7 +293,13 @@ class AdvancedPluginManager:
                     logger.debug(f"插件 {plugin_id} 已加载，跳过")
                     continue
                 try:
-                    import importlib
+                    # === 修复: 清理该插件相关的模块缓存 ===
+                    plugin_module_prefix = f"plugins.{plugin_id}"
+                    modules_to_clean = [k for k in sys.modules.keys() if k.startswith(plugin_module_prefix)]
+                    for mod_name in modules_to_clean:
+                        del sys.modules[mod_name]
+
+                    importlib.invalidate_caches()
                     module = importlib.import_module(module_path)
                     plugin_class = getattr(module, class_name)
 

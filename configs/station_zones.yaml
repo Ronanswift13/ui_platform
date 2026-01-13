@@ -1,0 +1,141 @@
+# 变电站室内区域配置
+# 版本: 2.0.0
+# 适用场景: 6机柜配电室
+
+id: "default_6cabinet"
+name: "默认6机柜配置"
+version: "1.0.0"
+coordinate_system: "local"  # local: 本地坐标系(米)
+unit: "meter"
+
+# 场景边界 (10m x 6m)
+scene_bounds:
+  x_min: 0.0
+  x_max: 10.0
+  y_min: 0.0
+  y_max: 6.0
+
+# 区域定义
+zones:
+  # 主通道 (y=0~2m)
+  - id: "passage_main"
+    name: "主通道"
+    type: "passage"
+    alert_level: "normal"
+    vertices:
+      - [0.0, 0.0]
+      - [10.0, 0.0]
+      - [10.0, 2.0]
+      - [0.0, 2.0]
+    require_authorization: false
+    max_occupancy: 10
+
+# 机柜定义 (y=2~6m, 等分为6个)
+cabinets:
+  - id: 1
+    name: "机柜-01"
+    vertices:
+      - [0.0, 2.0]
+      - [1.67, 2.0]
+      - [1.67, 6.0]
+      - [0.0, 6.0]
+    yellow_line:
+      start: [0.0, 2.5]
+      end: [1.67, 2.5]
+    yellow_line_distance: 0.5
+    max_occupancy: 1
+    require_authorization: true
+
+  - id: 2
+    name: "机柜-02"
+    vertices:
+      - [1.67, 2.0]
+      - [3.33, 2.0]
+      - [3.33, 6.0]
+      - [1.67, 6.0]
+    yellow_line:
+      start: [1.67, 2.5]
+      end: [3.33, 2.5]
+    yellow_line_distance: 0.5
+    max_occupancy: 1
+    require_authorization: true
+
+  - id: 3
+    name: "机柜-03"
+    vertices:
+      - [3.33, 2.0]
+      - [5.0, 2.0]
+      - [5.0, 6.0]
+      - [3.33, 6.0]
+    yellow_line:
+      start: [3.33, 2.5]
+      end: [5.0, 2.5]
+    yellow_line_distance: 0.5
+    max_occupancy: 1
+    require_authorization: true
+
+  - id: 4
+    name: "机柜-04"
+    vertices:
+      - [5.0, 2.0]
+      - [6.67, 2.0]
+      - [6.67, 6.0]
+      - [5.0, 6.0]
+    yellow_line:
+      start: [5.0, 2.5]
+      end: [6.67, 2.5]
+    yellow_line_distance: 0.5
+    max_occupancy: 1
+    require_authorization: true
+
+  - id: 5
+    name: "机柜-05"
+    vertices:
+      - [6.67, 2.0]
+      - [8.33, 2.0]
+      - [8.33, 6.0]
+      - [6.67, 6.0]
+    yellow_line:
+      start: [6.67, 2.5]
+      end: [8.33, 2.5]
+    yellow_line_distance: 0.5
+    max_occupancy: 1
+    require_authorization: true
+
+  - id: 6
+    name: "机柜-06"
+    vertices:
+      - [8.33, 2.0]
+      - [10.0, 2.0]
+      - [10.0, 6.0]
+      - [8.33, 6.0]
+    yellow_line:
+      start: [8.33, 2.5]
+      end: [10.0, 2.5]
+    yellow_line_distance: 0.5
+    max_occupancy: 1
+    require_authorization: true
+
+# 阈值配置
+thresholds:
+  on_line_distance: 0.3    # 压线判定距离(米)
+  cross_line_distance: 0.0  # 越线判定距离(米)
+  debounce_frames: 5       # 状态去抖帧数
+  confirm_frames: 3        # 状态确认帧数
+
+# 传感器安装参数
+sensors:
+  camera:
+    position: [5.0, 0.5, 3.0]  # x, y, z (米)
+    tilt_deg: 40.0
+    fov_deg: 90.0
+  lidar:
+    position: [5.0, 0.5, 2.5]  # x, y, z (米)
+    tilt_deg: 20.0
+    scan_range_deg: [-45, 45]
+
+# 报警配置
+alarm:
+  green_states: ["normal"]
+  yellow_states: ["on_line", "misplaced"]
+  red_states: ["cross_line", "high_risk"]
