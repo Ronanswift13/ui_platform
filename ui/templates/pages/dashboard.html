@@ -557,7 +557,7 @@
     <div class="dashboard-toolbar">
         <div class="toolbar-title">
             <i class="bi bi-lightning-charge-fill"></i>
-            透明变电站监测中心
+            激光星芒破夜绘明监测中心
             <span class="version">V2.0</span>
         </div>
         <div class="toolbar-controls">
@@ -586,9 +586,9 @@
 
     <!-- 左侧模块导航 -->
     <div class="module-sidebar">
-        <!-- 基础巡视模块 -->
+        <!-- 室外巡视模块 (V3.0重组) -->
         <div class="module-group">
-            <div class="module-group-title">基础巡视</div>
+            <div class="module-group-title">室外巡视</div>
 
             <div class="module-item active" data-module="transformer" onclick="switchModule('transformer')">
                 <i class="bi bi-box text-primary"></i>
@@ -626,6 +626,14 @@
                 <i class="bi bi-speedometer2 text-danger"></i>
                 <div class="module-item-info">
                     <div class="module-item-name">表计读数</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </div>
+
+            <div class="module-item" data-module="bird" onclick="switchModule('bird')">
+                <i class="bi bi-feather" style="color: #17a2b8;"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">鸟类监控</div>
                     <div class="module-item-status ready">已就绪</div>
                 </div>
             </div>
@@ -723,6 +731,9 @@
             <div class="panel-tab" data-panel="analysis" onclick="switchPanel('analysis')">
                 <i class="bi bi-graph-up"></i> 分析
             </div>
+            <div class="panel-tab" data-panel="controls" onclick="switchPanel('controls')">
+                <i class="bi bi-sliders"></i> 功能设置
+            </div>
         </div>
 
         <div class="panel-content">
@@ -785,6 +796,19 @@
                         <li class="mb-1"><i class="bi bi-info-circle text-info me-2"></i>建议关注套管温升</li>
                         <li class="mb-1"><i class="bi bi-exclamation-circle text-warning me-2"></i>油位略低于正常范围</li>
                     </ul>
+                </div>
+            </div>
+
+            <!-- 功能设置面板 (V3.0新增) -->
+            <div class="panel-section" id="panel-controls">
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-light">模块功能设置</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="applyModuleSettings()">
+                        <i class="bi bi-check"></i> 应用
+                    </button>
+                </div>
+                <div id="module-controls-container">
+                    {% include 'components/dashboard_module_controls.html' %}
                 </div>
             </div>
         </div>

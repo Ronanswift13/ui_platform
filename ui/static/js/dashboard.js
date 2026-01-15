@@ -1,6 +1,6 @@
 /**
- * 透明变电站监测中心 Dashboard JavaScript
- * 输变电监测平台 V2.0
+ * 激光星芒破夜绘明监测中心 Dashboard JavaScript
+ * 输变电监测平台 V3.0
  *
  * 功能:
  * - 统一模块切换与管理
@@ -8,13 +8,14 @@
  * - 检测结果可视化
  * - 告警管理与联动
  * - 多摄像头切换
+ * - 模块功能面板集成
  */
 
 // =============================================================================
 // 全局状态
 // =============================================================================
 const DashboardState = {
-    version: '2.0.0',
+    version: '3.0.0',
     currentModule: 'transformer',
     currentCamera: 'cam1',
     currentVoltage: '110kv',
@@ -42,15 +43,16 @@ const DashboardState = {
         memoryUsage: 0
     },
 
-    // 模块配置
+    // 模块配置 (V3.0重组)
     modules: {
-        // 基础模块
-        transformer: { name: '主变巡视', icon: 'box', type: 'basic', loaded: false },
-        switch: { name: '开关巡视', icon: 'toggle-on', type: 'basic', loaded: false },
-        busbar: { name: '母线巡视', icon: 'diagram-3', type: 'basic', loaded: false },
-        capacitor: { name: '电容器巡视', icon: 'battery-charging', type: 'basic', loaded: false },
-        meter: { name: '表计读数', icon: 'speedometer2', type: 'basic', loaded: false },
-        // 高级模块
+        // 室外巡视模块
+        transformer: { name: '主变巡视', icon: 'box', type: 'outdoor', loaded: false },
+        switch: { name: '开关巡视', icon: 'toggle-on', type: 'outdoor', loaded: false },
+        busbar: { name: '母线巡视', icon: 'diagram-3', type: 'outdoor', loaded: false },
+        capacitor: { name: '电容器巡视', icon: 'battery-charging', type: 'outdoor', loaded: false },
+        meter: { name: '表计读数', icon: 'speedometer2', type: 'outdoor', loaded: false },
+        bird: { name: '鸟类监控', icon: 'feather', type: 'outdoor', loaded: false },
+        // 高级监测模块
         acoustic: { name: '声学监测', icon: 'soundwave', type: 'advanced', loaded: false },
         gas: { name: '气体检测', icon: 'cloud-haze2', type: 'advanced', loaded: false },
         hyperspectral: { name: '高光谱检测', icon: 'rainbow', type: 'advanced', loaded: false },
@@ -94,6 +96,9 @@ function initDashboard() {
     // 加载初始区域和告警
     loadRegions();
     loadAlarms();
+
+    // V3.0: 初始化模块功能面板
+    loadModuleControlPanel(DashboardState.currentModule);
 
     console.log('[Dashboard] 初始化完成');
 }
@@ -316,6 +321,87 @@ function switchModule(moduleId) {
 
     // 更新区域列表
     loadRegions();
+
+    // V3.0: 切换功能控制面板
+    loadModuleControlPanel(moduleId);
+}
+
+/**
+ * V3.0新增: 加载模块功能控制面板
+ */
+function loadModuleControlPanel(moduleId) {
+    // 隐藏所有模块控制面板
+    document.querySelectorAll('.module-control-panel').forEach(panel => {
+        panel.style.display = 'none';
+    });
+
+    // 显示当前模块的控制面板
+    const targetPanel = document.getElementById(`panel-${moduleId}`);
+    if (targetPanel) {
+        targetPanel.style.display = 'block';
+        console.log(`[Controls] 显示模块面板: ${moduleId}`);
+    } else {
+        console.log(`[Controls] 模块 ${moduleId} 无专属控制面板`);
+    }
+}
+
+/**
+ * V3.0新增: 应用模块设置
+ */
+function applyModuleSettings() {
+    const moduleId = DashboardState.currentModule;
+    const settings = collectModuleSettings(moduleId);
+
+    console.log(`[Settings] 应用 ${moduleId} 设置:`, settings);
+
+    // 发送设置到后端
+    fetch(`/api/module/${moduleId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('设置已应用', 'success');
+        } else {
+            showNotification('设置应用失败: ' + (data.message || ''), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('[Settings] 应用失败:', error);
+        showNotification('设置应用失败', 'error');
+    });
+}
+
+/**
+ * V3.0新增: 收集模块设置
+ */
+function collectModuleSettings(moduleId) {
+    const settings = {};
+    const panel = document.getElementById(`panel-${moduleId}`);
+
+    if (!panel) return settings;
+
+    // 收集所有checkbox设置
+    panel.querySelectorAll('input[type="checkbox"]').forEach(input => {
+        settings[input.id] = input.checked;
+    });
+
+    // 收集所有number/text输入
+    panel.querySelectorAll('input[type="number"], input[type="text"]').forEach(input => {
+        settings[input.id || input.name] = input.value;
+    });
+
+    return settings;
+}
+
+/**
+ * V3.0新增: 显示通知
+ */
+function showNotification(message, type = 'info') {
+    console.log(`[Notification] ${type}: ${message}`);
+    // 可以在这里添加Toast通知UI
 }
 
 async function loadModuleData(moduleId) {

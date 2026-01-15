@@ -22,53 +22,36 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    <!-- Dashboard监测中心 (V2.0新增) -->
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'dashboard' %}active{% endif %}" href="/dashboard">
-                            <i class="bi bi-grid-1x2-fill"></i> 监测中心
+                    <!-- 室外监测中心 (V3.0重组) -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if active_tab in ['dashboard', 'transformer', 'switch', 'busbar', 'capacitor', 'meter', 'bird'] %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-grid-1x2-fill"></i> 室外监测中心
                         </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li><a class="dropdown-item" href="/dashboard"><i class="bi bi-speedometer"></i> 监测中心</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/module/transformer"><i class="bi bi-box"></i> 主变巡视</a></li>
+                            <li><a class="dropdown-item" href="/module/switch"><i class="bi bi-toggle-on"></i> 开关间隔</a></li>
+                            <li><a class="dropdown-item" href="/module/busbar"><i class="bi bi-diagram-3"></i> 母线巡视</a></li>
+                            <li><a class="dropdown-item" href="/module/capacitor"><i class="bi bi-battery-charging"></i> 电容器</a></li>
+                            <li><a class="dropdown-item" href="/module/meter"><i class="bi bi-speedometer2"></i> 表计读数</a></li>
+                            <li><a class="dropdown-item" href="/module/bird"><i class="bi bi-feather"></i> 鸟类监控</a></li>
+                        </ul>
                     </li>
-                    <!-- 功能模块Tab -->
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'transformer' %}active{% endif %}" href="/module/transformer">
-                            <i class="bi bi-box"></i> 主变巡视
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'switch' %}active{% endif %}" href="/module/switch">
-                            <i class="bi bi-toggle-on"></i> 开关间隔
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'busbar' %}active{% endif %}" href="/module/busbar">
-                            <i class="bi bi-diagram-3"></i> 母线巡视
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'capacitor' %}active{% endif %}" href="/module/capacitor">
-                            <i class="bi bi-battery-charging"></i> 电容器
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'meter' %}active{% endif %}" href="/module/meter">
-                            <i class="bi bi-speedometer2"></i> 表计读数
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'bird' %}active{% endif %}" href="/module/bird">
-                            <i class="bi bi-feather"></i> 鸟类监控
-                        </a>
-                    </li>
+                    <!-- 室内围栏 -->
                     <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'indoor_fence' %}active{% endif %}" href="/module/indoor_fence">
                             <i class="bi bi-shield-shaded"></i> 室内围栏
                         </a>
                     </li>
+                    <!-- 回放 -->
                     <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'replay' %}active{% endif %}" href="/replay">
                             <i class="bi bi-play-circle"></i> 回放
                         </a>
                     </li>
+                    <!-- 模型训练 -->
                     <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'training' %}active{% endif %}" href="/training">
                             <i class="bi bi-cpu"></i> 模型训练
@@ -91,6 +74,13 @@
                             <li><a class="dropdown-item" href="/multimodal-fusion"><i class="bi bi-diagram-3"></i> 多模态融合</a></li>
                         </ul>
                     </li>
+                    <!-- 数据导入 (V3.0新增) -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab == 'data_import' %}active{% endif %}" href="/data-import">
+                            <i class="bi bi-cloud-upload"></i> 数据导入
+                        </a>
+                    </li>
+                    <!-- 系统设置 -->
                     <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'settings' %}active{% endif %}" href="/settings">
                             <i class="bi bi-gear"></i> 系统设置

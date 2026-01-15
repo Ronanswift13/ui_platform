@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}数据导入 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    .data-import-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .page-header h2 {
+        margin: 0;
+        color: #333;
+    }
+
+    .page-header .subtitle {
+        color: #666;
+        font-size: 0.9rem;
+        margin-top: 5px;
+    }
+
+    .config-section {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #007bff;
+    }
+
+    .voltage-selector {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .voltage-btn {
+        padding: 10px 20px;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+
+    .voltage-btn:hover {
+        border-color: #007bff;
+        background: #f8f9fa;
+    }
+
+    .voltage-btn.active {
+        border-color: #007bff;
+        background: #007bff;
+        color: #fff;
+    }
+
+    .plugin-group {
+        margin-bottom: 20px;
+    }
+
+    .plugin-group-title {
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 10px;
+        font-size: 0.95rem;
+    }
+
+    .plugin-checkboxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .plugin-checkbox {
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .plugin-checkbox:hover {
+        background: #e9ecef;
+    }
+
+    .plugin-checkbox.selected {
+        background: #e3f2fd;
+        border-color: #2196f3;
+    }
+
+    .plugin-checkbox input {
+        margin-right: 8px;
+    }
+
+    .plugin-checkbox i {
+        margin-right: 6px;
+        font-size: 1.1rem;
+    }
+
+    .upload-zone {
+        border: 3px dashed #dee2e6;
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        background: #fafafa;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragover {
+        border-color: #007bff;
+        background: #f0f7ff;
+    }
+
+    .upload-zone i {
+        font-size: 3rem;
+        color: #adb5bd;
+        margin-bottom: 15px;
+    }
+
+    .upload-zone h4 {
+        color: #495057;
+        margin-bottom: 10px;
+    }
+
+    .upload-zone p {
+        color: #6c757d;
+        margin-bottom: 0;
+    }
+
+    .file-list {
+        margin-top: 20px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .file-item .file-info {
+        display: flex;
+        align-items: center;
+    }
+
+    .file-item .file-icon {
+        font-size: 1.5rem;
+        margin-right: 12px;
+        color: #6c757d;
+    }
+
+    .file-item .file-name {
+        font-weight: 500;
+    }
+
+    .file-item .file-size {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .file-item .file-status {
+        font-size: 0.85rem;
+    }
+
+    .file-item .btn-remove {
+        color: #dc3545;
+        cursor: pointer;
+        padding: 5px;
+    }
+
+    .progress-section {
+        margin-top: 20px;
+    }
+
+    .upload-progress {
+        height: 25px;
+        border-radius: 12px;
+    }
+
+    .upload-progress .progress-bar {
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+
+    .action-buttons .btn {
+        padding: 12px 30px;
+        font-weight: 500;
+    }
+
+    .data-summary {
+        background: #e8f5e9;
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin-top: 20px;
+    }
+
+    .data-summary h6 {
+        color: #2e7d32;
+        margin-bottom: 10px;
+    }
+
+    .summary-stats {
+        display: flex;
+        gap: 30px;
+        flex-wrap: wrap;
+    }
+
+    .summary-stat {
+        display: flex;
+        align-items: center;
+    }
+
+    .summary-stat .stat-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1b5e20;
+        margin-right: 8px;
+    }
+
+    .summary-stat .stat-label {
+        color: #388e3c;
+        font-size: 0.9rem;
+    }
+
+    .history-section {
+        margin-top: 30px;
+    }
+
+    .history-table {
+        width: 100%;
+    }
+
+    .history-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .history-table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .status-badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .status-badge.success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-badge.error {
+        background: #f8d7da;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="data-import-container">
+    <div class="page-header">
+        <h2><i class="bi bi-cloud-upload text-primary"></i> 数据导入</h2>
+        <p class="subtitle">上传训练数据以支持AI模型的联动训练</p>
+    </div>
+
+    <!-- 电压等级选择 -->
+    <div class="config-section">
+        <h5 class="section-title"><i class="bi bi-lightning-charge"></i> 电压等级选择</h5>
+        <div class="voltage-selector" id="voltage-selector">
+            <button class="voltage-btn" data-voltage="1000kv">1000kV</button>
+            <button class="voltage-btn" data-voltage="800kv-dc">±800kV</button>
+            <button class="voltage-btn" data-voltage="500kv">500kV</button>
+            <button class="voltage-btn active" data-voltage="220kv">220kV</button>
+            <button class="voltage-btn" data-voltage="110kv">110kV</button>
+            <button class="voltage-btn" data-voltage="35kv">35kV</button>
+            <button class="voltage-btn" data-voltage="10kv">10kV</button>
+        </div>
+    </div>
+
+    <!-- 插件功能选择 -->
+    <div class="config-section">
+        <h5 class="section-title"><i class="bi bi-plug"></i> 巡视功能选择</h5>
+
+        <!-- 室外巡视 -->
+        <div class="plugin-group">
+            <div class="plugin-group-title">室外巡视</div>
+            <div class="plugin-checkboxes">
+                <label class="plugin-checkbox selected">
+                    <input type="checkbox" name="plugin" value="transformer" checked>
+                    <i class="bi bi-box text-primary"></i> 主变巡视
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="switch">
+                    <i class="bi bi-toggle-on text-success"></i> 开关间隔
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="busbar">
+                    <i class="bi bi-diagram-3 text-warning"></i> 母线巡视
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="capacitor">
+                    <i class="bi bi-battery-charging text-info"></i> 电容器
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="meter">
+                    <i class="bi bi-speedometer2 text-danger"></i> 表计读数
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="bird">
+                    <i class="bi bi-feather text-cyan"></i> 鸟类监控
+                </label>
+            </div>
+        </div>
+
+        <!-- 室内功能 -->
+        <div class="plugin-group">
+            <div class="plugin-group-title">室内功能</div>
+            <div class="plugin-checkboxes">
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="indoor_fence">
+                    <i class="bi bi-shield-shaded text-secondary"></i> 室内围栏
+                </label>
+            </div>
+        </div>
+
+        <!-- 高级插件 -->
+        <div class="plugin-group">
+            <div class="plugin-group-title">高级监测插件</div>
+            <div class="plugin-checkboxes">
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="acoustic">
+                    <i class="bi bi-soundwave text-primary"></i> 声学监测
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="gas">
+                    <i class="bi bi-cloud-haze2 text-warning"></i> 气体检测
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="hyperspectral">
+                    <i class="bi bi-rainbow text-info"></i> 高光谱检测
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="slam">
+                    <i class="bi bi-map text-success"></i> SLAM建图
+                </label>
+                <label class="plugin-checkbox">
+                    <input type="checkbox" name="plugin" value="fusion">
+                    <i class="bi bi-diagram-3-fill text-danger"></i> 多模态融合
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据上传区域 -->
+    <div class="config-section">
+        <h5 class="section-title"><i class="bi bi-upload"></i> 数据上传</h5>
+
+        <div class="upload-zone" id="upload-zone">
+            <i class="bi bi-cloud-arrow-up"></i>
+            <h4>拖放文件到此处上传</h4>
+            <p>支持图片 (JPG, PNG)、视频 (MP4, AVI) 和标注文件 (TXT, XML, JSON)</p>
+            <p class="text-muted mt-2">或 <a href="#" onclick="document.getElementById('file-input').click(); return false;">点击选择文件</a></p>
+            <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.mp4,.avi,.txt,.xml,.json" style="display: none;">
+        </div>
+
+        <!-- 文件列表 -->
+        <div class="file-list" id="file-list">
+            <!-- 文件项将动态添加 -->
+        </div>
+
+        <!-- 上传进度 -->
+        <div class="progress-section" id="progress-section" style="display: none;">
+            <div class="progress upload-progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" id="upload-progress-bar">0%</div>
+            </div>
+        </div>
+
+        <!-- 数据摘要 -->
+        <div class="data-summary" id="data-summary" style="display: none;">
+            <h6><i class="bi bi-check-circle"></i> 数据摘要</h6>
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-images">0</span>
+                    <span class="stat-label">张图片</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-videos">0</span>
+                    <span class="stat-label">个视频</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-labels">0</span>
+                    <span class="stat-label">个标注文件</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-size">0</span>
+                    <span class="stat-label">MB 总大小</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="action-buttons">
+        <button class="btn btn-outline-secondary" onclick="clearAllFiles()">
+            <i class="bi bi-trash"></i> 清除全部
+        </button>
+        <button class="btn btn-outline-primary" onclick="validateData()">
+            <i class="bi bi-check2-circle"></i> 验证数据
+        </button>
+        <button class="btn btn-primary" onclick="uploadAndSave()" id="btn-upload">
+            <i class="bi bi-cloud-upload"></i> 上传并保存
+        </button>
+    </div>
+
+    <!-- 历史记录 -->
+    <div class="config-section history-section">
+        <h5 class="section-title"><i class="bi bi-clock-history"></i> 导入历史</h5>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>电压等级</th>
+                    <th>插件</th>
+                    <th>文件数</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="history-tbody">
+                <tr>
+                    <td colspan="6" class="text-center text-muted">暂无导入记录</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/data_import.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initDataImport();
+    });
+</script>
+{% endblock %}

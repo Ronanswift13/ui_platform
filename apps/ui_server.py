@@ -84,7 +84,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="输变电监测平台",
         description="输变电激光星芒破夜绘明监测平台 Web UI",
-        version="2.0.0",
+        version="3.0.0",
     )
 
     # 挂载静态文件
@@ -224,7 +224,33 @@ def create_app() -> FastAPI:
             {
                 "request": request,
                 "active_tab": "training",
-                "version": "2.0.0",
+                "version": "3.0.0",
+            },
+        )
+
+    # ============== 监测中心Dashboard页面 ==============
+    @app.get("/dashboard", response_class=HTMLResponse)
+    async def dashboard_page(request: Request):
+        """监测中心Dashboard页面"""
+        return templates.TemplateResponse(
+            "pages/dashboard.html",
+            {
+                "request": request,
+                "active_tab": "dashboard",
+                "version": "3.0.0",
+            },
+        )
+
+    # ============== 数据导入页面 (V3.0新增) ==============
+    @app.get("/data-import", response_class=HTMLResponse)
+    async def data_import_page(request: Request):
+        """数据导入页面"""
+        return templates.TemplateResponse(
+            "pages/data_import.html",
+            {
+                "request": request,
+                "active_tab": "data_import",
+                "version": "3.0.0",
             },
         )
 
