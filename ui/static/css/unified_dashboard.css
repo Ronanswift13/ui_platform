@@ -1,0 +1,761 @@
+/**
+ * 统一仪表盘样式
+ * ================
+ *
+ * 输变电激光星芒破夜绘明监测平台 V3.0
+ * 基于UPDATE.md优化方案
+ */
+
+/* =============================================================================
+   变量定义
+   ========================================================================== */
+:root {
+    --ud-bg-primary: #0f0f1a;
+    --ud-bg-secondary: #1a1a2e;
+    --ud-bg-tertiary: #242442;
+    --ud-border-color: #2d3748;
+
+    --ud-text-primary: #ffffff;
+    --ud-text-secondary: #a0aec0;
+    --ud-text-muted: #718096;
+
+    --ud-accent-primary: #00d4ff;
+    --ud-accent-success: #10b981;
+    --ud-accent-warning: #f59e0b;
+    --ud-accent-danger: #ef4444;
+    --ud-accent-info: #3b82f6;
+
+    --ud-health-excellent: #10b981;
+    --ud-health-good: #22c55e;
+    --ud-health-warning: #f59e0b;
+    --ud-health-danger: #ef4444;
+
+    --ud-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    --ud-radius: 12px;
+    --ud-radius-sm: 8px;
+}
+
+
+/* =============================================================================
+   主布局
+   ========================================================================== */
+.unified-dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr 350px;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+    padding: 16px;
+    min-height: calc(100vh - 56px);
+    background: var(--ud-bg-primary);
+}
+
+.ud-header {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+}
+
+.ud-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--ud-text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.ud-title i {
+    color: var(--ud-accent-primary);
+}
+
+.ud-filters {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.ud-filter-select {
+    background: var(--ud-bg-tertiary);
+    border: 1px solid var(--ud-border-color);
+    color: var(--ud-text-primary);
+    padding: 8px 16px;
+    border-radius: var(--ud-radius-sm);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ud-filter-select:hover {
+    border-color: var(--ud-accent-primary);
+}
+
+.ud-filter-select:focus {
+    outline: none;
+    border-color: var(--ud-accent-primary);
+    box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+}
+
+
+/* =============================================================================
+   设备概览区
+   ========================================================================== */
+.device-overview {
+    grid-column: 1 / 2;
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ud-text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ud-border-color);
+}
+
+.section-title i {
+    color: var(--ud-accent-primary);
+}
+
+.device-type-card {
+    background: var(--ud-bg-tertiary);
+    border-radius: var(--ud-radius-sm);
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+}
+
+.device-type-card:hover {
+    border-color: var(--ud-accent-primary);
+    box-shadow: var(--ud-shadow);
+}
+
+.device-type-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.device-type-header i {
+    font-size: 1.25rem;
+}
+
+.device-type-name {
+    flex: 1;
+    color: var(--ud-text-primary);
+    font-weight: 500;
+}
+
+.device-type-count {
+    color: var(--ud-text-muted);
+    font-size: 0.875rem;
+}
+
+.device-type-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ud-border-color);
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stat-label {
+    color: var(--ud-text-muted);
+    font-size: 0.75rem;
+}
+
+.stat-value {
+    color: var(--ud-text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.device-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.device-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.device-item:hover {
+    background: var(--ud-bg-primary);
+    border-color: var(--ud-accent-primary);
+}
+
+.device-item.status-warning {
+    border-left: 3px solid var(--ud-accent-warning);
+}
+
+.device-item.status-alarm {
+    border-left: 3px solid var(--ud-accent-danger);
+}
+
+.device-name {
+    flex: 1;
+    color: var(--ud-text-primary);
+    font-size: 0.875rem;
+}
+
+.device-health {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.health-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--ud-bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.health-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.health-fill.health-excellent { background: var(--ud-health-excellent); }
+.health-fill.health-good { background: var(--ud-health-good); }
+.health-fill.health-warning { background: var(--ud-health-warning); }
+.health-fill.health-danger { background: var(--ud-health-danger); }
+
+.health-value {
+    color: var(--ud-text-secondary);
+    font-size: 0.75rem;
+    min-width: 35px;
+}
+
+.device-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--ud-text-muted);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ud-health-excellent);
+}
+
+.status-dot.status-warning { background: var(--ud-accent-warning); }
+.status-dot.status-alarm { background: var(--ud-accent-danger); animation: pulse 1.5s infinite; }
+.status-dot.status-error { background: var(--ud-accent-danger); }
+
+
+/* =============================================================================
+   趋势图区域
+   ========================================================================== */
+.trend-section {
+    grid-column: 2 / 3;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.trend-chart-container {
+    flex: 1;
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+    padding: 16px;
+    min-height: 300px;
+}
+
+.trend-chart-container canvas {
+    max-height: 250px;
+}
+
+.area-summary {
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+    padding: 16px;
+}
+
+.area-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.area-card {
+    background: var(--ud-bg-tertiary);
+    border-radius: var(--ud-radius-sm);
+    padding: 12px;
+    transition: all 0.2s;
+}
+
+.area-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ud-shadow);
+}
+
+.area-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.area-name {
+    color: var(--ud-text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.area-health {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.area-health.health-excellent { color: var(--ud-health-excellent); }
+.area-health.health-good { color: var(--ud-health-good); }
+.area-health.health-warning { color: var(--ud-health-warning); }
+.area-health.health-danger { color: var(--ud-health-danger); }
+
+.area-stats {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.area-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.875rem;
+    color: var(--ud-text-secondary);
+}
+
+.area-progress .progress {
+    background: var(--ud-bg-secondary);
+}
+
+
+/* =============================================================================
+   右侧面板
+   ========================================================================== */
+.right-panel {
+    grid-column: 3 / 4;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* 健康指标 */
+.health-indicators {
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+    padding: 16px;
+}
+
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.health-card {
+    background: var(--ud-bg-tertiary);
+    border-radius: var(--ud-radius-sm);
+    padding: 12px;
+    text-align: center;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.health-card:hover {
+    border-color: var(--ud-accent-primary);
+}
+
+.health-card.unhealthy {
+    border-color: var(--ud-accent-danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.health-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.module-name {
+    color: var(--ud-text-secondary);
+    font-size: 0.75rem;
+}
+
+.health-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.health-score.health-excellent { color: var(--ud-health-excellent); }
+.health-score.health-good { color: var(--ud-health-good); }
+.health-score.health-warning { color: var(--ud-health-warning); }
+.health-score.health-danger { color: var(--ud-health-danger); }
+
+.health-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--ud-text-muted);
+}
+
+.status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.status-indicator.healthy { background: var(--ud-health-excellent); }
+.status-indicator.unhealthy { background: var(--ud-accent-danger); animation: pulse 1.5s infinite; }
+
+
+/* 告警列表 */
+.alarm-panel {
+    flex: 1;
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+    padding: 16px;
+    overflow-y: auto;
+    max-height: 400px;
+}
+
+.alarm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.alarm-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.alarm-card {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: var(--ud-bg-tertiary);
+    border-radius: var(--ud-radius-sm);
+    margin-bottom: 8px;
+    border-left: 3px solid var(--ud-accent-warning);
+    transition: all 0.2s;
+}
+
+.alarm-card:hover {
+    background: var(--ud-bg-primary);
+}
+
+.alarm-card.level-critical {
+    border-left-color: var(--ud-accent-danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.alarm-card.level-alarm {
+    border-left-color: var(--ud-accent-danger);
+}
+
+.alarm-card.level-warning {
+    border-left-color: var(--ud-accent-warning);
+}
+
+.alarm-card.level-info {
+    border-left-color: var(--ud-accent-info);
+}
+
+.alarm-card.acknowledged {
+    opacity: 0.6;
+}
+
+.alarm-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.2);
+    border-radius: var(--ud-radius-sm);
+    color: var(--ud-accent-danger);
+    font-size: 1.25rem;
+}
+
+.level-warning .alarm-icon {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--ud-accent-warning);
+}
+
+.level-info .alarm-icon {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--ud-accent-info);
+}
+
+.alarm-content {
+    flex: 1;
+}
+
+.alarm-title {
+    color: var(--ud-text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.alarm-message {
+    color: var(--ud-text-muted);
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+}
+
+.alarm-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--ud-text-muted);
+}
+
+.alarm-meta span {
+    padding: 2px 6px;
+    background: var(--ud-bg-secondary);
+    border-radius: 4px;
+}
+
+.alarm-actions {
+    display: flex;
+    align-items: flex-start;
+}
+
+.no-alarms {
+    text-align: center;
+    color: var(--ud-text-muted);
+    padding: 24px;
+}
+
+
+/* 深度学习状态 */
+.dl-status-panel {
+    background: var(--ud-bg-secondary);
+    border-radius: var(--ud-radius);
+    border: 1px solid var(--ud-border-color);
+    padding: 16px;
+}
+
+.dl-stats-header h6 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ud-text-primary);
+    margin-bottom: 12px;
+}
+
+.dl-stats-overview {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.dl-stat-item {
+    background: var(--ud-bg-tertiary);
+    border-radius: var(--ud-radius-sm);
+    padding: 10px;
+    text-align: center;
+}
+
+.dl-stat-item .stat-label {
+    display: block;
+    color: var(--ud-text-muted);
+    font-size: 0.7rem;
+    margin-bottom: 4px;
+}
+
+.dl-stat-item .stat-value {
+    color: var(--ud-accent-primary);
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.dl-models-list {
+    border-top: 1px solid var(--ud-border-color);
+    padding-top: 12px;
+}
+
+.models-title {
+    color: var(--ud-text-secondary);
+    font-size: 0.8rem;
+    margin-bottom: 8px;
+}
+
+.dl-model-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: var(--ud-bg-tertiary);
+    border-radius: var(--ud-radius-sm);
+    margin-bottom: 6px;
+}
+
+.dl-model-item .model-name {
+    color: var(--ud-text-primary);
+    font-size: 0.8rem;
+}
+
+.dl-model-item .model-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: var(--ud-text-muted);
+}
+
+.dl-model-item .status-dot.active {
+    background: var(--ud-health-excellent);
+}
+
+.dl-model-item .status-dot.inactive {
+    background: var(--ud-text-muted);
+}
+
+
+/* =============================================================================
+   动画
+   ========================================================================== */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+/* =============================================================================
+   响应式
+   ========================================================================== */
+@media (max-width: 1400px) {
+    .unified-dashboard {
+        grid-template-columns: 1fr 300px;
+    }
+
+    .device-overview {
+        grid-column: 1 / 2;
+    }
+
+    .trend-section {
+        grid-column: 1 / 2;
+    }
+
+    .right-panel {
+        grid-column: 2 / 3;
+        grid-row: 2 / 4;
+    }
+
+    .area-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 992px) {
+    .unified-dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .device-overview,
+    .trend-section,
+    .right-panel {
+        grid-column: 1 / 2;
+    }
+
+    .right-panel {
+        grid-row: auto;
+    }
+
+    .health-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .area-cards {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .unified-dashboard {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .ud-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .ud-filters {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .ud-filter-select {
+        flex: 1;
+        min-width: 100px;
+    }
+
+    .health-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .area-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .dl-stats-overview {
+        grid-template-columns: 1fr;
+    }
+}

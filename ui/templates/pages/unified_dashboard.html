@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}统一监控仪表盘 - 输变电监测平台 V3.0{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/unified_dashboard.css">
+{% endblock %}
+
+{% block content %}
+<div class="unified-dashboard">
+    <!-- 顶部标题栏 -->
+    <div class="ud-header">
+        <div class="ud-title">
+            <i class="bi bi-grid-3x3-gap-fill"></i>
+            <span>统一监控仪表盘</span>
+            <span class="badge bg-info">V3.0</span>
+        </div>
+        <div class="ud-filters">
+            <select class="ud-filter-select" id="voltage-filter">
+                <option value="all">全部电压等级</option>
+                <option value="500kv">500kV</option>
+                <option value="220kv">220kV</option>
+                <option value="110kv">110kV</option>
+                <option value="35kv">35kV</option>
+                <option value="10kv">10kV</option>
+            </select>
+            <select class="ud-filter-select" id="area-filter">
+                <option value="all">全部区域</option>
+                <option value="outdoor">室外场地</option>
+                <option value="indoor">室内环境</option>
+                <option value="control">控制室</option>
+            </select>
+            <select class="ud-filter-select" id="module-filter">
+                <option value="all">全部模块</option>
+                <option value="transformer">主变检测</option>
+                <option value="switch">开关检测</option>
+                <option value="busbar">母线检测</option>
+                <option value="capacitor">电容器检测</option>
+                <option value="meter">表计读数</option>
+                <option value="acoustic">声学监测</option>
+                <option value="gas">气体检测</option>
+                <option value="bird">鸟类监测</option>
+            </select>
+            <button class="btn btn-sm btn-outline-light" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 设备概览 -->
+    <div class="device-overview">
+        <div class="section-title">
+            <i class="bi bi-hdd-stack"></i>
+            <span>设备状态概览</span>
+        </div>
+        <div id="device-overview">
+            <!-- 设备列表将由JavaScript动态生成 -->
+            <div class="text-center text-muted py-4">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                加载中...
+            </div>
+        </div>
+    </div>
+
+    <!-- 趋势图区 -->
+    <div class="trend-section">
+        <!-- 健康趋势图 -->
+        <div class="trend-chart-container">
+            <div class="section-title">
+                <i class="bi bi-graph-up"></i>
+                <span>健康趋势</span>
+                <span class="ms-auto text-muted small">最近60分钟</span>
+            </div>
+            <canvas id="trend-chart"></canvas>
+        </div>
+
+        <!-- 区域汇总 -->
+        <div class="area-summary">
+            <div class="section-title">
+                <i class="bi bi-building"></i>
+                <span>区域状态汇总</span>
+            </div>
+            <div class="area-cards" id="area-summary">
+                <!-- 区域卡片将由JavaScript动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧面板 -->
+    <div class="right-panel">
+        <!-- 健康指标 -->
+        <div class="health-indicators">
+            <div class="section-title">
+                <i class="bi bi-heart-pulse"></i>
+                <span>模块健康状态</span>
+            </div>
+            <div class="health-grid" id="health-indicators">
+                <!-- 健康指标将由JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <!-- 告警面板 -->
+        <div class="alarm-panel">
+            <div class="alarm-header">
+                <div class="alarm-title-row">
+                    <i class="bi bi-bell text-warning"></i>
+                    <span class="text-light">实时告警</span>
+                    <span class="badge bg-danger" id="total-alarm-count">0</span>
+                </div>
+                <select class="form-select form-select-sm bg-dark text-light border-secondary"
+                        style="width: auto;" id="alarm-level-filter">
+                    <option value="all">全部等级</option>
+                    <option value="critical">紧急</option>
+                    <option value="alarm">告警</option>
+                    <option value="warning">注意</option>
+                    <option value="info">信息</option>
+                </select>
+            </div>
+            <div id="unified-alarm-list">
+                <!-- 告警列表将由JavaScript动态生成 -->
+            </div>
+        </div>
+
+        <!-- 深度学习状态 -->
+        <div id="dl-status-panel" class="dl-status-panel">
+            <!-- 深度学习状态将由JavaScript动态生成 -->
+            <div class="text-center text-muted py-3">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                加载深度学习状态...
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js用于趋势图 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- 统一仪表盘脚本 -->
+<script src="/static/js/unified_dashboard.js"></script>
+
+<script>
+    // 页面初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        initUnifiedDashboard();
+    });
+
+    // 页面卸载时停止刷新
+    window.addEventListener('beforeunload', function() {
+        stopAutoRefresh();
+    });
+</script>
+{% endblock %}
