@@ -95,11 +95,11 @@ class GasDetectionConfig:
 # 气体泄漏检测插件
 # =============================================================================
 class GasDetectionPlugin:
-    """气体泄漏检测插件 - 完整修复版"""
+    """气体泄漏检测插件 V3.0 - 集成GL-TransLSTM深度学习"""
 
     PLUGIN_ID = "gas_detection"
     PLUGIN_NAME = "气体泄漏检测"
-    PLUGIN_VERSION = "1.0.1"
+    PLUGIN_VERSION = "3.0.0"
 
     def __init__(self, manifest=None, plugin_dir=None, config=None):
         """
@@ -238,19 +238,27 @@ class GasDetectionPlugin:
             return False
     
     def _load_predictor(self):
-        """加载预测器 - 使用绝对导入"""
+        """加载预测器 V3.0 - 集成GL-TransLSTM"""
         try:
             module_name = 'plugins.gas_detection.predictor'
             if module_name in sys.modules:
                 module = sys.modules[module_name]
             else:
                 module = importlib.import_module(module_name)
-            
+
             predictor_class = getattr(module, 'GasConcentrationPredictor', None)
             if predictor_class:
                 predictor = predictor_class(self.config)
+
+                # V3.0: 调用initialize初始化GL-TransLSTM
+                if hasattr(predictor, 'initialize'):
+                    predictor.initialize()
+                    logger.info(f"[{self.PLUGIN_NAME}] 预测器V3.0初始化完成 (GL-TransLSTM)")
+
+                # 兼容旧版model_registry
                 if self._model_registry and hasattr(predictor, 'set_model_registry'):
                     predictor.set_model_registry(self._model_registry)
+
                 logger.info(f"[{self.PLUGIN_NAME}] 预测器加载成功")
                 return predictor
         except Exception as e:
@@ -276,6 +284,10 @@ class GasDetectionPlugin:
     
     def shutdown(self) -> bool:
         try:
+            # V3.0: 清理预测器资源
+            if self._predictor and hasattr(self._predictor, 'cleanup'):
+                self._predictor.cleanup()
+
             self._history_buffers.clear()
             self._alarm_states.clear()
             self._is_initialized = False
@@ -419,10 +431,21 @@ class GasDetectionPlugin:
         return {"available": True, "next_24h": "stable", "next_7d": "stable", "confidence": 0.85}
     
     def _detect_leakage(self, device_id: str) -> Dict[str, Any]:
+        """泄漏检测 V3.0 - 优先使用GL-TransLSTM"""
+        # V3.0: 优先使用预测器的泄漏检测
+        if self._predictor and hasattr(self._predictor, 'detect_leak'):
+            try:
+                leak_result = self._predictor.detect_leak()
+                if leak_result.get("success"):
+                    return leak_result
+            except Exception as e:
+                logger.debug(f"[{self.PLUGIN_NAME}] GL-TransLSTM泄漏检测失败: {e}")
+
+        # 回退到传统方法
         history = self._get_history(device_id)
         if not history or len(history.get("timestamps", [])) < self.config.leak_detection_window:
             return {"detected": False, "reason": "数据不足"}
-        
+
         for gas in [GasType.SF6, GasType.H2]:
             if gas in history["gas_data"]:
                 values = list(history["gas_data"][gas])[-self.config.leak_detection_window:]
@@ -430,7 +453,7 @@ class GasDetectionPlugin:
                     rate = (values[-1] - values[0]) / len(values)
                     if rate > self.config.leak_rate_threshold:
                         return {"detected": True, "gas": gas, "rate": rate, "severity": "warning"}
-        
+
         return {"detected": False, "reason": "未检测到异常"}
     
     def _determine_overall_status(self, gas_status: Dict, predictions: Dict, leak_detection: Dict) -> str:

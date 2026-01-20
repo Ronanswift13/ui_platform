@@ -1,14 +1,19 @@
 """
-表计读数检测器 - 增强版
+表计读数检测器 - 增强版 V3.0
 输变电激光监测平台 (E组) - 全自动AI巡检改造
 
 增强功能:
-- HRNet关键点检测: 表盘圆心/指针/刻度精确定位
+- 关键点检测: 表盘圆心/指针/刻度精确定位 (UPDATE.md短期计划)
 - 透视矫正: 基于关键点的图像变换
 - 增强指针检测: 改进霍夫变换
 - CRNN数字OCR: 数字表和七段码识别
 - 自动量程识别: 文本OCR识别表盘标记
 - 失败兜底策略: 多次重试+人工复核标记
+
+V3.0更新:
+- 集成KeypointDetector深度学习模型
+- 支持任意角度表计读数
+- 增强透视校正能力
 """
 
 from __future__ import annotations
@@ -24,6 +29,20 @@ try:
     import cv2
 except ImportError:
     cv2 = None
+
+# V3.0: 导入关键点检测器
+try:
+    from ai_models.deep_learning.keypoint_detector import (
+        KeypointDetector as DLKeypointDetector,
+        KeypointConfig,
+        MeterType as DLMeterType,
+    )
+    DL_AVAILABLE = True
+except ImportError:
+    DL_AVAILABLE = False
+    DLKeypointDetector = None
+    KeypointConfig = None
+    DLMeterType = None
 
 
 class MeterType(Enum):
@@ -151,7 +170,7 @@ class MeterReadingDetectorEnhanced:
         self.config = config
         self._model_registry = model_registry
         self._initialized = False
-        
+
         # 配置参数
         self._confidence_threshold = config.get("confidence_threshold", self.DEFAULT_CONFIDENCE_THRESHOLD)
         self._manual_review_threshold = config.get("manual_review_threshold", self.DEFAULT_MANUAL_REVIEW_THRESHOLD)
@@ -159,9 +178,13 @@ class MeterReadingDetectorEnhanced:
         self._max_retry = config.get("max_retry", self.DEFAULT_MAX_RETRY)
         self._use_deep_learning = config.get("use_deep_learning", True)
         self._perspective_correction = config.get("perspective_correction", True)
-        
-        # 版本信息
-        self._model_version = "meter_enhanced_v1.0"
+
+        # V3.0: 关键点检测器
+        self._dl_keypoint_detector: Optional[DLKeypointDetector] = None
+        self._dl_initialized = False
+
+        # 版本信息 (V3.0更新)
+        self._model_version = "meter_enhanced_v3.0"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -173,17 +196,51 @@ class MeterReadingDetectorEnhanced:
     def initialize(self) -> bool:
         """初始化检测器"""
         try:
-            if self._model_registry and self._use_deep_learning:
+            # V3.0: 优先初始化关键点检测器
+            if self._use_deep_learning and DL_AVAILABLE:
+                self._init_keypoint_detector()
+
+            # 兼容旧版：如果有模型注册表，预加载模型
+            if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
                     try:
                         self._model_registry.load(model_id)
                     except Exception as e:
                         print(f"[MeterDetector] 模型 {model_id} 加载失败: {e}")
-            
+
             self._initialized = True
             return True
         except Exception as e:
             print(f"[MeterDetector] 初始化失败: {e}")
+            return False
+
+    def _init_keypoint_detector(self) -> bool:
+        """初始化关键点检测器 (V3.0)"""
+        if not DL_AVAILABLE:
+            print("[MeterDetector] KeypointDetector模块不可用")
+            return False
+
+        try:
+            model_path = self.config.get("keypoint_model_path", None)
+
+            kp_config = KeypointConfig(
+                model_path=model_path,
+                input_size=(256, 256),
+                confidence_threshold=self._confidence_threshold,
+                enable_perspective_correction=self._perspective_correction,
+                validate_range=True,
+            )
+
+            self._dl_keypoint_detector = DLKeypointDetector(kp_config)
+            self._dl_keypoint_detector.load()
+            self._dl_initialized = True
+
+            print(f"[MeterDetector] 关键点检测器初始化成功 (V3.0)")
+            return True
+
+        except Exception as e:
+            print(f"[MeterDetector] 关键点检测器初始化失败: {e}")
+            self._dl_initialized = False
             return False
     
     def read_meter(
@@ -291,17 +348,62 @@ class MeterReadingDetectorEnhanced:
         return result
     
     def _detect_keypoints(self, image: np.ndarray) -> MeterKeypoints:
-        """检测关键点"""
+        """检测关键点 (V3.0: 优先使用KeypointDetector)"""
         keypoints = MeterKeypoints()
-        
-        # 优先使用深度学习
+
+        # V3.0: 优先使用KeypointDetector深度学习
+        if self._use_deep_learning and self._dl_initialized and self._dl_keypoint_detector is not None:
+            dl_keypoints = self._detect_keypoints_v3(image)
+            if dl_keypoints:
+                return dl_keypoints
+
+        # 兼容旧版：使用model_registry
         if self._use_deep_learning and self._model_registry:
             dl_keypoints = self._detect_keypoints_dl(image)
             if dl_keypoints:
                 return dl_keypoints
-        
+
         # 回退到传统方法
         return self._detect_keypoints_traditional(image)
+
+    def _detect_keypoints_v3(self, image: np.ndarray) -> Optional[MeterKeypoints]:
+        """V3.0关键点检测 (使用KeypointDetector)"""
+        if not self._dl_initialized or self._dl_keypoint_detector is None:
+            return None
+
+        try:
+            dl_keypoints = self._dl_keypoint_detector.detect_keypoints(image)
+
+            # 转换为本地格式
+            keypoints = MeterKeypoints()
+            corners = []
+
+            for kp in dl_keypoints:
+                local_kp = Keypoint(
+                    name=kp.name,
+                    x=kp.x,
+                    y=kp.y,
+                    confidence=kp.confidence
+                )
+
+                if kp.name == "center":
+                    keypoints.center = local_kp
+                elif kp.name == "pointer_tip":
+                    keypoints.pointer_tip = local_kp
+                elif kp.name == "scale_start":
+                    keypoints.scale_min = local_kp
+                elif kp.name == "scale_end":
+                    keypoints.scale_max = local_kp
+                elif kp.name in ["top_left", "top_right", "bottom_right", "bottom_left"]:
+                    corners.append(local_kp)
+
+            keypoints.dial_corners = corners
+            return keypoints
+
+        except Exception as e:
+            print(f"[MeterDetector] V3.0关键点检测失败: {e}")
+
+        return None
     
     def _detect_keypoints_dl(self, image: np.ndarray) -> Optional[MeterKeypoints]:
         """深度学习关键点检测"""

@@ -1,13 +1,19 @@
 """
-开关间隔巡视检测器 - 增强版
+开关间隔巡视检测器 - 增强版 V3.0
 输变电激光监测平台 (B组) - 全自动AI巡检改造
 
 增强功能:
+- YOLOv8-ViT开关状态检测 (UPDATE.md短期计划)
 - 多任务模型同时识别(状态+指示灯+读数)
 - CRNN/Transformer OCR文字识别
 - 深度学习证据融合
 - 规则引擎集成
 - 增强清晰度评价
+
+V3.0更新:
+- 集成YOLOv8-ViT深度学习模型
+- 支持多类型开关统一检测
+- 增强OCR识别准确率
 """
 
 from __future__ import annotations
@@ -20,6 +26,18 @@ try:
     import cv2
 except ImportError:
     cv2 = None
+
+# V3.0: 导入YOLOv8-ViT深度学习模型
+try:
+    from ai_models.deep_learning.yolov8_vit import (
+        YOLOv8ViTDetector, YOLOv8ViTConfig, DetectionTask
+    )
+    DL_AVAILABLE = True
+except ImportError:
+    DL_AVAILABLE = False
+    YOLOv8ViTDetector = None
+    YOLOv8ViTConfig = None
+    DetectionTask = None
 
 
 class SwitchType(Enum):
@@ -98,12 +116,12 @@ class SwitchDetectorEnhanced:
         self.config = config
         self._model_registry = model_registry
         self._fusion_engine = fusion_engine
-        
+
         # 配置参数
         self.state_config = config.get("state_recognition", {})
         self.clarity_config = config.get("clarity_evaluation", {})
         self.logic_config = config.get("logic_validation", {})
-        
+
         # 融合权重
         weights = self.state_config.get("fusion_weights", {})
         self.weights = {
@@ -111,10 +129,62 @@ class SwitchDetectorEnhanced:
             "color": weights.get("color", 0.3),
             "angle": weights.get("angle", 0.2),
             "dl": weights.get("deep_learning", 0.6),
+            "yolov8_vit": weights.get("yolov8_vit", 0.7),  # V3.0新增
         }
-        
+
         self.use_deep_learning = config.get("use_deep_learning", True)
         self.min_state_score = self.state_config.get("min_state_score", 0.55)
+
+        # V3.0: YOLOv8-ViT深度学习检测器
+        self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
+        self._dl_initialized = False
+
+        # V3.0: 版本信息
+        self._model_version = "switch_enhanced_v3.0"
+
+    def initialize(self) -> bool:
+        """初始化检测器 (V3.0新增)"""
+        try:
+            if self.use_deep_learning and DL_AVAILABLE:
+                self._init_yolov8_vit()
+            return True
+        except Exception as e:
+            print(f"[SwitchDetector] 初始化失败: {e}")
+            return False
+
+    def _init_yolov8_vit(self) -> bool:
+        """初始化YOLOv8-ViT检测器 (V3.0)"""
+        if not DL_AVAILABLE:
+            print("[SwitchDetector] YOLOv8-ViT模块不可用")
+            return False
+
+        try:
+            model_path = self.config.get("yolov8_model_path", None)
+            device = self.config.get("device", "cpu")
+            conf_threshold = self.state_config.get("confidence_threshold", 0.5)
+
+            config = YOLOv8ViTConfig(
+                model_path=model_path,
+                task=DetectionTask.SWITCH_STATE,
+                confidence_threshold=conf_threshold,
+                nms_threshold=0.45,
+                device=device,
+                use_vit_backbone=True,
+                use_se_attention=True,
+                use_faster_block=True,
+            )
+
+            self._yolov8_vit_detector = YOLOv8ViTDetector(config)
+            self._yolov8_vit_detector.load()
+            self._dl_initialized = True
+
+            print(f"[SwitchDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            return True
+
+        except Exception as e:
+            print(f"[SwitchDetector] YOLOv8-ViT初始化失败: {e}")
+            self._dl_initialized = False
+            return False
     
     # ==================== 多任务状态识别 ====================
     
@@ -125,38 +195,124 @@ class SwitchDetectorEnhanced:
         use_fusion: bool = True,
     ) -> Dict:
         """
-        识别开关状态
-        
-        多证据融合: OCR + 颜色 + 角度 + 深度学习
+        识别开关状态 (V3.0: 优先使用YOLOv8-ViT)
+
+        多证据融合: YOLOv8-ViT + OCR + 颜色 + 角度 + 深度学习
         """
         evidences: List[StateEvidence] = []
-        
-        # 1. 深度学习多任务识别
-        if self.use_deep_learning and self._model_registry:
+
+        # V3.0: 优先使用YOLOv8-ViT深度学习
+        if self.use_deep_learning and self._dl_initialized and self._yolov8_vit_detector is not None:
+            vit_evidence = self._recognize_by_yolov8_vit(image, switch_type)
+            if vit_evidence:
+                evidences.append(vit_evidence)
+
+        # 1. 传统深度学习多任务识别(作为备选)
+        if self.use_deep_learning and self._model_registry and not evidences:
             dl_evidence = self._recognize_by_deep_learning(image, switch_type)
             if dl_evidence:
                 evidences.append(dl_evidence)
-        
+
         # 2. OCR文字识别
         ocr_evidence = self._recognize_by_ocr(image)
         if ocr_evidence:
             evidences.append(ocr_evidence)
-        
+
         # 3. 颜色检测
         color_evidence = self._recognize_by_color(image)
         if color_evidence:
             evidences.append(color_evidence)
-        
+
         # 4. 角度检测
         angle_evidence = self._recognize_by_angle(image, switch_type)
         if angle_evidence:
             evidences.append(angle_evidence)
-        
+
         # 5. 证据融合
         if use_fusion and self._fusion_engine:
             return self._fuse_with_engine(evidences)
         else:
             return self._fuse_evidences(evidences)
+
+    def _recognize_by_yolov8_vit(
+        self,
+        image: np.ndarray,
+        switch_type: SwitchType
+    ) -> Optional[StateEvidence]:
+        """YOLOv8-ViT开关状态识别 (V3.0新增)"""
+        if not self._dl_initialized or self._yolov8_vit_detector is None:
+            return None
+
+        try:
+            result = self._yolov8_vit_detector.detect(image)
+
+            if result.detections:
+                # 查找与switch_type匹配的检测结果
+                for det in result.detections:
+                    class_name = det.class_name.lower()
+
+                    # 映射检测结果到开关状态
+                    state = self._map_detection_to_state(class_name, switch_type)
+                    if state != SwitchState.UNKNOWN:
+                        return StateEvidence(
+                            source="yolov8_vit",
+                            state=state,
+                            confidence=det.confidence,
+                            raw_value={
+                                "class_name": det.class_name,
+                                "class_id": det.class_id,
+                                "bbox": det.bbox,
+                            },
+                            metadata={
+                                "model_version": result.model_version,
+                                "inference_time_ms": result.inference_time_ms,
+                                "source": "yolov8_vit_v3",
+                            },
+                        )
+
+        except Exception as e:
+            print(f"[SwitchDetector] YOLOv8-ViT识别失败: {e}")
+
+        return None
+
+    def _map_detection_to_state(self, class_name: str, switch_type: SwitchType) -> SwitchState:
+        """将检测类别映射到开关状态 (V3.0)"""
+        # 断路器状态映射
+        breaker_mapping = {
+            "breaker_open": SwitchState.OPEN,
+            "breaker_closed": SwitchState.CLOSED,
+            "breaker_intermediate": SwitchState.INTERMEDIATE,
+        }
+
+        # 隔离开关状态映射
+        isolator_mapping = {
+            "isolator_open": SwitchState.OPEN,
+            "isolator_closed": SwitchState.CLOSED,
+        }
+
+        # 接地开关状态映射
+        grounding_mapping = {
+            "grounding_open": SwitchState.OPEN,
+            "grounding_closed": SwitchState.CLOSED,
+        }
+
+        # 通用状态关键词
+        if "open" in class_name:
+            return SwitchState.OPEN
+        elif "closed" in class_name or "close" in class_name:
+            return SwitchState.CLOSED
+        elif "intermediate" in class_name:
+            return SwitchState.INTERMEDIATE
+
+        # 根据类型选择映射
+        if switch_type == SwitchType.BREAKER:
+            return breaker_mapping.get(class_name, SwitchState.UNKNOWN)
+        elif switch_type == SwitchType.ISOLATOR:
+            return isolator_mapping.get(class_name, SwitchState.UNKNOWN)
+        elif switch_type == SwitchType.GROUNDING:
+            return grounding_mapping.get(class_name, SwitchState.UNKNOWN)
+
+        return SwitchState.UNKNOWN
     
     def _recognize_by_deep_learning(
         self, 

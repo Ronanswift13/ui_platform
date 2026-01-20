@@ -254,6 +254,19 @@ def create_app() -> FastAPI:
             },
         )
 
+    # ============== 统一仪表盘页面 (V3.0新增) ==============
+    @app.get("/unified-dashboard", response_class=HTMLResponse)
+    async def unified_dashboard_page(request: Request):
+        """统一监控仪表盘页面"""
+        return templates.TemplateResponse(
+            "pages/unified_dashboard.html",
+            {
+                "request": request,
+                "active_tab": "unified_dashboard",
+                "version": "3.0.0",
+            },
+        )
+
     # ============== 集成高级插件 ==============
     if ADVANCED_PLUGINS_AVAILABLE:
         try:

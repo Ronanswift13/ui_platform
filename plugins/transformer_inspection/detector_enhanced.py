@@ -1,13 +1,18 @@
 """
-主变自主巡视检测器 - 增强版
+主变自主巡视检测器 - 增强版 V3.0
 输变电激光监测平台 (A组) - 全自动AI巡检改造
 
 增强功能:
-- YOLOv8缺陷检测: 破损/锈蚀/油泄漏/异物
+- YOLOv8-ViT缺陷检测: 破损/锈蚀/油泄漏/异物 (UPDATE.md短期计划)
 - U-Net油位分割: 精确油位标记检测
 - CNN硅胶分类: 变色状态识别
-- 热成像对齐: 可见光与热成像配准
+- 热成像融合: 可见光与热成像双模态检测
 - 多模型融合: 综合决策输出
+
+V3.0更新:
+- 集成YOLOv8-ViT深度学习模型
+- 支持热成像融合检测
+- 增强小目标检测能力
 """
 
 from __future__ import annotations
@@ -22,6 +27,18 @@ try:
     import cv2
 except ImportError:
     cv2 = None
+
+# 导入深度学习模型
+try:
+    from ai_models.deep_learning.yolov8_vit import (
+        YOLOv8ViTDetector, YOLOv8ViTConfig, DetectionTask
+    )
+    DL_AVAILABLE = True
+except ImportError:
+    DL_AVAILABLE = False
+    YOLOv8ViTDetector = None
+    YOLOv8ViTConfig = None
+    DetectionTask = None
 
 
 class DefectType(Enum):
@@ -157,28 +174,32 @@ class TransformerDetectorEnhanced:
     }
     
     def __init__(
-        self, 
+        self,
         config: Dict[str, Any],
         model_registry=None,
     ):
         """
         初始化增强检测器
-        
+
         Args:
             config: 配置字典
-            model_registry: 模型注册表实例
+            model_registry: 模型注册表实例 (已废弃，保留兼容性)
         """
         self.config = config
         self._model_registry = model_registry
         self._initialized = False
-        
+
         # 配置参数
         self._confidence_threshold = config.get("confidence_threshold", 0.5)
         self._nms_threshold = config.get("nms_threshold", 0.4)
         self._use_deep_learning = config.get("use_deep_learning", True)
-        
-        # 版本信息
-        self._model_version = "transformer_enhanced_v1.0"
+
+        # V3.0: YOLOv8-ViT深度学习检测器
+        self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
+        self._dl_initialized = False
+
+        # 版本信息 (V3.0更新)
+        self._model_version = "transformer_enhanced_v3.0"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -190,89 +211,227 @@ class TransformerDetectorEnhanced:
     def initialize(self) -> bool:
         """初始化检测器"""
         try:
-            # 如果有模型注册表，预加载模型
-            if self._model_registry and self._use_deep_learning:
+            # V3.0: 优先初始化YOLOv8-ViT深度学习检测器
+            if self._use_deep_learning and DL_AVAILABLE:
+                self._init_yolov8_vit()
+
+            # 兼容旧版：如果有模型注册表，预加载模型
+            if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
                     try:
                         self._model_registry.load(model_id)
                     except Exception as e:
                         print(f"[TransformerDetector] 模型 {model_id} 加载失败: {e}")
-            
+
             self._initialized = True
             return True
         except Exception as e:
             print(f"[TransformerDetector] 初始化失败: {e}")
+            return False
+
+    def _init_yolov8_vit(self) -> bool:
+        """初始化YOLOv8-ViT检测器 (V3.0)"""
+        if not DL_AVAILABLE:
+            print("[TransformerDetector] YOLOv8-ViT模块不可用")
+            return False
+
+        try:
+            # 创建配置
+            model_path = self.config.get("yolov8_model_path", None)
+            device = self.config.get("device", "cpu")
+            use_thermal = self.config.get("use_thermal_fusion", False)
+
+            config = YOLOv8ViTConfig(
+                model_path=model_path,
+                task=DetectionTask.TRANSFORMER_DEFECT,
+                confidence_threshold=self._confidence_threshold,
+                nms_threshold=self._nms_threshold,
+                device=device,
+                use_vit_backbone=True,
+                use_se_attention=True,
+                use_faster_block=True,
+                small_object_aug=True,
+                thermal_fusion=use_thermal,
+            )
+
+            # 创建检测器
+            self._yolov8_vit_detector = YOLOv8ViTDetector(config)
+            self._yolov8_vit_detector.load()
+            self._dl_initialized = True
+
+            print(f"[TransformerDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            return True
+
+        except Exception as e:
+            print(f"[TransformerDetector] YOLOv8-ViT初始化失败: {e}")
+            self._dl_initialized = False
             return False
     
     def detect_defects(
         self,
         image: np.ndarray,
         roi_bbox: Optional[Dict[str, float]] = None,
+        thermal_image: Optional[np.ndarray] = None,
     ) -> List[Detection]:
         """
-        缺陷检测
-        
+        缺陷检测 (V3.0: 支持热成像融合)
+
         Args:
             image: BGR图像
             roi_bbox: 可选的ROI区域
-            
+            thermal_image: 可选的热成像图像 (V3.0新增)
+
         Returns:
             检测结果列表
         """
         start_time = time.perf_counter()
-        
+
         # 裁剪ROI
         if roi_bbox:
             image = self._crop_roi(image, roi_bbox)
-        
+            if thermal_image is not None:
+                thermal_image = self._crop_roi(thermal_image, roi_bbox)
+
         detections = []
-        
-        # 优先使用深度学习
-        if self._use_deep_learning and self._model_registry:
-            dl_detections = self._detect_by_deep_learning(image)
+
+        # V3.0: 优先使用YOLOv8-ViT深度学习 (支持热成像融合)
+        if self._use_deep_learning:
+            if thermal_image is not None and self._dl_initialized and self._yolov8_vit_detector is not None:
+                # 热成像融合检测
+                dl_detections = self._detect_with_thermal_fusion(image, thermal_image)
+            else:
+                # 普通深度学习检测
+                dl_detections = self._detect_by_deep_learning(image)
+
             if dl_detections:
                 detections.extend(dl_detections)
-        
+
         # 深度学习失败或未启用时，回退到传统方法
         if not detections:
             traditional_detections = self._detect_by_traditional(image)
             detections.extend(traditional_detections)
-        
+
         # NMS去重
         detections = self._apply_nms(detections)
-        
+
         processing_time = (time.perf_counter() - start_time) * 1000
         for det in detections:
             det.metadata["processing_time_ms"] = processing_time
-        
+
+        return detections
+
+    def _detect_with_thermal_fusion(
+        self,
+        visible_image: np.ndarray,
+        thermal_image: np.ndarray
+    ) -> List[Detection]:
+        """热成像融合检测 (V3.0新增)"""
+        detections = []
+
+        if not self._dl_initialized or self._yolov8_vit_detector is None:
+            return detections
+
+        try:
+            result = self._yolov8_vit_detector.detect_with_thermal(
+                visible_image, thermal_image
+            )
+
+            for det in result.detections:
+                class_name = det.class_name
+                defect_type = self._map_class_to_defect_type(class_name)
+
+                detections.append(Detection(
+                    defect_type=defect_type,
+                    bbox=det.bbox,
+                    confidence=det.confidence,
+                    class_name=class_name,
+                    metadata={
+                        "source": "yolov8_vit_thermal_fusion",
+                        "class_id": det.class_id,
+                        "inference_time_ms": result.inference_time_ms,
+                        "model_version": result.model_version,
+                        "fusion_metadata": det.metadata,
+                    }
+                ))
+
+        except Exception as e:
+            print(f"[TransformerDetector] 热成像融合检测失败: {e}")
+
         return detections
     
     def _detect_by_deep_learning(self, image: np.ndarray) -> List[Detection]:
-        """深度学习缺陷检测"""
+        """深度学习缺陷检测 (V3.0: 优先使用YOLOv8-ViT)"""
         detections = []
-        
-        try:
-            model_id = self.MODEL_IDS["defect"]
-            result = self._model_registry.infer(model_id, image)  # type: ignore[union-attr]
-            
-            for det in result.detections:
-                class_id = det.get("class_id", 0)
-                defect_type = self.DEFECT_CLASSES.get(class_id, DefectType.DAMAGE)
-                
-                detections.append(Detection(
-                    defect_type=defect_type,
-                    bbox=det["bbox"],
-                    confidence=det["confidence"],
-                    class_name=det.get("class_name", defect_type.value),
-                    metadata={
-                        "source": "deep_learning",
-                        "model_id": model_id,
-                    }
-                ))
-        except Exception as e:
-            print(f"[TransformerDetector] 深度学习检测失败: {e}")
-        
+
+        # V3.0: 优先使用YOLOv8-ViT检测器
+        if self._dl_initialized and self._yolov8_vit_detector is not None:
+            try:
+                result = self._yolov8_vit_detector.detect(
+                    image,
+                    confidence_threshold=self._confidence_threshold,
+                    nms_threshold=self._nms_threshold
+                )
+
+                for det in result.detections:
+                    # 将YOLOv8-ViT的类名映射到DefectType
+                    class_name = det.class_name
+                    defect_type = self._map_class_to_defect_type(class_name)
+
+                    detections.append(Detection(
+                        defect_type=defect_type,
+                        bbox=det.bbox,
+                        confidence=det.confidence,
+                        class_name=class_name,
+                        metadata={
+                            "source": "yolov8_vit_v3",
+                            "class_id": det.class_id,
+                            "inference_time_ms": result.inference_time_ms,
+                            "model_version": result.model_version,
+                        }
+                    ))
+
+                return detections
+
+            except Exception as e:
+                print(f"[TransformerDetector] YOLOv8-ViT检测失败: {e}")
+
+        # 兼容旧版：回退到model_registry
+        if self._model_registry is not None:
+            try:
+                model_id = self.MODEL_IDS["defect"]
+                result = self._model_registry.infer(model_id, image)
+
+                for det in result.detections:
+                    class_id = det.get("class_id", 0)
+                    defect_type = self.DEFECT_CLASSES.get(class_id, DefectType.DAMAGE)
+
+                    detections.append(Detection(
+                        defect_type=defect_type,
+                        bbox=det["bbox"],
+                        confidence=det["confidence"],
+                        class_name=det.get("class_name", defect_type.value),
+                        metadata={
+                            "source": "model_registry_legacy",
+                            "model_id": model_id,
+                        }
+                    ))
+            except Exception as e:
+                print(f"[TransformerDetector] model_registry检测失败: {e}")
+
         return detections
+
+    def _map_class_to_defect_type(self, class_name: str) -> DefectType:
+        """将类名映射到缺陷类型"""
+        class_mapping = {
+            "oil_leak": DefectType.OIL_LEAK,
+            "rust": DefectType.RUST,
+            "damage": DefectType.DAMAGE,
+            "foreign_object": DefectType.FOREIGN_OBJECT,
+            "crack": DefectType.CRACK,
+            "deformation": DefectType.DEFORMATION,
+            "discoloration": DefectType.DISCOLORATION,
+        }
+        return class_mapping.get(class_name.lower(), DefectType.DAMAGE)
     
     def _detect_by_traditional(self, image: np.ndarray) -> List[Detection]:
         """传统方法缺陷检测(回退方案)"""
@@ -765,51 +924,51 @@ class TransformerDetectorEnhanced:
         rois: Optional[List[Dict[str, Any]]] = None,
     ) -> TransformerInspectionResult:
         """
-        综合巡视
-        
+        综合巡视 (V3.0: 支持YOLOv8-ViT和热成像融合)
+
         Args:
             image: 可见光图像
             thermal_image: 热成像图像(可选)
             rois: ROI列表
-            
+
         Returns:
             综合巡视结果
         """
         start_time = time.perf_counter()
-        
-        # 缺陷检测
-        defects = self.detect_defects(image)
-        
+
+        # V3.0: 缺陷检测 - 支持热成像融合
+        defects = self.detect_defects(image, thermal_image=thermal_image)
+
         # 处理ROI
         oil_level = None
         silica_gel = None
-        
+
         if rois:
             for roi in rois:
                 roi_type = roi.get("type", "")
                 roi_bbox = roi.get("bbox", None)
-                
+
                 if roi_type == "oil_level" and roi_bbox:
                     oil_level = self.detect_oil_level(image, roi_bbox)
                 elif roi_type == "silica_gel" and roi_bbox:
                     silica_gel = self.recognize_silica_gel(image, roi_bbox)
-        
+
         # 热成像分析
         thermal = None
         if thermal_image is not None:
             thermal = self.analyze_thermal(thermal_image, image)
-        
+
         processing_time = (time.perf_counter() - start_time) * 1000
-        
+
         # 计算综合置信度
         confidences = [d.confidence for d in defects]
         if oil_level:
             confidences.append(oil_level.confidence)
         if silica_gel:
             confidences.append(silica_gel.confidence)
-        
+
         avg_confidence = float(np.mean(confidences)) if confidences else 0.0
-        
+
         return TransformerInspectionResult(
             defects=defects,
             oil_level=oil_level,

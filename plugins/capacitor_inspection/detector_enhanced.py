@@ -1,13 +1,18 @@
 """
-电容器自主巡视检测器 - 增强版
+电容器自主巡视检测器 - 增强版 V3.0
 输变电激光监测平台 (D组) - 全自动AI巡检改造
 
 增强功能:
-- YOLOv8电容器检测: 精确定位电容器单元
+- YOLOv8-ViT电容器检测 (UPDATE.md短期计划)
 - 姿态估计倾斜分析: 基于几何的倾斜角度计算
 - RT-DETR入侵检测: 人/车/动物实时检测
 - 时序入侵确认: 防止瞬时误报
 - 三相排列校验: 电容器组完整性验证
+
+V3.0更新:
+- 集成YOLOv8-ViT深度学习模型
+- 增强鼓包/渗漏检测能力
+- 支持多类型缺陷统一检测
 """
 
 from __future__ import annotations
@@ -22,6 +27,18 @@ try:
     import cv2
 except ImportError:
     cv2 = None
+
+# V3.0: 导入YOLOv8-ViT深度学习模型
+try:
+    from ai_models.deep_learning.yolov8_vit import (
+        YOLOv8ViTDetector, YOLOv8ViTConfig, DetectionTask
+    )
+    DL_AVAILABLE = True
+except ImportError:
+    DL_AVAILABLE = False
+    YOLOv8ViTDetector = None
+    YOLOv8ViTConfig = None
+    DetectionTask = None
 
 
 class CapacitorDefectType(Enum):
@@ -240,40 +257,44 @@ class CapacitorDetectorEnhanced:
     ):
         """
         初始化增强检测器
-        
+
         Args:
             config: 配置字典
-            model_registry: 模型注册表实例
+            model_registry: 模型注册表实例 (已废弃，保留兼容性)
         """
         self.config = config
         self._model_registry = model_registry
         self._initialized = False
-        
+
         # 配置参数
         self._confidence_threshold = config.get("confidence_threshold", 0.55)
         self._nms_threshold = config.get("nms_threshold", 0.4)
         self._use_deep_learning = config.get("use_deep_learning", True)
-        
+
         # 倾斜检测
         tilt_config = config.get("tilt_detection", {})
         self._tilt_warning = tilt_config.get("warning_angle", self.DEFAULT_TILT_WARNING)
         self._tilt_error = tilt_config.get("max_tilt_angle", self.DEFAULT_TILT_ERROR)
-        
+
         # 入侵检测
         intrusion_config = config.get("intrusion_detection", {})
         self._intrusion_enabled = intrusion_config.get("enabled", True)
         self._alert_delay = intrusion_config.get("alert_delay", self.DEFAULT_ALERT_DELAY)
-        
+
         # 电容器组配置
         bank_config = config.get("capacitor_bank", {})
         self._expected_rows = bank_config.get("rows", 3)
         self._expected_cols = bank_config.get("columns", 4)
-        
+
         # 入侵跟踪器
         self._intrusion_tracker = IntrusionTracker()
-        
-        # 版本信息
-        self._model_version = "capacitor_enhanced_v1.0"
+
+        # V3.0: YOLOv8-ViT深度学习检测器
+        self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
+        self._dl_initialized = False
+
+        # 版本信息 (V3.0更新)
+        self._model_version = "capacitor_enhanced_v3.0"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -285,17 +306,55 @@ class CapacitorDetectorEnhanced:
     def initialize(self) -> bool:
         """初始化检测器"""
         try:
-            if self._model_registry and self._use_deep_learning:
+            # V3.0: 优先初始化YOLOv8-ViT深度学习检测器
+            if self._use_deep_learning and DL_AVAILABLE:
+                self._init_yolov8_vit()
+
+            # 兼容旧版：如果有模型注册表，预加载模型
+            if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
                     try:
                         self._model_registry.load(model_id)
                     except Exception as e:
                         print(f"[CapacitorDetector] 模型 {model_id} 加载失败: {e}")
-            
+
             self._initialized = True
             return True
         except Exception as e:
             print(f"[CapacitorDetector] 初始化失败: {e}")
+            return False
+
+    def _init_yolov8_vit(self) -> bool:
+        """初始化YOLOv8-ViT检测器 (V3.0)"""
+        if not DL_AVAILABLE:
+            print("[CapacitorDetector] YOLOv8-ViT模块不可用")
+            return False
+
+        try:
+            model_path = self.config.get("yolov8_model_path", None)
+            device = self.config.get("device", "cpu")
+
+            config = YOLOv8ViTConfig(
+                model_path=model_path,
+                task=DetectionTask.CAPACITOR_DEFECT,
+                confidence_threshold=self._confidence_threshold,
+                nms_threshold=self._nms_threshold,
+                device=device,
+                use_vit_backbone=True,
+                use_se_attention=True,
+                use_faster_block=True,
+            )
+
+            self._yolov8_vit_detector = YOLOv8ViTDetector(config)
+            self._yolov8_vit_detector.load()
+            self._dl_initialized = True
+
+            print(f"[CapacitorDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            return True
+
+        except Exception as e:
+            print(f"[CapacitorDetector] YOLOv8-ViT初始化失败: {e}")
+            self._dl_initialized = False
             return False
     
     def detect_structural_defects(
@@ -355,28 +414,50 @@ class CapacitorDetectorEnhanced:
         return defects
     
     def _detect_capacitor_units(self, image: np.ndarray) -> List[Dict]:
-        """检测电容器单元"""
+        """检测电容器单元 (V3.0: 优先使用YOLOv8-ViT)"""
         units = []
-        
-        # 优先使用深度学习
+
+        # V3.0: 优先使用YOLOv8-ViT深度学习
+        if self._use_deep_learning and self._dl_initialized and self._yolov8_vit_detector is not None:
+            try:
+                result = self._yolov8_vit_detector.detect(image)
+
+                for det in result.detections:
+                    if det.confidence >= self._confidence_threshold:
+                        units.append({
+                            "bbox": det.bbox,
+                            "confidence": det.confidence,
+                            "class_name": det.class_name,
+                            "class_id": det.class_id,
+                            "source": "yolov8_vit_v3",
+                            "inference_time_ms": result.inference_time_ms,
+                        })
+
+                if units:
+                    return units
+
+            except Exception as e:
+                print(f"[CapacitorDetector] YOLOv8-ViT检测失败: {e}")
+
+        # 兼容旧版：使用model_registry
         if self._use_deep_learning and self._model_registry:
             try:
                 model_id = self.MODEL_IDS["capacitor"]
                 result = self._model_registry.infer(model_id, image)
-                
+
                 for det in result.detections:
                     if det["confidence"] >= self._confidence_threshold:
                         units.append({
                             "bbox": det["bbox"],
                             "confidence": det["confidence"],
                             "class_name": det.get("class_name", "capacitor"),
-                            "source": "deep_learning"
+                            "source": "model_registry_legacy"
                         })
-                
+
                 return units
             except Exception as e:
-                print(f"[CapacitorDetector] 深度学习检测失败: {e}")
-        
+                print(f"[CapacitorDetector] model_registry检测失败: {e}")
+
         # 回退到传统方法
         return self._detect_units_traditional(image)
     

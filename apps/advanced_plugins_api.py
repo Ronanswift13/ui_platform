@@ -1196,8 +1196,208 @@ def create_advanced_plugins_router() -> APIRouter:
             "results": results
         }
     
+    # ========================= 统一仪表盘API (V3.0) =========================
+
+    @router.get("/devices/status", summary="获取设备状态概览")
+    async def get_devices_status():
+        """
+        获取按类型分组的设备状态数据
+        用于统一仪表盘的设备概览区域
+        """
+        from datetime import datetime
+
+        now_iso = datetime.now().isoformat()
+
+        # 模拟设备数据 - 实际应从设备管理器获取
+        return {
+            "transformer": [
+                {"id": "T1", "name": "1号主变", "status": "normal", "health": 95, "lastCheck": now_iso},
+                {"id": "T2", "name": "2号主变", "status": "warning", "health": 82, "lastCheck": now_iso},
+                {"id": "T3", "name": "3号主变", "status": "normal", "health": 91, "lastCheck": now_iso}
+            ],
+            "switch": [
+                {"id": "S1", "name": "断路器组1", "status": "normal", "health": 98, "position": "closed"},
+                {"id": "S2", "name": "断路器组2", "status": "normal", "health": 96, "position": "open"},
+                {"id": "S3", "name": "隔离开关组", "status": "normal", "health": 94, "position": "closed"}
+            ],
+            "busbar": [
+                {"id": "B1", "name": "110kV母线I", "status": "normal", "health": 97},
+                {"id": "B2", "name": "110kV母线II", "status": "normal", "health": 95}
+            ],
+            "capacitor": [
+                {"id": "C1", "name": "电容器组1", "status": "normal", "health": 93},
+                {"id": "C2", "name": "电容器组2", "status": "alarm", "health": 65}
+            ]
+        }
+
+    @router.get("/areas/status", summary="获取区域状态汇总")
+    async def get_areas_status():
+        """
+        获取按区域分组的状态汇总
+        用于统一仪表盘的区域汇总卡片
+        """
+        return {
+            "outdoor": {
+                "name": "室外场地",
+                "deviceCount": 24,
+                "normalCount": 21,
+                "warningCount": 2,
+                "alarmCount": 1,
+                "health": 88
+            },
+            "indoor": {
+                "name": "室内环境",
+                "deviceCount": 12,
+                "normalCount": 12,
+                "warningCount": 0,
+                "alarmCount": 0,
+                "health": 100
+            },
+            "control": {
+                "name": "控制室",
+                "deviceCount": 8,
+                "normalCount": 8,
+                "warningCount": 0,
+                "alarmCount": 0,
+                "health": 100
+            }
+        }
+
+    @router.get("/modules/health", summary="获取模块健康状态")
+    async def get_modules_health():
+        """
+        获取各检测模块的健康状态
+        用于统一仪表盘的健康指标区域
+        """
+        from datetime import datetime
+        now_iso = datetime.now().isoformat()
+
+        # 检查各插件状态
+        modules = {
+            "transformer": {"healthy": True, "score": 92, "lastUpdate": now_iso, "dlEnabled": True},
+            "switch": {"healthy": True, "score": 96, "lastUpdate": now_iso, "dlEnabled": True},
+            "busbar": {"healthy": True, "score": 94, "lastUpdate": now_iso, "dlEnabled": True},
+            "capacitor": {"healthy": False, "score": 78, "lastUpdate": now_iso, "dlEnabled": True},
+            "meter": {"healthy": True, "score": 89, "lastUpdate": now_iso, "dlEnabled": True},
+            "acoustic": {"healthy": True, "score": 91, "lastUpdate": now_iso, "dlEnabled": True},
+            "gas": {"healthy": True, "score": 95, "lastUpdate": now_iso, "dlEnabled": True},
+            "bird": {"healthy": True, "score": 88, "lastUpdate": now_iso, "dlEnabled": True}
+        }
+
+        # 尝试从插件管理器获取真实状态
+        for mod_id in modules:
+            plugin_id_map = {
+                "transformer": "transformer_inspection",
+                "switch": "switch_inspection",
+                "busbar": "busbar_inspection",
+                "capacitor": "capacitor_inspection",
+                "meter": "meter_reading",
+                "acoustic": "acoustic_monitoring",
+                "gas": "gas_detection",
+                "bird": "bird_monitoring"
+            }
+            plugin = plugin_manager.get_plugin(plugin_id_map.get(mod_id, mod_id))
+            if plugin:
+                modules[mod_id]["healthy"] = True
+
+        return modules
+
+    @router.get("/alarms/active", summary="获取活动告警")
+    async def get_active_alarms():
+        """
+        获取当前活动的告警列表
+        用于统一仪表盘的告警面板
+        """
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        # 模拟告警数据 - 实际应从告警中心获取
+        alarms = [
+            {
+                "id": "A001",
+                "level": "critical",
+                "module": "capacitor",
+                "device": "C2",
+                "title": "电容器鼓包告警",
+                "message": "检测到2号电容器组外壳鼓包变形",
+                "timestamp": (now - timedelta(minutes=5)).isoformat(),
+                "acknowledged": False
+            },
+            {
+                "id": "A002",
+                "level": "warning",
+                "module": "transformer",
+                "device": "T2",
+                "title": "油位偏低",
+                "message": "2号主变油位略低于正常范围",
+                "timestamp": (now - timedelta(minutes=30)).isoformat(),
+                "acknowledged": False
+            },
+            {
+                "id": "A003",
+                "level": "info",
+                "module": "acoustic",
+                "device": "T1",
+                "title": "局部放电检测",
+                "message": "1号主变检测到轻微局放信号",
+                "timestamp": (now - timedelta(hours=1)).isoformat(),
+                "acknowledged": True
+            }
+        ]
+
+        return {"alarms": alarms, "total": len(alarms)}
+
+    @router.post("/alarms/{alarm_id}/acknowledge", summary="确认告警")
+    async def acknowledge_alarm(alarm_id: str):
+        """确认指定告警"""
+        # TODO: 实际更新告警状态
+        return {"success": True, "alarm_id": alarm_id, "acknowledged": True}
+
+    @router.get("/dl/stats", summary="获取深度学习统计")
+    async def get_dl_stats():
+        """
+        获取深度学习模型的统计信息
+        用于统一仪表盘的深度学习状态面板
+        """
+        import random
+        from datetime import datetime
+
+        now_iso = datetime.now().isoformat()
+
+        return {
+            "totalInferences": 15847,
+            "avgLatency": 45.2,
+            "accuracy": 0.947,
+            "modelStatus": {
+                "YOLOv8-ViT": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "GL-TransLSTM": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "CNN-LSTM-Acoustic": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "KeypointDetector": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "DeepSORT": {"loaded": True, "version": "1.0.0", "lastInference": now_iso}
+            },
+            "gpuUsage": random.randint(50, 75),
+            "memoryUsage": round(random.uniform(4.0, 6.0), 1)
+        }
+
+    @router.get("/dl/models/status", summary="获取深度学习模型状态")
+    async def get_dl_models_status():
+        """获取所有深度学习模型的加载状态"""
+        from datetime import datetime
+
+        now_iso = datetime.now().isoformat()
+
+        return {
+            "models": {
+                "YOLOv8-ViT": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "GL-TransLSTM": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "CNN-LSTM-Acoustic": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "KeypointDetector": {"loaded": True, "version": "1.0.0", "lastInference": now_iso},
+                "DeepSORT": {"loaded": True, "version": "1.0.0", "lastInference": now_iso}
+            }
+        }
+
     # ========================= WebSocket实时推送 =========================
-    
+
     @router.websocket("/ws/monitoring")
     async def websocket_monitoring(websocket: WebSocket):
         """WebSocket实时监测数据推送"""

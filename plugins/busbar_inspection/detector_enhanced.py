@@ -1,13 +1,18 @@
 """
-母线自主巡视检测器 - 增强版
+母线自主巡视检测器 - 增强版 V3.0
 输变电激光监测平台 (C组) - 全自动AI巡检改造
 
 增强功能:
+- YOLOv8-ViT小目标检测 (UPDATE.md短期计划)
 - 4K图像切片处理: 重叠瓦片分解
-- YOLOv8m小目标检测: 高精度远距检测
-- 多尺度特征融合: 大小目标兼顾
+- 多尺度特征融合: FPN改进
 - 质量门禁增强: 模糊/过曝/遮挡检测
 - 智能变焦建议: 自动计算推荐倍数
+
+V3.0更新:
+- 集成YOLOv8-ViT深度学习模型
+- 增强远距小目标检测能力
+- 支持多尺度推理
 """
 
 from __future__ import annotations
@@ -22,6 +27,18 @@ try:
     import cv2
 except ImportError:
     cv2 = None
+
+# V3.0: 导入YOLOv8-ViT深度学习模型
+try:
+    from ai_models.deep_learning.yolov8_vit import (
+        YOLOv8ViTDetector, YOLOv8ViTConfig, DetectionTask
+    )
+    DL_AVAILABLE = True
+except ImportError:
+    DL_AVAILABLE = False
+    YOLOv8ViTDetector = None
+    YOLOv8ViTConfig = None
+    DetectionTask = None
 
 
 class BusbarDefectType(Enum):
@@ -145,15 +162,15 @@ class BusbarDetectorEnhanced:
     ):
         """
         初始化增强检测器
-        
+
         Args:
             config: 配置字典
-            model_registry: 模型注册表实例
+            model_registry: 模型注册表实例 (已废弃，保留兼容性)
         """
         self.config = config
         self._model_registry = model_registry
         self._initialized = False
-        
+
         # 配置参数
         self._confidence_threshold = config.get("confidence_threshold", 0.4)
         self._nms_threshold = config.get("nms_threshold", 0.4)
@@ -161,14 +178,18 @@ class BusbarDetectorEnhanced:
         self._tile_overlap = config.get("tile_overlap", self.DEFAULT_OVERLAP)
         self._use_slicing = config.get("use_slicing", True)
         self._use_deep_learning = config.get("use_deep_learning", True)
-        
+
         # 质量门禁阈值
         self._clarity_threshold = config.get("clarity_threshold", 0.5)
         self._brightness_range = config.get("brightness_range", (0.2, 0.8))
         self._contrast_threshold = config.get("contrast_threshold", 0.3)
-        
-        # 版本信息
-        self._model_version = "busbar_enhanced_v1.0"
+
+        # V3.0: YOLOv8-ViT深度学习检测器
+        self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
+        self._dl_initialized = False
+
+        # 版本信息 (V3.0更新)
+        self._model_version = "busbar_enhanced_v3.0"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -180,17 +201,57 @@ class BusbarDetectorEnhanced:
     def initialize(self) -> bool:
         """初始化检测器"""
         try:
-            if self._model_registry and self._use_deep_learning:
+            # V3.0: 优先初始化YOLOv8-ViT深度学习检测器
+            if self._use_deep_learning and DL_AVAILABLE:
+                self._init_yolov8_vit()
+
+            # 兼容旧版：如果有模型注册表，预加载模型
+            if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
                     try:
                         self._model_registry.load(model_id)
                     except Exception as e:
                         print(f"[BusbarDetector] 模型 {model_id} 加载失败: {e}")
-            
+
             self._initialized = True
             return True
         except Exception as e:
             print(f"[BusbarDetector] 初始化失败: {e}")
+            return False
+
+    def _init_yolov8_vit(self) -> bool:
+        """初始化YOLOv8-ViT检测器 (V3.0)"""
+        if not DL_AVAILABLE:
+            print("[BusbarDetector] YOLOv8-ViT模块不可用")
+            return False
+
+        try:
+            model_path = self.config.get("yolov8_model_path", None)
+            device = self.config.get("device", "cpu")
+
+            config = YOLOv8ViTConfig(
+                model_path=model_path,
+                task=DetectionTask.BUSBAR_DEFECT,
+                confidence_threshold=self._confidence_threshold,
+                nms_threshold=self._nms_threshold,
+                device=device,
+                use_vit_backbone=True,
+                use_se_attention=True,
+                use_faster_block=True,
+                small_object_aug=True,  # 启用小目标增强
+                multi_scale_inference=True,  # 启用多尺度推理
+            )
+
+            self._yolov8_vit_detector = YOLOv8ViTDetector(config)
+            self._yolov8_vit_detector.load()
+            self._dl_initialized = True
+
+            print(f"[BusbarDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            return True
+
+        except Exception as e:
+            print(f"[BusbarDetector] YOLOv8-ViT初始化失败: {e}")
+            self._dl_initialized = False
             return False
     
     def detect_defects(
@@ -288,39 +349,95 @@ class BusbarDetectorEnhanced:
         return tiles
     
     def _detect_single(self, image: np.ndarray) -> List[BusbarDetection]:
-        """单图检测"""
-        # 优先使用深度学习
+        """单图检测 (V3.0: 优先使用YOLOv8-ViT)"""
+        # V3.0: 优先使用YOLOv8-ViT深度学习
+        if self._use_deep_learning and self._dl_initialized and self._yolov8_vit_detector is not None:
+            detections = self._detect_by_yolov8_vit(image)
+            if detections:
+                return detections
+
+        # 兼容旧版：使用model_registry
         if self._use_deep_learning and self._model_registry:
             detections = self._detect_by_deep_learning(image)
             if detections:
                 return detections
-        
+
         # 回退到传统方法
         return self._detect_by_traditional(image)
-    
-    def _detect_by_deep_learning(self, image: np.ndarray) -> List[BusbarDetection]:
-        """深度学习检测"""
+
+    def _detect_by_yolov8_vit(self, image: np.ndarray) -> List[BusbarDetection]:
+        """YOLOv8-ViT深度学习检测 (V3.0新增)"""
         detections = []
-        
+
+        if not self._dl_initialized or self._yolov8_vit_detector is None:
+            return detections
+
+        try:
+            # 使用多尺度检测(对小目标更有效)
+            result = self._yolov8_vit_detector.detect_multi_scale(image)
+
+            for det in result.detections:
+                if det.confidence >= self._confidence_threshold:
+                    # 将类名映射到缺陷类型
+                    defect_type = self._map_class_to_defect_type(det.class_name)
+
+                    detections.append(BusbarDetection(
+                        defect_type=defect_type,
+                        bbox=det.bbox,
+                        confidence=det.confidence,
+                        class_name=det.class_name,
+                        metadata={
+                            "source": "yolov8_vit_v3",
+                            "class_id": det.class_id,
+                            "inference_time_ms": result.inference_time_ms,
+                            "model_version": result.model_version,
+                            "multi_scale": True,
+                        }
+                    ))
+
+        except Exception as e:
+            print(f"[BusbarDetector] YOLOv8-ViT检测失败: {e}")
+
+        return detections
+
+    def _map_class_to_defect_type(self, class_name: str) -> BusbarDefectType:
+        """将类名映射到缺陷类型 (V3.0)"""
+        class_mapping = {
+            "pin_missing": BusbarDefectType.PIN_MISSING,
+            "crack": BusbarDefectType.CRACK,
+            "foreign_object": BusbarDefectType.FOREIGN_OBJECT,
+            "corrosion": BusbarDefectType.CORROSION,
+            "flashover": BusbarDefectType.FLASHOVER,
+            "broken_strand": BusbarDefectType.BROKEN_STRAND,
+            "insulator_damage": BusbarDefectType.INSULATOR_DAMAGE,
+            "fitting_loose": BusbarDefectType.FITTING_LOOSE,
+            "deformation": BusbarDefectType.CRACK,  # 映射到裂纹
+        }
+        return class_mapping.get(class_name.lower(), BusbarDefectType.CRACK)
+
+    def _detect_by_deep_learning(self, image: np.ndarray) -> List[BusbarDetection]:
+        """深度学习检测 (兼容旧版model_registry)"""
+        detections = []
+
         try:
             model_id = self.MODEL_IDS["detector"]
             result = self._model_registry.infer(model_id, image)  # type: ignore[union-attr]
-            
+
             for det in result.detections:
                 if det["confidence"] >= self._confidence_threshold:
                     class_id = det.get("class_id", 0)
                     defect_type = self.DEFECT_CLASSES.get(class_id, BusbarDefectType.CRACK)
-                    
+
                     detections.append(BusbarDetection(
                         defect_type=defect_type,
                         bbox=det["bbox"],
                         confidence=det["confidence"],
                         class_name=det.get("class_name", defect_type.value),
-                        metadata={"source": "deep_learning", "model_id": model_id}
+                        metadata={"source": "model_registry_legacy", "model_id": model_id}
                     ))
         except Exception as e:
-            print(f"[BusbarDetector] 深度学习检测失败: {e}")
-        
+            print(f"[BusbarDetector] model_registry检测失败: {e}")
+
         return detections
     
     def _detect_by_traditional(self, image: np.ndarray) -> List[BusbarDetection]:
