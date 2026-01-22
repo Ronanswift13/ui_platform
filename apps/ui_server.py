@@ -241,6 +241,32 @@ def create_app() -> FastAPI:
             },
         )
 
+    # ============== 室外监测中心 (V3.5新增) ==============
+    @app.get("/outdoor", response_class=HTMLResponse)
+    async def outdoor_center_page(request: Request):
+        """室外监测中心页面 - 融合基础巡视和高级监测"""
+        return templates.TemplateResponse(
+            "pages/outdoor_center.html",
+            {
+                "request": request,
+                "active_tab": "outdoor",
+                "version": "3.5.0",
+            },
+        )
+
+    # ============== 室内监测中心 (V3.5新增) ==============
+    @app.get("/indoor", response_class=HTMLResponse)
+    async def indoor_center_page(request: Request):
+        """室内监测中心页面 - 包含电子围栏、动物入侵、温度监测等"""
+        return templates.TemplateResponse(
+            "pages/indoor_center.html",
+            {
+                "request": request,
+                "active_tab": "indoor",
+                "version": "3.5.0",
+            },
+        )
+
     # ============== 数据导入页面 (V3.0新增) ==============
     @app.get("/data-import", response_class=HTMLResponse)
     async def data_import_page(request: Request):
@@ -263,6 +289,82 @@ def create_app() -> FastAPI:
             {
                 "request": request,
                 "active_tab": "unified_dashboard",
+                "version": "3.0.0",
+            },
+        )
+
+    # ============== 中期迭代功能页面 (V3.0新增) ==============
+
+    # 中期迭代模块配置
+    ITERATION_MODULES = {
+        "point-cloud": {
+            "name": "3D点云处理",
+            "icon": "box-seam",
+            "description": "基于深度摄像头和毫米波雷达的3D点云处理，支持室内越线检测和多目标跟踪",
+            "category": "ai",
+            "features": ["深度图转点云", "点云下采样", "点云过滤", "多传感器融合"],
+        },
+        "temporal": {
+            "name": "时序分析引擎",
+            "icon": "clock-history",
+            "description": "基于LSTM/Transformer的多帧时序分析，用于开关状态判定和异常检测",
+            "category": "ai",
+            "features": ["多帧状态融合", "异常动作检测", "状态转换分析", "置信度聚合"],
+        },
+        "bird-risk": {
+            "name": "鸟类风险预测",
+            "icon": "exclamation-triangle",
+            "description": "升级版鸟类监测系统，融合YOLOv8-ViT检测和轨迹预测模型",
+            "category": "ai",
+            "features": ["鸟类物种分类", "轨迹预测", "风险评估", "智能驱鸟策略"],
+        },
+        "mlops": {
+            "name": "MLOps流水线",
+            "icon": "graph-up-arrow",
+            "description": "完整的机器学习运维平台，支持模型训练、评估、部署和主动学习",
+            "category": "platform",
+            "features": ["模型注册", "训练调度", "主动学习", "Canary部署"],
+        },
+        "microservice": {
+            "name": "微服务架构",
+            "icon": "diagram-3",
+            "description": "基于FastAPI/gRPC的微服务架构，支持服务注册、负载均衡和任务队列",
+            "category": "platform",
+            "features": ["服务注册发现", "API网关", "任务队列", "WebSocket通信"],
+        },
+        "monitoring": {
+            "name": "系统监控",
+            "icon": "activity",
+            "description": "完整的可观测性平台，集成Prometheus指标、结构化日志和分布式追踪",
+            "category": "platform",
+            "features": ["Prometheus指标", "结构化日志", "分布式追踪", "健康检查"],
+        },
+    }
+
+    @app.get("/iteration/{module_id}", response_class=HTMLResponse)
+    async def iteration_page(request: Request, module_id: str):
+        """中期迭代功能页面"""
+        if module_id not in ITERATION_MODULES:
+            return templates.TemplateResponse(
+                "pages/404.html",
+                {"request": request},
+                status_code=404,
+            )
+
+        module = ITERATION_MODULES[module_id]
+
+        return templates.TemplateResponse(
+            "pages/iteration_module.html",
+            {
+                "request": request,
+                "active_tab": "iteration",
+                "module_id": module_id,
+                "module_name": module["name"],
+                "module_icon": module["icon"],
+                "module_description": module["description"],
+                "module_category": module["category"],
+                "module_features": module["features"],
+                "all_modules": ITERATION_MODULES,
                 "version": "3.0.0",
             },
         )

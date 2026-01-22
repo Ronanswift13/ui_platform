@@ -22,27 +22,16 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    <!-- 室外监测中心 (V3.0重组) -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if active_tab in ['dashboard', 'transformer', 'switch', 'busbar', 'capacitor', 'meter', 'bird'] %}active{% endif %}"
-                           href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-grid-1x2-fill"></i> 室外监测中心
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-dark">
-                            <li><a class="dropdown-item" href="/dashboard"><i class="bi bi-speedometer"></i> 监测中心</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/module/transformer"><i class="bi bi-box"></i> 主变巡视</a></li>
-                            <li><a class="dropdown-item" href="/module/switch"><i class="bi bi-toggle-on"></i> 开关间隔</a></li>
-                            <li><a class="dropdown-item" href="/module/busbar"><i class="bi bi-diagram-3"></i> 母线巡视</a></li>
-                            <li><a class="dropdown-item" href="/module/capacitor"><i class="bi bi-battery-charging"></i> 电容器</a></li>
-                            <li><a class="dropdown-item" href="/module/meter"><i class="bi bi-speedometer2"></i> 表计读数</a></li>
-                            <li><a class="dropdown-item" href="/module/bird"><i class="bi bi-feather"></i> 鸟类监控</a></li>
-                        </ul>
-                    </li>
-                    <!-- 室内围栏 -->
+                    <!-- 室外监测中心 (V3.5重组 - 融合高级监测) -->
                     <li class="nav-item">
-                        <a class="nav-link {% if active_tab == 'indoor_fence' %}active{% endif %}" href="/module/indoor_fence">
-                            <i class="bi bi-shield-shaded"></i> 室内围栏
+                        <a class="nav-link {% if active_tab in ['outdoor', 'dashboard', 'transformer', 'switch', 'busbar', 'capacitor', 'meter', 'bird', 'acoustic', 'gas', 'hyperspectral', 'slam', 'fusion', 'advanced'] %}active{% endif %}" href="/outdoor">
+                            <i class="bi bi-sun"></i> 室外监测中心
+                        </a>
+                    </li>
+                    <!-- 室内监测中心 (V3.5重组 - 原室内围栏升级) -->
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_tab in ['indoor', 'indoor_fence', 'indoor_animal', 'indoor_temp', 'indoor_device', 'indoor_fire', 'indoor_env'] %}active{% endif %}" href="/indoor">
+                            <i class="bi bi-building"></i> 室内监测中心
                         </a>
                     </li>
                     <!-- 回放 -->
@@ -57,28 +46,29 @@
                             <i class="bi bi-cpu"></i> 模型训练
                         </a>
                     </li>
-                    <!-- 高级监测插件菜单 -->
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if active_tab == 'advanced' %}active{% endif %}"
-                           href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="bi bi-cpu-fill"></i> 高级监测
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-dark">
-                            <li><a class="dropdown-item" href="/advanced-plugins"><i class="bi bi-grid-3x3-gap"></i> 插件管理</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/acoustic"><i class="bi bi-soundwave"></i> 声学监测</a></li>
-                            <li><a class="dropdown-item" href="/gas-detection"><i class="bi bi-cloud-haze2"></i> 气体检测</a></li>
-                            <li><a class="dropdown-item" href="/hyperspectral"><i class="bi bi-rainbow"></i> 高光谱检测</a></li>
-                            <li><a class="dropdown-item" href="/slam"><i class="bi bi-map"></i> SLAM建图</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="/multimodal-fusion"><i class="bi bi-diagram-3"></i> 多模态融合</a></li>
-                        </ul>
-                    </li>
                     <!-- 数据导入 (V3.0新增) -->
                     <li class="nav-item">
                         <a class="nav-link {% if active_tab == 'data_import' %}active{% endif %}" href="/data-import">
                             <i class="bi bi-cloud-upload"></i> 数据导入
                         </a>
+                    </li>
+                    <!-- 平台架构 (V3.0新增) -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if active_tab in ['mlops', 'microservice', 'monitoring', 'iteration'] %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-rocket-takeoff"></i> 平台架构
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li class="dropdown-header text-info"><i class="bi bi-cpu"></i> AI模型架构</li>
+                            <li><a class="dropdown-item" href="/iteration/point-cloud"><i class="bi bi-box-seam"></i> 3D点云处理</a></li>
+                            <li><a class="dropdown-item" href="/iteration/temporal"><i class="bi bi-clock-history"></i> 时序分析引擎</a></li>
+                            <li><a class="dropdown-item" href="/iteration/bird-risk"><i class="bi bi-exclamation-triangle"></i> 鸟类风险预测</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-header text-info"><i class="bi bi-gear-wide-connected"></i> 平台服务</li>
+                            <li><a class="dropdown-item" href="/iteration/mlops"><i class="bi bi-graph-up-arrow"></i> MLOps流水线</a></li>
+                            <li><a class="dropdown-item" href="/iteration/microservice"><i class="bi bi-diagram-3"></i> 微服务架构</a></li>
+                            <li><a class="dropdown-item" href="/iteration/monitoring"><i class="bi bi-activity"></i> 系统监控</a></li>
+                        </ul>
                     </li>
                     <!-- 系统设置 -->
                     <li class="nav-item">

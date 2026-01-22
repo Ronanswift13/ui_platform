@@ -464,6 +464,340 @@ Dashboard 模块功能控制面板
     </div>
 </div>
 
+<!-- =========================================================================
+     中期迭代功能面板 (V3.0新增)
+     ========================================================================= -->
+
+<!-- 3D点云处理功能面板 -->
+<div class="module-control-panel" id="panel-point_cloud" style="display: none;">
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-box-seam text-primary"></i> 3D点云处理</h6>
+        <div class="control-item">
+            <div class="feature-badge">
+                <span class="badge bg-success">中期迭代</span>
+                <span class="badge bg-primary">已启用</span>
+            </div>
+            <p class="text-muted small mt-2">深度图转点云、体素下采样、RANSAC分割，支持3D感知</p>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="pc-depth-convert" checked>
+                <label class="form-check-label" for="pc-depth-convert">深度图转点云</label>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="pc-voxel-downsample" checked>
+                <label class="form-check-label" for="pc-voxel-downsample">体素下采样</label>
+            </div>
+            <div class="control-params">
+                <div class="param-row">
+                    <label>体素尺寸(m)</label>
+                    <input type="number" class="form-control form-control-sm" value="0.05" step="0.01" min="0.01" max="1.0">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="pc-ransac" checked>
+                <label class="form-check-label" for="pc-ransac">RANSAC平面分割</label>
+            </div>
+            <div class="control-params">
+                <div class="param-row">
+                    <label>距离阈值(m)</label>
+                    <input type="number" class="form-control form-control-sm" value="0.02" step="0.005" min="0.001" max="0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="pc-multi-sensor">
+                <label class="form-check-label" for="pc-multi-sensor">多传感器融合</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-info-circle"></i> 模块信息</h6>
+        <div class="feature-info">
+            <div class="info-row"><span>模块路径:</span> <code>ai_models/deep_learning/point_cloud_processor.py</code></div>
+            <div class="info-row"><span>API端点:</span> <code>/api/ai/point-cloud/process</code></div>
+        </div>
+    </div>
+</div>
+
+<!-- 时序分析功能面板 -->
+<div class="module-control-panel" id="panel-temporal" style="display: none;">
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-clock-history text-success"></i> 时序分析模块</h6>
+        <div class="control-item">
+            <div class="feature-badge">
+                <span class="badge bg-success">中期迭代</span>
+                <span class="badge bg-primary">已启用</span>
+            </div>
+            <p class="text-muted small mt-2">LSTM/Transformer时序模型，多帧融合判断开关状态</p>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="temp-multi-frame" checked>
+                <label class="form-check-label" for="temp-multi-frame">多帧融合判断</label>
+            </div>
+            <div class="control-params">
+                <div class="param-row">
+                    <label>窗口大小(帧)</label>
+                    <input type="number" class="form-control form-control-sm" value="10" min="3" max="30">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="temp-anomaly" checked>
+                <label class="form-check-label" for="temp-anomaly">异常检测</label>
+            </div>
+            <div class="control-params">
+                <div class="param-row">
+                    <label>振荡检测</label>
+                    <input type="checkbox" class="form-check-input" checked>
+                </div>
+                <div class="param-row">
+                    <label>卡滞检测</label>
+                    <input type="checkbox" class="form-check-input" checked>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="temp-scada" checked>
+                <label class="form-check-label" for="temp-scada">SCADA数据交叉验证</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-info-circle"></i> 模块信息</h6>
+        <div class="feature-info">
+            <div class="info-row"><span>模块路径:</span> <code>ai_models/deep_learning/temporal_analyzer.py</code></div>
+            <div class="info-row"><span>API端点:</span> <code>/api/ai/temporal/analyze</code></div>
+        </div>
+    </div>
+</div>
+
+<!-- 鸟类风险预测功能面板 -->
+<div class="module-control-panel" id="panel-bird_risk" style="display: none;">
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-feather2 text-warning"></i> 鸟类风险预测</h6>
+        <div class="control-item">
+            <div class="feature-badge">
+                <span class="badge bg-success">中期迭代</span>
+                <span class="badge bg-primary">已启用</span>
+            </div>
+            <p class="text-muted small mt-2">EfficientNet鸟类分类+卡尔曼轨迹预测，动态风险评估</p>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="bird-species-classify" checked>
+                <label class="form-check-label" for="bird-species-classify">鸟类种类分类</label>
+            </div>
+            <div class="control-params">
+                <div class="param-row">
+                    <label>分类置信度</label>
+                    <input type="number" class="form-control form-control-sm" value="0.7" step="0.05" min="0.5" max="1.0">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="bird-trajectory" checked>
+                <label class="form-check-label" for="bird-trajectory">轨迹预测</label>
+            </div>
+            <div class="control-params">
+                <div class="param-row">
+                    <label>预测时长(秒)</label>
+                    <input type="number" class="form-control form-control-sm" value="3.0" step="0.5" min="1.0" max="10.0">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="bird-deterrence" checked>
+                <label class="form-check-label" for="bird-deterrence">驱鸟策略推荐</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-info-circle"></i> 模块信息</h6>
+        <div class="feature-info">
+            <div class="info-row"><span>模块路径:</span> <code>ai_models/deep_learning/bird_risk_predictor.py</code></div>
+            <div class="info-row"><span>API端点:</span> <code>/api/ai/bird-risk/predict</code></div>
+            <div class="info-row"><span>UI页面:</span> <a href="/module/bird">/module/bird</a></div>
+        </div>
+    </div>
+</div>
+
+<!-- MLOps流水线功能面板 -->
+<div class="module-control-panel" id="panel-mlops" style="display: none;">
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-gear-wide-connected text-info"></i> MLOps流水线</h6>
+        <div class="control-item">
+            <div class="feature-badge">
+                <span class="badge bg-success">中期迭代</span>
+                <span class="badge bg-primary">已启用</span>
+            </div>
+            <p class="text-muted small mt-2">模型注册、训练调度、主动学习、金丝雀部署</p>
+        </div>
+
+        <div class="control-item">
+            <h6 class="text-light small">模型注册表</h6>
+            <div class="mlops-stat">
+                <span class="stat-label">已注册模型:</span>
+                <span class="stat-value" id="mlops-registered-models">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">模型版本:</span>
+                <span class="stat-value" id="mlops-model-versions">v1.0.0</span>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <h6 class="text-light small">训练调度</h6>
+            <div class="mlops-stat">
+                <span class="stat-label">活跃任务:</span>
+                <span class="stat-value" id="mlops-active-jobs">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">待标注样本:</span>
+                <span class="stat-value" id="mlops-pending-samples">-</span>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <a href="/training" class="btn btn-outline-info btn-sm w-100">
+                <i class="bi bi-box-arrow-up-right"></i> 打开训练管理
+            </a>
+        </div>
+    </div>
+
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-info-circle"></i> 模块信息</h6>
+        <div class="feature-info">
+            <div class="info-row"><span>模块路径:</span> <code>platform_core/mlops_pipeline.py</code></div>
+            <div class="info-row"><span>API端点:</span> <code>/api/mlops</code></div>
+        </div>
+    </div>
+</div>
+
+<!-- 微服务架构功能面板 -->
+<div class="module-control-panel" id="panel-microservice" style="display: none;">
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-hdd-network text-primary"></i> 微服务架构</h6>
+        <div class="control-item">
+            <div class="feature-badge">
+                <span class="badge bg-success">中期迭代</span>
+                <span class="badge bg-primary">已启用</span>
+            </div>
+            <p class="text-muted small mt-2">服务注册发现、API网关、异步任务队列、WebSocket</p>
+        </div>
+
+        <div class="control-item">
+            <h6 class="text-light small">服务状态</h6>
+            <div class="mlops-stat">
+                <span class="stat-label">注册服务:</span>
+                <span class="stat-value" id="ms-registered-services">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">网关状态:</span>
+                <span class="stat-value text-success" id="ms-gateway-status">online</span>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <h6 class="text-light small">任务队列</h6>
+            <div class="mlops-stat">
+                <span class="stat-label">活跃任务:</span>
+                <span class="stat-value" id="ms-active-tasks">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">待处理任务:</span>
+                <span class="stat-value" id="ms-pending-tasks">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">WebSocket连接:</span>
+                <span class="stat-value" id="ms-ws-connections">-</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-info-circle"></i> 模块信息</h6>
+        <div class="feature-info">
+            <div class="info-row"><span>模块路径:</span> <code>platform_core/microservice.py</code></div>
+            <div class="info-row"><span>负载均衡:</span> <code>round_robin</code></div>
+        </div>
+    </div>
+</div>
+
+<!-- 系统监控功能面板 -->
+<div class="module-control-panel" id="panel-monitoring" style="display: none;">
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-activity text-success"></i> 系统监控</h6>
+        <div class="control-item">
+            <div class="feature-badge">
+                <span class="badge bg-success">中期迭代</span>
+                <span class="badge bg-primary">已启用</span>
+            </div>
+            <p class="text-muted small mt-2">Prometheus指标、ELK日志、Jaeger追踪、健康检查</p>
+        </div>
+
+        <div class="control-item">
+            <h6 class="text-light small">指标收集</h6>
+            <div class="mlops-stat">
+                <span class="stat-label">收集指标数:</span>
+                <span class="stat-value" id="mon-metrics-collected">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">追踪记录数:</span>
+                <span class="stat-value" id="mon-traces-recorded">-</span>
+            </div>
+        </div>
+
+        <div class="control-item">
+            <h6 class="text-light small">告警与健康</h6>
+            <div class="mlops-stat">
+                <span class="stat-label">活跃告警:</span>
+                <span class="stat-value" id="mon-active-alerts">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">健康检查通过:</span>
+                <span class="stat-value text-success" id="mon-health-passed">-</span>
+            </div>
+            <div class="mlops-stat">
+                <span class="stat-label">健康检查失败:</span>
+                <span class="stat-value text-danger" id="mon-health-failed">-</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-section">
+        <h6 class="section-title"><i class="bi bi-info-circle"></i> 模块信息</h6>
+        <div class="feature-info">
+            <div class="info-row"><span>模块路径:</span> <code>platform_core/monitoring.py</code></div>
+            <div class="info-row"><span>API端点:</span> <code>/api/monitoring</code></div>
+            <div class="info-row"><span>日志级别:</span> <code>info</code></div>
+        </div>
+    </div>
+</div>
+
 <style>
 .module-control-panel {
     padding: 10px;
@@ -524,5 +858,56 @@ Dashboard 模块功能控制面板
 
 .param-row .form-check {
     margin: 0;
+}
+
+/* 中期迭代功能样式 */
+.feature-badge {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.feature-info {
+    font-size: 0.75rem;
+}
+
+.feature-info .info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    color: #aaa;
+}
+
+.feature-info .info-row span:first-child {
+    color: #888;
+}
+
+.feature-info code {
+    font-size: 0.7rem;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #00d4ff;
+}
+
+.feature-info a {
+    font-size: 0.7rem;
+    color: #00d4ff;
+}
+
+.mlops-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 0.75rem;
+}
+
+.mlops-stat .stat-label {
+    color: #888;
+}
+
+.mlops-stat .stat-value {
+    color: #00d4ff;
+    font-weight: 500;
 }
 </style>

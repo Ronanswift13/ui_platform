@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}{{ module_name }} - 平台架构 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    .iteration-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+    }
+    .iteration-header h1 {
+        margin-bottom: 0.5rem;
+    }
+    .feature-card {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .feature-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    .feature-badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+    }
+    .sidebar-module {
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+        text-decoration: none;
+        display: block;
+    }
+    .sidebar-module:hover {
+        background-color: #f8f9fa;
+    }
+    .sidebar-module.active {
+        background-color: #e7f1ff;
+        border-left: 3px solid #0d6efd;
+    }
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .status-ready { background-color: #28a745; }
+    .status-beta { background-color: #ffc107; }
+    .category-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 10px;
+    }
+    .api-endpoint {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+        padding: 0.5rem 0.75rem;
+        border-radius: 5px;
+        font-size: 0.85rem;
+    }
+    .code-block {
+        background-color: #2d2d2d;
+        color: #f8f8f2;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        overflow-x: auto;
+    }
+    .demo-panel {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧导航 -->
+    <div class="col-md-3 col-lg-2">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-rocket-takeoff"></i> 平台架构
+            </div>
+            <div class="card-body p-2">
+                <div class="mb-2">
+                    <small class="text-muted fw-bold"><i class="bi bi-cpu"></i> AI模型架构</small>
+                </div>
+                {% for mid, mod in all_modules.items() %}
+                    {% if mod.category == 'ai' %}
+                    <a href="/iteration/{{ mid }}" class="sidebar-module {% if mid == module_id %}active{% endif %}">
+                        <i class="bi bi-{{ mod.icon }}"></i> {{ mod.name }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
+
+                <hr class="my-2">
+
+                <div class="mb-2">
+                    <small class="text-muted fw-bold"><i class="bi bi-gear-wide-connected"></i> 平台服务</small>
+                </div>
+                {% for mid, mod in all_modules.items() %}
+                    {% if mod.category == 'platform' %}
+                    <a href="/iteration/{{ mid }}" class="sidebar-module {% if mid == module_id %}active{% endif %}">
+                        <i class="bi bi-{{ mod.icon }}"></i> {{ mod.name }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
+
+                <hr class="my-2">
+
+                <a href="/dashboard#iteration" class="sidebar-module">
+                    <i class="bi bi-speedometer2"></i> 功能总览
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="col-md-9 col-lg-10">
+        <!-- 页面头部 -->
+        <div class="iteration-header">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h1><i class="bi bi-{{ module_icon }}"></i> {{ module_name }}</h1>
+                    <p class="mb-0 opacity-75">{{ module_description }}</p>
+                </div>
+                <div>
+                    {% if module_category == 'ai' %}
+                    <span class="badge bg-info fs-6"><i class="bi bi-cpu"></i> AI模型架构</span>
+                    {% else %}
+                    <span class="badge bg-success fs-6"><i class="bi bi-gear-wide-connected"></i> 平台服务</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能特性 -->
+        <div class="row mb-4">
+            {% for feature in module_features %}
+            <div class="col-md-6 col-lg-3 mb-3">
+                <div class="card feature-card h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle-fill text-success fs-2 mb-2"></i>
+                        <h6 class="card-title mb-0">{{ feature }}</h6>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 模块详情 -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-info-circle"></i> 模块说明
+                    </div>
+                    <div class="card-body">
+                        {% if module_id == 'point-cloud' %}
+                        <h5>3D点云处理模块</h5>
+                        <p>该模块提供基于深度摄像头（如Intel RealSense）和毫米波雷达的3D点云处理能力，主要用于室内越线检测和多目标跟踪场景。</p>
+                        <h6>核心功能：</h6>
+                        <ul>
+                            <li><strong>深度图转点云</strong>：将深度摄像头数据转换为3D点云坐标</li>
+                            <li><strong>点云下采样</strong>：体素化下采样减少计算量</li>
+                            <li><strong>点云过滤</strong>：距离范围过滤、统计离群点去除</li>
+                            <li><strong>多传感器融合</strong>：融合视觉图像和点云数据</li>
+                        </ul>
+                        <h6>API示例：</h6>
+                        <div class="code-block">
+from ai_models.deep_learning.point_cloud_processor import (
+    DepthToPointCloud, CameraIntrinsics
+)
+
+intrinsics = CameraIntrinsics(fx=525.0, fy=525.0, cx=320.0, cy=240.0)
+converter = DepthToPointCloud(intrinsics)
+point_cloud = converter.convert(depth_image)
+downsampled = point_cloud.downsample(voxel_size=0.05)
+                        </div>
+
+                        {% elif module_id == 'temporal' %}
+                        <h5>时序分析引擎</h5>
+                        <p>基于LSTM/Transformer的多帧时序分析引擎，用于开关状态判定、异常动作检测等场景，通过分析连续多帧数据减少单帧误判。</p>
+                        <h6>核心功能：</h6>
+                        <ul>
+                            <li><strong>多帧状态融合</strong>：滑动窗口聚合多帧检测结果</li>
+                            <li><strong>状态转换分析</strong>：检测开关操作过程中的状态变化</li>
+                            <li><strong>异常动作检测</strong>：识别卡滞、抖动等异常操作</li>
+                            <li><strong>置信度聚合</strong>：加权融合提升判定准确性</li>
+                        </ul>
+                        <h6>API示例：</h6>
+                        <div class="code-block">
+from ai_models.deep_learning.temporal_analyzer import (
+    TemporalAnalyzer, TemporalAnalyzerConfig, FrameObservation
+)
+
+config = TemporalAnalyzerConfig(window_size=10, confidence_threshold=0.7)
+analyzer = TemporalAnalyzer(config)
+
+# 添加帧观测
+for frame in frames:
+    obs = FrameObservation(timestamp=t, state=state, confidence=conf)
+    analyzer.add_observation(obs)
+
+# 执行分析
+decision = analyzer.analyze()
+                        </div>
+
+                        {% elif module_id == 'bird-risk' %}
+                        <h5>鸟类风险预测模块</h5>
+                        <p>升级版鸟类监测系统，融合YOLOv8-ViT检测模型和EfficientNet分类器，通过轨迹预测评估鸟类入侵风险。</p>
+                        <h6>核心功能：</h6>
+                        <ul>
+                            <li><strong>鸟类物种分类</strong>：识别麻雀、喜鹊、乌鸦等常见鸟类</li>
+                            <li><strong>轨迹预测</strong>：基于历史轨迹预测飞行方向和速度</li>
+                            <li><strong>风险评估</strong>：评估鸟类对设备的威胁级别</li>
+                            <li><strong>智能驱鸟策略</strong>：根据风险等级自动选择驱鸟方式</li>
+                        </ul>
+                        <h6>API示例：</h6>
+                        <div class="code-block">
+from ai_models.deep_learning.bird_risk_predictor import (
+    BirdRiskPredictor, BirdRiskPredictorConfig
+)
+
+config = BirdRiskPredictorConfig(max_tracks=100)
+predictor = BirdRiskPredictor(config)
+
+tracks, risk = predictor.process_detections(
+    detections, image, timestamp
+)
+print(f"风险等级: {risk.risk_level}, 建议动作: {risk.recommended_action}")
+                        </div>
+
+                        {% elif module_id == 'mlops' %}
+                        <h5>MLOps流水线</h5>
+                        <p>完整的机器学习运维平台，支持模型全生命周期管理，包括训练、评估、部署和持续迭代。</p>
+                        <h6>核心功能：</h6>
+                        <ul>
+                            <li><strong>模型注册</strong>：统一管理模型版本和元数据</li>
+                            <li><strong>训练调度</strong>：自动化训练任务管理</li>
+                            <li><strong>主动学习</strong>：不确定性采样优化标注效率</li>
+                            <li><strong>Canary部署</strong>：灰度发布降低上线风险</li>
+                        </ul>
+                        <h6>API示例：</h6>
+                        <div class="code-block">
+from platform_core.mlops_pipeline import MLOpsPipeline
+
+pipeline = MLOpsPipeline()
+
+# 注册模型
+version = pipeline.registry.register(
+    model_id="yolov8_vit", version="v1.0.0",
+    model_path="/models/yolov8_vit.pt"
+)
+
+# 提交训练任务
+job = pipeline.scheduler.submit(
+    model_id="yolov8_vit",
+    config={"epochs": 50, "batch_size": 32}
+)
+                        </div>
+
+                        {% elif module_id == 'microservice' %}
+                        <h5>微服务架构</h5>
+                        <p>基于FastAPI/gRPC的微服务架构，实现插件服务化、负载均衡和异步任务处理。</p>
+                        <h6>核心功能：</h6>
+                        <ul>
+                            <li><strong>服务注册发现</strong>：动态服务注册和健康检查</li>
+                            <li><strong>API网关</strong>：统一路由和负载均衡</li>
+                            <li><strong>任务队列</strong>：异步任务调度和并发控制</li>
+                            <li><strong>WebSocket通信</strong>：实时告警和进度推送</li>
+                        </ul>
+                        <h6>API示例：</h6>
+                        <div class="code-block">
+from platform_core.microservice import MicroserviceOrchestrator
+
+orchestrator = MicroserviceOrchestrator()
+orchestrator.start()
+
+# 注册任务处理器
+orchestrator.register_task_handler("inference", inference_handler)
+
+# 提交异步任务
+task_id = orchestrator.submit_task(
+    name="推理任务",
+    func_name="inference",
+    kwargs={"image": image_data}
+)
+                        </div>
+
+                        {% elif module_id == 'monitoring' %}
+                        <h5>系统监控模块</h5>
+                        <p>完整的可观测性平台，集成Prometheus指标收集、结构化日志和分布式追踪。</p>
+                        <h6>核心功能：</h6>
+                        <ul>
+                            <li><strong>Prometheus指标</strong>：请求延迟、推理时间、资源使用率</li>
+                            <li><strong>结构化日志</strong>：JSON格式日志便于分析</li>
+                            <li><strong>分布式追踪</strong>：跟踪请求在服务间的流转</li>
+                            <li><strong>健康检查</strong>：自动化服务健康监测</li>
+                        </ul>
+                        <h6>API示例：</h6>
+                        <div class="code-block">
+from platform_core.monitoring import MonitoringSystem
+
+monitoring = MonitoringSystem("my_service")
+monitoring.start()
+
+# 记录指标
+monitoring.metrics.counter_inc("requests_total")
+monitoring.record_inference("yolov8", latency=0.05, success=True)
+
+# 获取健康状态
+status = monitoring.get_health_status()
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧状态面板 -->
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <i class="bi bi-gear"></i> 模块状态
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">运行状态</label>
+                            <div>
+                                <span class="status-indicator status-ready"></span>
+                                <span class="text-success">已就绪</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">版本</label>
+                            <div><code>v1.0.0</code></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">模块类型</label>
+                            <div>
+                                {% if module_category == 'ai' %}
+                                <span class="badge bg-info">AI模型</span>
+                                {% else %}
+                                <span class="badge bg-success">平台服务</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <label class="form-label">相关API</label>
+                            <div class="api-endpoint mb-2">
+                                GET /api/iteration/{{ module_id }}/status
+                            </div>
+                            <div class="api-endpoint">
+                                POST /api/iteration/{{ module_id }}/execute
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-lightning"></i> 快速操作
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" onclick="testModule()">
+                                <i class="bi bi-play-circle"></i> 测试模块
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="viewLogs()">
+                                <i class="bi bi-file-text"></i> 查看日志
+                            </button>
+                            <a href="/dashboard#iteration" class="btn btn-outline-info">
+                                <i class="bi bi-speedometer2"></i> 功能总览
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function testModule() {
+    const moduleId = '{{ module_id }}';
+    alert(`正在测试 {{ module_name }} 模块...\n\n模块ID: ${moduleId}\n状态: 测试中`);
+
+    // TODO: 实际调用测试API
+    // fetch(`/api/iteration/${moduleId}/test`)
+    //     .then(r => r.json())
+    //     .then(data => console.log(data));
+}
+
+function viewLogs() {
+    alert('日志功能开发中...\n\n请访问系统监控模块查看详细日志。');
+}
+</script>
+{% endblock %}

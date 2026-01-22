@@ -1,0 +1,916 @@
+{% extends "base.html" %}
+
+{% block title %}室内监测中心 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --panel-bg: #1e293b;
+        --panel-border: #334155;
+        --accent-primary: #3b82f6;
+        --accent-success: #22c55e;
+        --accent-warning: #eab308;
+        --accent-danger: #ef4444;
+        --accent-info: #06b6d4;
+    }
+
+    body {
+        background: #0f172a;
+    }
+
+    .indoor-container {
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+        height: calc(100vh - 100px);
+        gap: 0;
+    }
+
+    /* 顶部工具栏 */
+    .top-toolbar {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--panel-border);
+    }
+
+    .toolbar-title {
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .version-badge {
+        font-size: 0.65rem;
+        background: var(--accent-primary);
+        color: #fff;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .toolbar-controls {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .toolbar-select {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid var(--panel-border);
+        color: #fff;
+        padding: 0.4rem 1rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+
+    /* 主监测区域 - 网格布局 */
+    .monitor-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 1rem;
+        padding: 1rem;
+        overflow: auto;
+    }
+
+    /* 监测模块卡片 */
+    .monitor-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        transition: all 0.3s;
+    }
+
+    .monitor-card:hover {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+    }
+
+    .monitor-card.alarm {
+        border-color: var(--accent-danger);
+        animation: pulse-border 2s infinite;
+    }
+
+    @keyframes pulse-border {
+        0%, 100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.3); }
+        50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.6); }
+    }
+
+    .card-header {
+        padding: 0.75rem 1rem;
+        background: rgba(0,0,0,0.3);
+        border-bottom: 1px solid var(--panel-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .card-title {
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .card-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .status-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .status-badge.online { background: var(--accent-success); color: #fff; }
+    .status-badge.warning { background: var(--accent-warning); color: #000; }
+    .status-badge.offline { background: #64748b; color: #fff; }
+    .status-badge.alarm { background: var(--accent-danger); color: #fff; }
+
+    .card-body {
+        flex: 1;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* 视频/监测区域 */
+    .monitor-view {
+        flex: 1;
+        background: linear-gradient(45deg, #111827 25%, #1f2937 25%, #1f2937 50%, #111827 50%, #111827 75%, #1f2937 75%);
+        background-size: 20px 20px;
+        border-radius: 8px;
+        position: relative;
+        min-height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .monitor-view canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .monitor-placeholder {
+        color: #64748b;
+        text-align: center;
+    }
+
+    .monitor-placeholder i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* 数据指标区域 */
+    .metrics-row {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .metric-item {
+        flex: 1;
+        min-width: 60px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 6px;
+        padding: 0.5rem;
+        text-align: center;
+    }
+
+    .metric-label {
+        color: #94a3b8;
+        font-size: 0.65rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .metric-value {
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .metric-value.normal { color: var(--accent-success); }
+    .metric-value.warning { color: var(--accent-warning); }
+    .metric-value.danger { color: var(--accent-danger); }
+
+    /* 控制按钮 */
+    .card-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .card-actions .btn {
+        flex: 1;
+        font-size: 0.75rem;
+        padding: 0.4rem;
+    }
+
+    /* 机柜状态网格 (电子围栏专用) */
+    .cabinet-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .cabinet-cell {
+        background: rgba(0,0,0,0.3);
+        border-radius: 6px;
+        padding: 0.5rem;
+        text-align: center;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+
+    .cabinet-cell:hover {
+        background: rgba(255,255,255,0.1);
+    }
+
+    .cabinet-cell.occupied {
+        background: rgba(59, 130, 246, 0.3);
+        border: 1px solid var(--accent-primary);
+    }
+
+    .cabinet-cell.alarm {
+        background: rgba(239, 68, 68, 0.3);
+        border: 1px solid var(--accent-danger);
+    }
+
+    .cabinet-id {
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .cabinet-status {
+        color: #94a3b8;
+        font-size: 0.65rem;
+    }
+
+    /* 人员列表 */
+    .person-list {
+        max-height: 100px;
+        overflow-y: auto;
+        margin-top: 0.5rem;
+    }
+
+    .person-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.4rem 0.5rem;
+        background: rgba(0,0,0,0.2);
+        border-radius: 4px;
+        margin-bottom: 0.3rem;
+        font-size: 0.75rem;
+    }
+
+    .person-info {
+        color: #fff;
+    }
+
+    .person-status {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 3px;
+    }
+
+    .person-status.safe { background: var(--accent-success); }
+    .person-status.warning { background: var(--accent-warning); color: #000; }
+    .person-status.danger { background: var(--accent-danger); }
+
+    /* 温度热力图 */
+    .heatmap-container {
+        position: relative;
+        flex: 1;
+        min-height: 100px;
+    }
+
+    .temp-scale {
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        background: linear-gradient(to bottom, #ef4444, #eab308, #22c55e, #3b82f6);
+        border-radius: 4px;
+    }
+
+    .temp-labels {
+        position: absolute;
+        right: 25px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        font-size: 0.65rem;
+        color: #94a3b8;
+    }
+
+    /* 底部状态栏 */
+    .bottom-statusbar {
+        background: var(--panel-bg);
+        border-top: 1px solid var(--panel-border);
+        padding: 0.5rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+
+    .status-indicators {
+        display: flex;
+        gap: 1.5rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent-success);
+    }
+
+    .status-dot.warning { background: var(--accent-warning); }
+    .status-dot.error { background: var(--accent-danger); }
+
+    /* 响应式布局 */
+    @media (max-width: 1400px) {
+        .monitor-grid {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+        }
+    }
+
+    @media (max-width: 992px) {
+        .monitor-grid {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto;
+        }
+        .monitor-card {
+            min-height: 300px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="indoor-container">
+    <!-- 顶部工具栏 -->
+    <div class="top-toolbar">
+        <div class="toolbar-title">
+            <i class="bi bi-building text-info"></i>
+            室内监测中心
+            <span class="version-badge">V3.5</span>
+        </div>
+        <div class="toolbar-controls">
+            <select class="toolbar-select" id="area-selector">
+                <option value="all">全部区域</option>
+                <option value="control">主控室</option>
+                <option value="gis">GIS室</option>
+                <option value="relay">继保室</option>
+                <option value="battery">蓄电池室</option>
+            </select>
+            <button class="btn btn-sm btn-outline-light" onclick="refreshAll()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新
+            </button>
+            <button class="btn btn-sm btn-outline-warning" onclick="viewAlarms()">
+                <i class="bi bi-exclamation-triangle"></i> 告警 <span class="badge bg-danger" id="total-alarms">2</span>
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="startMonitoring()">
+                <i class="bi bi-play-fill"></i> 全部启动
+            </button>
+        </div>
+    </div>
+
+    <!-- 主监测区域 - 6宫格布局 -->
+    <div class="monitor-grid">
+        <!-- 1. 电子围栏/越线检测 -->
+        <div class="monitor-card" id="card-fence">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="bi bi-shield-shaded text-primary"></i>
+                    电子围栏
+                </div>
+                <div class="card-status">
+                    <span class="status-badge online">在线</span>
+                    <button class="btn btn-sm btn-link text-light p-0" onclick="openModuleDetail('fence')">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="monitor-view">
+                    <canvas id="fence-canvas"></canvas>
+                </div>
+                <div class="cabinet-grid">
+                    <div class="cabinet-cell" id="cabinet-1">
+                        <div class="cabinet-id">#1</div>
+                        <div class="cabinet-status">空闲</div>
+                    </div>
+                    <div class="cabinet-cell occupied" id="cabinet-2">
+                        <div class="cabinet-id">#2</div>
+                        <div class="cabinet-status">作业中</div>
+                    </div>
+                    <div class="cabinet-cell" id="cabinet-3">
+                        <div class="cabinet-id">#3</div>
+                        <div class="cabinet-status">空闲</div>
+                    </div>
+                    <div class="cabinet-cell" id="cabinet-4">
+                        <div class="cabinet-id">#4</div>
+                        <div class="cabinet-status">空闲</div>
+                    </div>
+                    <div class="cabinet-cell alarm" id="cabinet-5">
+                        <div class="cabinet-id">#5</div>
+                        <div class="cabinet-status">越线!</div>
+                    </div>
+                    <div class="cabinet-cell" id="cabinet-6">
+                        <div class="cabinet-id">#6</div>
+                        <div class="cabinet-status">空闲</div>
+                    </div>
+                </div>
+                <div class="person-list" id="person-list">
+                    <div class="person-item">
+                        <span class="person-info"><i class="bi bi-person"></i> 张工 - 机柜#2</span>
+                        <span class="person-status safe">安全</span>
+                    </div>
+                    <div class="person-item">
+                        <span class="person-info"><i class="bi bi-person"></i> 李工 - 机柜#5</span>
+                        <span class="person-status danger">越线</span>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-outline-primary" onclick="toggleFence('fence')">
+                        <i class="bi bi-shield-check"></i> 配置围栏
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewHistory('fence')">
+                        <i class="bi bi-clock-history"></i> 历史
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 动物入侵检测 -->
+        <div class="monitor-card" id="card-animal">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="bi bi-bug text-warning"></i>
+                    动物入侵检测
+                </div>
+                <div class="card-status">
+                    <span class="status-badge online">在线</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="monitor-view">
+                    <canvas id="animal-canvas"></canvas>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">今日检测</div>
+                        <div class="metric-value">156</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">入侵告警</div>
+                        <div class="metric-value warning">3</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">驱离成功</div>
+                        <div class="metric-value normal">2</div>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">鼠类</div>
+                        <div class="metric-value">2</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">蛇类</div>
+                        <div class="metric-value">0</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">其他</div>
+                        <div class="metric-value">1</div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-outline-warning" onclick="activateDeterrent()">
+                        <i class="bi bi-volume-up"></i> 启动驱离
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewHistory('animal')">
+                        <i class="bi bi-clock-history"></i> 历史
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 温度监测 -->
+        <div class="monitor-card" id="card-temperature">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="bi bi-thermometer-half text-danger"></i>
+                    温度监测
+                </div>
+                <div class="card-status">
+                    <span class="status-badge warning">注意</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="heatmap-container">
+                    <canvas id="temp-heatmap"></canvas>
+                    <div class="temp-scale"></div>
+                    <div class="temp-labels">
+                        <span>60°C</span>
+                        <span>45°C</span>
+                        <span>30°C</span>
+                        <span>15°C</span>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">环境温度</div>
+                        <div class="metric-value normal">25.3°C</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">最高温度</div>
+                        <div class="metric-value warning">47.8°C</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">平均温度</div>
+                        <div class="metric-value">32.1°C</div>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">湿度</div>
+                        <div class="metric-value">65%</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">热点数</div>
+                        <div class="metric-value warning">2</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">趋势</div>
+                        <div class="metric-value normal">↑稳定</div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-outline-danger" onclick="showTempDetail()">
+                        <i class="bi bi-geo-alt"></i> 定位热点
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewHistory('temp')">
+                        <i class="bi bi-graph-up"></i> 趋势
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 设备状态监测 -->
+        <div class="monitor-card" id="card-device">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="bi bi-hdd-stack text-info"></i>
+                    设备状态监测
+                </div>
+                <div class="card-status">
+                    <span class="status-badge online">正常</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="monitor-view">
+                    <canvas id="device-canvas"></canvas>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">设备总数</div>
+                        <div class="metric-value">48</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">在线</div>
+                        <div class="metric-value normal">46</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">异常</div>
+                        <div class="metric-value warning">2</div>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">开关柜</div>
+                        <div class="metric-value normal">12/12</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">继保装置</div>
+                        <div class="metric-value normal">24/24</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">通信设备</div>
+                        <div class="metric-value warning">10/12</div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-outline-info" onclick="scanDevices()">
+                        <i class="bi bi-search"></i> 扫描设备
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewDeviceList()">
+                        <i class="bi bi-list-ul"></i> 设备列表
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. 消防监测 -->
+        <div class="monitor-card" id="card-fire">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="bi bi-fire text-danger"></i>
+                    消防监测
+                </div>
+                <div class="card-status">
+                    <span class="status-badge online">正常</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="monitor-view">
+                    <canvas id="fire-canvas"></canvas>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">烟感</div>
+                        <div class="metric-value normal">正常</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">温感</div>
+                        <div class="metric-value normal">正常</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">手报</div>
+                        <div class="metric-value normal">正常</div>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">灭火系统</div>
+                        <div class="metric-value normal">就绪</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">消防水压</div>
+                        <div class="metric-value normal">0.8MPa</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">应急照明</div>
+                        <div class="metric-value normal">正常</div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-outline-danger" onclick="testFireAlarm()">
+                        <i class="bi bi-bell"></i> 测试报警
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewFirePlan()">
+                        <i class="bi bi-map"></i> 疏散图
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. 环境监测 -->
+        <div class="monitor-card" id="card-environment">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="bi bi-cloud-sun text-success"></i>
+                    环境监测
+                </div>
+                <div class="card-status">
+                    <span class="status-badge online">良好</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="monitor-view">
+                    <div class="monitor-placeholder">
+                        <i class="bi bi-graph-up"></i>
+                        <div>环境数据趋势图</div>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">SF6浓度</div>
+                        <div class="metric-value normal">0ppm</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">O2浓度</div>
+                        <div class="metric-value normal">20.9%</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">CO浓度</div>
+                        <div class="metric-value normal">0ppm</div>
+                    </div>
+                </div>
+                <div class="metrics-row">
+                    <div class="metric-item">
+                        <div class="metric-label">空调状态</div>
+                        <div class="metric-value normal">运行</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">通风状态</div>
+                        <div class="metric-value normal">正常</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">照明</div>
+                        <div class="metric-value normal">开启</div>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-outline-success" onclick="controlHVAC()">
+                        <i class="bi bi-wind"></i> 空调控制
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="viewEnvHistory()">
+                        <i class="bi bi-graph-up"></i> 趋势
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="bottom-statusbar">
+        <div class="status-indicators">
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>监测系统: 正常</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>传感器: 48/48在线</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot warning"></span>
+                <span>告警: 2条待处理</span>
+            </div>
+        </div>
+        <div>
+            <span>最后更新: <span id="last-update">2025-04-07 16:53:15</span></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 模块API映射
+const moduleApis = {
+    'fence': '/api/indoor/fence',
+    'animal': '/api/indoor/animal',
+    'temperature': '/api/indoor/temperature',
+    'device': '/api/indoor/device',
+    'fire': '/api/indoor/fire',
+    'environment': '/api/indoor/environment'
+};
+
+// 刷新所有模块数据
+function refreshAll() {
+    Object.keys(moduleApis).forEach(module => {
+        refreshModule(module);
+    });
+    updateLastTime();
+}
+
+// 刷新单个模块
+function refreshModule(moduleId) {
+    console.log('Refreshing module:', moduleId);
+    // TODO: 调用API获取数据
+}
+
+// 打开模块详情
+function openModuleDetail(moduleId) {
+    console.log('Opening detail for:', moduleId);
+    // TODO: 打开模态框或跳转详情页
+}
+
+// 查看历史记录
+function viewHistory(moduleId) {
+    console.log('Viewing history for:', moduleId);
+}
+
+// 启动全部监测
+function startMonitoring() {
+    console.log('Starting all monitoring...');
+    alert('已启动全部室内监测模块');
+}
+
+// 查看告警
+function viewAlarms() {
+    console.log('Viewing alarms...');
+}
+
+// 电子围栏配置
+function toggleFence(moduleId) {
+    console.log('Configuring fence...');
+}
+
+// 启动驱离设备
+function activateDeterrent() {
+    console.log('Activating deterrent...');
+    alert('超声波驱离设备已启动');
+}
+
+// 显示温度详情
+function showTempDetail() {
+    console.log('Showing temperature detail...');
+}
+
+// 扫描设备
+function scanDevices() {
+    console.log('Scanning devices...');
+    alert('正在扫描设备...');
+}
+
+// 查看设备列表
+function viewDeviceList() {
+    console.log('Viewing device list...');
+}
+
+// 测试消防报警
+function testFireAlarm() {
+    if (confirm('确定要测试消防报警吗？')) {
+        console.log('Testing fire alarm...');
+        alert('消防报警测试完成');
+    }
+}
+
+// 查看疏散图
+function viewFirePlan() {
+    console.log('Viewing fire plan...');
+}
+
+// 空调控制
+function controlHVAC() {
+    console.log('Controlling HVAC...');
+}
+
+// 查看环境历史
+function viewEnvHistory() {
+    console.log('Viewing environment history...');
+}
+
+// 更新时间
+function updateLastTime() {
+    const now = new Date();
+    const timeStr = now.toLocaleString('zh-CN');
+    document.getElementById('last-update').textContent = timeStr;
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 定时刷新
+    setInterval(updateLastTime, 1000);
+    setInterval(refreshAll, 30000); // 30秒刷新一次
+
+    // 初始化Canvas (模拟)
+    initCanvases();
+});
+
+// 初始化画布
+function initCanvases() {
+    const canvases = ['fence-canvas', 'animal-canvas', 'temp-heatmap', 'device-canvas', 'fire-canvas'];
+    canvases.forEach(id => {
+        const canvas = document.getElementById(id);
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+
+            // 绘制占位图案
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('监测画面加载中...', canvas.width/2, canvas.height/2);
+        }
+    });
+}
+</script>
+{% endblock %}

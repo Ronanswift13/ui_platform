@@ -1,0 +1,32 @@
+{
+  "models": {
+    "yolov8_vit": {
+      "v1.0.0": {
+        "model_id": "yolov8_vit",
+        "version": "v1.0.0",
+        "name": "YOLOv8-ViT检测器",
+        "description": "",
+        "status": "draft",
+        "model_path": "mlops/models/yolov8_vit/v1.0.0/test_model.pt",
+        "config_path": "",
+        "file_hash": "",
+        "file_size": 0,
+        "training_id": null,
+        "training_config": {},
+        "dataset_version": "",
+        "metrics": {
+          "mAP": 0.85,
+          "precision": 0.9
+        },
+        "validation_metrics": {},
+        "created_at": "2026-01-20T16:41:51.399378",
+        "updated_at": "2026-01-20T16:41:51.399378",
+        "trained_at": null,
+        "deployed_at": null,
+        "tags": [],
+        "metadata": {}
+      }
+    }
+  },
+  "production_versions": {}
+}

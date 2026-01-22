@@ -1,0 +1,911 @@
+{% extends "base.html" %}
+
+{% block title %}室外监测中心 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --panel-bg: #1a1a2e;
+        --panel-border: #2d3748;
+        --accent-primary: #00d4ff;
+        --accent-success: #10b981;
+        --accent-warning: #f59e0b;
+        --accent-danger: #ef4444;
+    }
+
+    body {
+        background: #0f0f1a;
+    }
+
+    .outdoor-container {
+        display: grid;
+        grid-template-columns: 260px 1fr 300px;
+        grid-template-rows: auto 1fr;
+        height: calc(100vh - 100px);
+        gap: 0;
+    }
+
+    /* 顶部工具栏 */
+    .top-toolbar {
+        grid-column: 1 / -1;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--panel-border);
+    }
+
+    .toolbar-title {
+        color: #fff;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+
+    .toolbar-title .version-badge {
+        font-size: 0.7rem;
+        background: var(--accent-primary);
+        color: #000;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        margin-left: 0.5rem;
+    }
+
+    .toolbar-controls {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .toolbar-select {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid var(--panel-border);
+        color: #fff;
+        padding: 0.4rem 1rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+    }
+
+    .toolbar-select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    /* 左侧模块导航 */
+    .module-sidebar {
+        background: var(--panel-bg);
+        border-right: 1px solid var(--panel-border);
+        overflow-y: auto;
+        padding: 0.5rem 0;
+    }
+
+    .module-group {
+        margin-bottom: 0.5rem;
+    }
+
+    .module-group-header {
+        color: #888;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .module-item {
+        display: flex;
+        align-items: center;
+        padding: 0.6rem 1rem;
+        color: #ccc;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+        text-decoration: none;
+    }
+
+    .module-item:hover {
+        background: rgba(255,255,255,0.05);
+        color: #fff;
+    }
+
+    .module-item.active {
+        background: rgba(0, 212, 255, 0.1);
+        border-left-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .module-item i {
+        font-size: 1.1rem;
+        margin-right: 0.6rem;
+        width: 20px;
+        text-align: center;
+    }
+
+    .module-item-info {
+        flex: 1;
+    }
+
+    .module-item-name {
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .module-item-status {
+        font-size: 0.65rem;
+        color: #666;
+    }
+
+    .module-item-status.ready {
+        color: var(--accent-success);
+    }
+
+    .module-item .badge {
+        font-size: 0.6rem;
+    }
+
+    /* 主内容区域 */
+    .main-content {
+        background: #000;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .video-area {
+        flex: 1;
+        position: relative;
+        background: linear-gradient(45deg, #111 25%, #1a1a1a 25%, #1a1a1a 50%, #111 50%, #111 75%, #1a1a1a 75%);
+        background-size: 20px 20px;
+    }
+
+    #main-video-canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .video-overlay-info {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+    }
+
+    .video-bottom-info {
+        position: absolute;
+        bottom: 1rem;
+        left: 1rem;
+        right: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .camera-info {
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
+
+    .detection-stats {
+        background: rgba(0,0,0,0.7);
+        color: #fff;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        display: flex;
+        gap: 1rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .stat-value {
+        color: var(--accent-primary);
+        font-weight: 600;
+    }
+
+    /* 右侧控制面板 */
+    .control-panel {
+        background: var(--panel-bg);
+        border-left: 1px solid var(--panel-border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .panel-header {
+        padding: 0.75rem 1rem;
+        background: rgba(0,0,0,0.3);
+        border-bottom: 1px solid var(--panel-border);
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .panel-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+
+    .control-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .control-section-title {
+        color: #888;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .control-card {
+        background: rgba(255,255,255,0.03);
+        border-radius: 8px;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .control-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .control-card-title {
+        color: #fff;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .control-card-body {
+        color: #aaa;
+        font-size: 0.8rem;
+    }
+
+    /* 识别结果列表 */
+    .result-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .result-item {
+        display: flex;
+        align-items: center;
+        padding: 0.6rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 6px;
+        margin-bottom: 0.4rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .result-item:hover {
+        background: rgba(255,255,255,0.08);
+    }
+
+    .result-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 0.6rem;
+        font-size: 0.9rem;
+    }
+
+    .result-icon.normal { background: rgba(16, 185, 129, 0.2); color: var(--accent-success); }
+    .result-icon.warning { background: rgba(245, 158, 11, 0.2); color: var(--accent-warning); }
+    .result-icon.danger { background: rgba(239, 68, 68, 0.2); color: var(--accent-danger); }
+
+    .result-info { flex: 1; }
+    .result-name { color: #fff; font-size: 0.8rem; }
+    .result-detail { color: #888; font-size: 0.7rem; }
+    .result-confidence { color: var(--accent-primary); font-size: 0.75rem; }
+
+    /* 告警列表 */
+    .alarm-item {
+        padding: 0.6rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 6px;
+        margin-bottom: 0.4rem;
+        border-left: 3px solid var(--accent-warning);
+    }
+
+    .alarm-item.critical {
+        border-left-color: var(--accent-danger);
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    .alarm-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.3rem;
+    }
+
+    .alarm-type { color: #fff; font-size: 0.8rem; font-weight: 500; }
+    .alarm-time { color: #666; font-size: 0.7rem; }
+    .alarm-message { color: #aaa; font-size: 0.75rem; }
+
+    /* 底部状态栏 */
+    .bottom-statusbar {
+        grid-column: 1 / -1;
+        background: var(--panel-bg);
+        border-top: 1px solid var(--panel-border);
+        padding: 0.4rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.75rem;
+        color: #888;
+    }
+
+    .status-indicators {
+        display: flex;
+        gap: 1.5rem;
+    }
+
+    .status-item {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent-success);
+    }
+
+    .status-dot.warning { background: var(--accent-warning); }
+    .status-dot.error { background: var(--accent-danger); }
+
+    .performance-metrics {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .metric-value {
+        color: var(--accent-primary);
+        font-weight: 600;
+    }
+
+    /* 模块控制面板切换 */
+    .module-control-panel {
+        display: none;
+    }
+
+    .module-control-panel.active {
+        display: block;
+    }
+
+    @media (max-width: 1200px) {
+        .outdoor-container {
+            grid-template-columns: 200px 1fr 260px;
+        }
+    }
+
+    @media (max-width: 992px) {
+        .outdoor-container {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto 1fr auto;
+        }
+        .module-sidebar {
+            display: flex;
+            overflow-x: auto;
+            border-right: none;
+            border-bottom: 1px solid var(--panel-border);
+        }
+        .module-group { display: flex; margin: 0; }
+        .module-group-header { display: none; }
+        .module-item { flex-direction: column; padding: 0.5rem; }
+        .control-panel { max-height: 300px; border-left: none; border-top: 1px solid var(--panel-border); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="outdoor-container">
+    <!-- 顶部工具栏 -->
+    <div class="top-toolbar">
+        <div class="toolbar-title">
+            <i class="bi bi-sun text-warning"></i>
+            室外监测中心
+            <span class="version-badge">V3.5</span>
+        </div>
+        <div class="toolbar-controls">
+            <select class="toolbar-select" id="voltage-selector">
+                <option value="all">全部电压等级</option>
+                <option value="500kv">500kV</option>
+                <option value="220kv">220kV</option>
+                <option value="110kv" selected>110kV</option>
+                <option value="35kv">35kV</option>
+                <option value="10kv">10kV</option>
+            </select>
+            <select class="toolbar-select" id="site-selector">
+                <option value="">选择站点...</option>
+                <option value="site1">110kV凤凰变电站</option>
+                <option value="site2">220kV龙华变电站</option>
+            </select>
+            <button class="btn btn-sm btn-outline-light" onclick="openSettings()">
+                <i class="bi bi-gear"></i>
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="startAutoPatrol()">
+                <i class="bi bi-play-fill"></i> 开始巡检
+            </button>
+        </div>
+    </div>
+
+    <!-- 左侧模块导航 -->
+    <div class="module-sidebar">
+        <!-- 基础巡视模块 -->
+        <div class="module-group">
+            <div class="module-group-header">
+                <i class="bi bi-grid-3x3-gap"></i> 基础巡视
+            </div>
+            <a class="module-item active" data-module="transformer" href="javascript:void(0)" onclick="switchModule('transformer')">
+                <i class="bi bi-box text-primary"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">主变巡视</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="switch" href="javascript:void(0)" onclick="switchModule('switch')">
+                <i class="bi bi-toggle-on text-success"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">开关巡视</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="busbar" href="javascript:void(0)" onclick="switchModule('busbar')">
+                <i class="bi bi-diagram-3 text-warning"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">母线巡视</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="capacitor" href="javascript:void(0)" onclick="switchModule('capacitor')">
+                <i class="bi bi-battery-charging text-info"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">电容器</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="meter" href="javascript:void(0)" onclick="switchModule('meter')">
+                <i class="bi bi-speedometer2 text-danger"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">表计读数</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="bird" href="javascript:void(0)" onclick="switchModule('bird')">
+                <i class="bi bi-feather text-cyan"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">鸟类监控</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+        </div>
+
+        <!-- 高级监测模块 -->
+        <div class="module-group">
+            <div class="module-group-header">
+                <i class="bi bi-cpu-fill"></i> 高级监测
+            </div>
+            <a class="module-item" data-module="acoustic" href="javascript:void(0)" onclick="switchModule('acoustic')">
+                <i class="bi bi-soundwave text-primary"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">声学监测</div>
+                    <div class="module-item-status">局放检测</div>
+                </div>
+                <span class="badge bg-danger">1</span>
+            </a>
+            <a class="module-item" data-module="gas" href="javascript:void(0)" onclick="switchModule('gas')">
+                <i class="bi bi-cloud-haze2 text-warning"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">气体检测</div>
+                    <div class="module-item-status">SF6/DGA</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="hyperspectral" href="javascript:void(0)" onclick="switchModule('hyperspectral')">
+                <i class="bi bi-rainbow text-info"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">高光谱检测</div>
+                    <div class="module-item-status">缺陷分析</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="slam" href="javascript:void(0)" onclick="switchModule('slam')">
+                <i class="bi bi-map text-success"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">SLAM建图</div>
+                    <div class="module-item-status">导航定位</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="fusion" href="javascript:void(0)" onclick="switchModule('fusion')">
+                <i class="bi bi-diagram-3-fill text-danger"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">多模态融合</div>
+                    <div class="module-item-status">综合诊断</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 主视频监控区域 -->
+    <div class="main-content">
+        <div class="video-area">
+            <canvas id="main-video-canvas"></canvas>
+            <div class="video-overlay-info">
+                <span id="current-datetime">2025-04-07 16:53:15</span>
+            </div>
+            <div class="video-bottom-info">
+                <div class="camera-info">
+                    <i class="bi bi-camera-video"></i>
+                    <span id="camera-name">110kV场地7号云台</span> |
+                    <span id="camera-resolution">1920×1080</span>
+                </div>
+                <div class="detection-stats">
+                    <div class="stat-item">
+                        <span>检测:</span>
+                        <span class="stat-value" id="detection-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>告警:</span>
+                        <span class="stat-value text-warning" id="alarm-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>FPS:</span>
+                        <span class="stat-value" id="fps-value">25</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧控制面板 -->
+    <div class="control-panel">
+        <div class="panel-header">
+            <i class="bi bi-sliders"></i>
+            <span id="current-module-name">主变巡视</span> - 控制面板
+        </div>
+        <div class="panel-body">
+            <!-- 识别结果 -->
+            <div class="control-section">
+                <div class="control-section-title">
+                    <i class="bi bi-bounding-box"></i> 识别结果
+                </div>
+                <ul class="result-list" id="result-list">
+                    <li class="result-item">
+                        <div class="result-icon normal"><i class="bi bi-check"></i></div>
+                        <div class="result-info">
+                            <div class="result-name">油位正常</div>
+                            <div class="result-detail">主变本体 #1</div>
+                        </div>
+                        <span class="result-confidence">98%</span>
+                    </li>
+                    <li class="result-item">
+                        <div class="result-icon warning"><i class="bi bi-exclamation"></i></div>
+                        <div class="result-info">
+                            <div class="result-name">硅胶轻微变色</div>
+                            <div class="result-detail">呼吸器</div>
+                        </div>
+                        <span class="result-confidence">85%</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 告警信息 -->
+            <div class="control-section">
+                <div class="control-section-title">
+                    <i class="bi bi-exclamation-triangle"></i> 告警信息
+                </div>
+                <div id="alarm-list">
+                    <div class="alarm-item">
+                        <div class="alarm-header">
+                            <span class="alarm-type">温度异常</span>
+                            <span class="alarm-time">2分钟前</span>
+                        </div>
+                        <div class="alarm-message">套管温度偏高 (+5.2°C)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模块控制 -->
+            <div class="control-section">
+                <div class="control-section-title">
+                    <i class="bi bi-gear"></i> 模块控制
+                </div>
+
+                <!-- 主变控制面板 -->
+                <div class="module-control-panel active" id="control-transformer">
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <span class="control-card-title">检测项目</span>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" checked>
+                            </div>
+                        </div>
+                        <div class="control-card-body">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="tf-oil" checked>
+                                <label class="form-check-label" for="tf-oil">油位</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="tf-silica" checked>
+                                <label class="form-check-label" for="tf-silica">硅胶</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="tf-leak" checked>
+                                <label class="form-check-label" for="tf-leak">渗漏</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <span class="control-card-title">置信度阈值</span>
+                        </div>
+                        <div class="control-card-body">
+                            <input type="range" class="form-range" min="0" max="100" value="60" id="tf-confidence">
+                            <div class="d-flex justify-content-between">
+                                <small>0%</small>
+                                <small id="tf-confidence-value">60%</small>
+                                <small>100%</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 开关控制面板 -->
+                <div class="module-control-panel" id="control-switch">
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <span class="control-card-title">开关类型</span>
+                        </div>
+                        <div class="control-card-body">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sw-breaker" checked>
+                                <label class="form-check-label" for="sw-breaker">断路器</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sw-isolator" checked>
+                                <label class="form-check-label" for="sw-isolator">隔离开关</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sw-ground" checked>
+                                <label class="form-check-label" for="sw-ground">接地开关</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 声学监测控制面板 -->
+                <div class="module-control-panel" id="control-acoustic">
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <span class="control-card-title">监测模式</span>
+                        </div>
+                        <div class="control-card-body">
+                            <select class="form-select form-select-sm bg-dark text-light border-secondary">
+                                <option>局放检测</option>
+                                <option>超声波分析</option>
+                                <option>声音异常</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <span class="control-card-title">频率范围</span>
+                        </div>
+                        <div class="control-card-body">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="最小Hz" value="20">
+                                </div>
+                                <div class="col-6">
+                                    <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="最大Hz" value="20000">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 气体检测控制面板 -->
+                <div class="module-control-panel" id="control-gas">
+                    <div class="control-card">
+                        <div class="control-card-header">
+                            <span class="control-card-title">气体类型</span>
+                        </div>
+                        <div class="control-card-body">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="gas-sf6" checked>
+                                <label class="form-check-label" for="gas-sf6">SF6</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="gas-h2" checked>
+                                <label class="form-check-label" for="gas-h2">H2</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="gas-co" checked>
+                                <label class="form-check-label" for="gas-co">CO</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 通用控制面板 (其他模块) -->
+                <div class="module-control-panel" id="control-default">
+                    <div class="control-card">
+                        <div class="control-card-body text-center text-muted">
+                            <i class="bi bi-gear fs-3"></i>
+                            <p class="mb-0 mt-2">选择左侧模块查看控制选项</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="control-section">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="startDetection()">
+                        <i class="bi bi-play-fill"></i> 开始检测
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="captureImage()">
+                        <i class="bi bi-camera"></i> 截图保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="bottom-statusbar">
+        <div class="status-indicators">
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>系统正常</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>AI模型: 已加载</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>摄像头: 在线</span>
+            </div>
+        </div>
+        <div class="performance-metrics">
+            <span>延迟: <span class="metric-value">45ms</span></span>
+            <span>GPU: <span class="metric-value">62%</span></span>
+            <span>内存: <span class="metric-value">4.2GB</span></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 当前激活的模块
+let currentModule = 'transformer';
+
+// 模块名称映射
+const moduleNames = {
+    'transformer': '主变巡视',
+    'switch': '开关巡视',
+    'busbar': '母线巡视',
+    'capacitor': '电容器',
+    'meter': '表计读数',
+    'bird': '鸟类监控',
+    'acoustic': '声学监测',
+    'gas': '气体检测',
+    'hyperspectral': '高光谱检测',
+    'slam': 'SLAM建图',
+    'fusion': '多模态融合'
+};
+
+// 切换模块
+function switchModule(moduleId) {
+    currentModule = moduleId;
+
+    // 更新左侧导航高亮
+    document.querySelectorAll('.module-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.module === moduleId) {
+            item.classList.add('active');
+        }
+    });
+
+    // 更新控制面板标题
+    document.getElementById('current-module-name').textContent = moduleNames[moduleId] || moduleId;
+
+    // 切换控制面板
+    document.querySelectorAll('.module-control-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+
+    const targetPanel = document.getElementById('control-' + moduleId);
+    if (targetPanel) {
+        targetPanel.classList.add('active');
+    } else {
+        document.getElementById('control-default').classList.add('active');
+    }
+
+    // 加载模块数据
+    loadModuleData(moduleId);
+}
+
+// 加载模块数据
+function loadModuleData(moduleId) {
+    console.log('Loading module:', moduleId);
+    // TODO: 调用API获取模块数据
+}
+
+// 开始检测
+function startDetection() {
+    console.log('Starting detection for module:', currentModule);
+    // TODO: 调用检测API
+}
+
+// 截图保存
+function captureImage() {
+    console.log('Capturing image...');
+    // TODO: 实现截图功能
+}
+
+// 开始自动巡检
+function startAutoPatrol() {
+    console.log('Starting auto patrol...');
+    // TODO: 实现自动巡检
+}
+
+// 打开设置
+function openSettings() {
+    window.location.href = '/settings';
+}
+
+// 更新时间显示
+function updateDateTime() {
+    const now = new Date();
+    const dateStr = now.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    document.getElementById('current-datetime').textContent = dateStr;
+}
+
+// 置信度滑块更新
+document.getElementById('tf-confidence')?.addEventListener('input', function() {
+    document.getElementById('tf-confidence-value').textContent = this.value + '%';
+});
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+});
+</script>
+{% endblock %}
