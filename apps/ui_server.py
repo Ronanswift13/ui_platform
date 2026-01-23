@@ -118,6 +118,14 @@ def create_app() -> FastAPI:
         except ImportError as e2:
             print(f"✗ 训练API导入完全失败: {e2}")
 
+    # ============== 集成室内监测中心API (V3.5) ==============
+    try:
+        from apps.indoor_api import integrate_indoor_api
+        integrate_indoor_api(app)
+        print("✓ 室内监测中心API已集成 (V3.5)")
+    except ImportError as e:
+        print(f"✗ 室内监测中心API导入失败: {e}")
+
     # ============== 页面路由 ==============
 
     @app.get("/", response_class=HTMLResponse)
