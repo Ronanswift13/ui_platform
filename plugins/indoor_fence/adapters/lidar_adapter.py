@@ -27,8 +27,15 @@ import math
 import socket
 import struct
 import threading
-import serial
 from abc import ABC, abstractmethod
+
+# 可选依赖: pyserial (仅RPLIDAR协议需要)
+try:
+    import serial
+    SERIAL_AVAILABLE = True
+except ImportError:
+    serial = None
+    SERIAL_AVAILABLE = False
 from enum import Enum
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from dataclasses import dataclass, field
@@ -143,6 +150,8 @@ class RPLidarDriver(LidarDriver):
     支持型号: A1, A2, A3, S1
     通信方式: 串口 (USB转TTL)
     协议: RPLIDAR Binary Protocol
+
+    注意: 需要安装 pyserial 包 (pip install pyserial)
     """
 
     # RPLIDAR命令
@@ -160,13 +169,18 @@ class RPLidarDriver(LidarDriver):
 
     def __init__(self, config: LidarConfig):
         super().__init__(config)
-        self._serial: Optional[serial.Serial] = None
+        if not SERIAL_AVAILABLE:
+            logger.warning("pyserial未安装, RPLIDAR驱动将无法连接真实设备")
+        self._serial: Optional[Any] = None  # serial.Serial when available
         self._read_thread: Optional[threading.Thread] = None
         self._scan_buffer: deque = deque(maxlen=10)
         self._current_scan_points: List[Tuple[float, float]] = []
 
     def connect(self) -> bool:
         """连接RPLIDAR"""
+        if not SERIAL_AVAILABLE:
+            logger.error("pyserial未安装, 无法连接RPLIDAR。请运行: pip install pyserial")
+            return False
         try:
             self._serial = serial.Serial(
                 port=self.config.serial_port,
