@@ -7,17 +7,23 @@
 - 历史数据批量导入
 - 数据验证和预处理
 - 多协议设备连接
+- 统一数据导入管道
 
 作者: 破夜绘明团队
-版本: 1.0.0
+版本: 2.0.0
 """
 
 from .sensor_interface import (
-    SensorInterface,
+    BaseSensor,
     SensorConfig,
-    SensorData,
+    SensorReading,
     SensorType,
-    ConnectionStatus,
+    SensorStatus,
+    DataQuality as SensorDataQuality,
+    GasSensor,
+    ThermalCameraSensor,
+    SensorManager,
+    create_sensor,
 )
 from .data_validator import (
     DataValidator,
@@ -35,14 +41,31 @@ from .protocol_adapters import (
     MQTTAdapter,
     HTTPAdapter,
 )
+from .import_pipeline import (
+    DataImportPipeline,
+    DataConfig,
+    DataSample,
+    DataType,
+    AnnotationType,
+    DataQuality,
+    DataValidator as PipelineValidator,
+    AutoAnnotator,
+    DataProcessor,
+    create_import_pipeline,
+)
 
 __all__ = [
     # 传感器接口
-    'SensorInterface',
+    'BaseSensor',
     'SensorConfig',
-    'SensorData',
+    'SensorReading',
     'SensorType',
-    'ConnectionStatus',
+    'SensorStatus',
+    'SensorDataQuality',
+    'GasSensor',
+    'ThermalCameraSensor',
+    'SensorManager',
+    'create_sensor',
     # 数据验证
     'DataValidator',
     'ValidationResult',
@@ -56,4 +79,15 @@ __all__ = [
     'OPCUAAdapter',
     'MQTTAdapter',
     'HTTPAdapter',
+    # 数据导入管道
+    'DataImportPipeline',
+    'DataConfig',
+    'DataSample',
+    'DataType',
+    'AnnotationType',
+    'DataQuality',
+    'PipelineValidator',
+    'AutoAnnotator',
+    'DataProcessor',
+    'create_import_pipeline',
 ]
