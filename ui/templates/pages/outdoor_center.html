@@ -400,6 +400,42 @@
         display: block;
     }
 
+    /* 参数行样式 */
+    .param-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        color: #ccc;
+        font-size: 0.8rem;
+    }
+
+    .param-row label {
+        flex: 1;
+    }
+
+    .param-row input[type="range"] {
+        flex: 2;
+        margin: 0 0.5rem;
+        height: 4px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 2px;
+    }
+
+    .param-row .value {
+        min-width: 40px;
+        text-align: right;
+        color: var(--accent-primary);
+    }
+
+    .param-row .form-check-input {
+        margin: 0;
+    }
+
+    .small {
+        font-size: 0.75rem;
+    }
+
     @media (max-width: 1200px) {
         .outdoor-container {
             grid-template-columns: 200px 1fr 260px;
@@ -634,66 +670,221 @@
             <!-- 模块控制 -->
             <div class="control-section">
                 <div class="control-section-title">
-                    <i class="bi bi-gear"></i> 模块控制
+                    <i class="bi bi-gear"></i> 模块设置
                 </div>
 
-                <!-- 主变控制面板 -->
+                <!-- 主变巡视控制面板 -->
                 <div class="module-control-panel active" id="control-transformer">
                     <div class="control-card">
-                        <div class="control-card-header">
-                            <span class="control-card-title">检测项目</span>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" checked>
-                            </div>
-                        </div>
+                        <div class="control-card-header">检测参数</div>
                         <div class="control-card-body">
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="tf-oil" checked>
-                                <label class="form-check-label" for="tf-oil">油位</label>
+                            <div class="param-row">
+                                <label>置信度阈值</label>
+                                <input type="range" id="tf-confidence" min="30" max="95" value="60">
+                                <span class="value" id="tf-confidence-value">60%</span>
                             </div>
-                            <div class="form-check form-check-inline">
+                            <div class="param-row">
+                                <label>检测项目</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="tf-oil-level" checked>
+                                <label class="form-check-label" for="tf-oil-level">油位</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="tf-silica" checked>
                                 <label class="form-check-label" for="tf-silica">硅胶</label>
                             </div>
-                            <div class="form-check form-check-inline">
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="tf-leak" checked>
-                                <label class="form-check-label" for="tf-leak">渗漏</label>
+                                <label class="form-check-label" for="tf-leak">漏油</label>
                             </div>
-                        </div>
-                    </div>
-                    <div class="control-card">
-                        <div class="control-card-header">
-                            <span class="control-card-title">置信度阈值</span>
-                        </div>
-                        <div class="control-card-body">
-                            <input type="range" class="form-range" min="0" max="100" value="60" id="tf-confidence">
-                            <div class="d-flex justify-content-between">
-                                <small>0%</small>
-                                <small id="tf-confidence-value">60%</small>
-                                <small>100%</small>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="tf-thermal" checked>
+                                <label class="form-check-label" for="tf-thermal">热成像</label>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 开关控制面板 -->
+                <!-- 开关巡视控制面板 -->
                 <div class="module-control-panel" id="control-switch">
                     <div class="control-card">
-                        <div class="control-card-header">
-                            <span class="control-card-title">开关类型</span>
-                        </div>
+                        <div class="control-card-header">开关状态检测</div>
                         <div class="control-card-body">
-                            <div class="form-check">
+                            <div class="param-row">
+                                <label>置信度阈值</label>
+                                <input type="range" id="sw-confidence" min="30" max="95" value="70">
+                                <span class="value" id="sw-confidence-value">70%</span>
+                            </div>
+                            <div class="param-row">
+                                <label>检测项目</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="sw-breaker" checked>
                                 <label class="form-check-label" for="sw-breaker">断路器</label>
                             </div>
-                            <div class="form-check">
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="sw-isolator" checked>
                                 <label class="form-check-label" for="sw-isolator">隔离开关</label>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="sw-ground" checked>
-                                <label class="form-check-label" for="sw-ground">接地开关</label>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="sw-indicator" checked>
+                                <label class="form-check-label" for="sw-indicator">指示灯</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="sw-interlock" checked>
+                                <label class="form-check-label" for="sw-interlock">互锁校验</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 母线巡视控制面板 -->
+                <div class="module-control-panel" id="control-busbar">
+                    <div class="control-card">
+                        <div class="control-card-header">母线缺陷检测</div>
+                        <div class="control-card-body">
+                            <div class="param-row">
+                                <label>置信度阈值</label>
+                                <input type="range" id="bb-confidence" min="30" max="95" value="50">
+                                <span class="value" id="bb-confidence-value">50%</span>
+                            </div>
+                            <div class="param-row">
+                                <label>小目标增强</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bb-small-target" checked>
+                                </div>
+                            </div>
+                            <div class="param-row">
+                                <label>切片检测(4K)</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bb-tiling" checked>
+                                </div>
+                            </div>
+                            <div class="param-row">
+                                <label>检测项目</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="bb-insulator" checked>
+                                <label class="form-check-label" for="bb-insulator">绝缘子</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="bb-pin" checked>
+                                <label class="form-check-label" for="bb-pin">销钉</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="bb-fitting" checked>
+                                <label class="form-check-label" for="bb-fitting">金具</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="bb-foreign" checked>
+                                <label class="form-check-label" for="bb-foreign">异物</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 电容器巡视控制面板 -->
+                <div class="module-control-panel" id="control-capacitor">
+                    <div class="control-card">
+                        <div class="control-card-header">电容器状态检测</div>
+                        <div class="control-card-body">
+                            <div class="param-row">
+                                <label>置信度阈值</label>
+                                <input type="range" id="cp-confidence" min="30" max="95" value="60">
+                                <span class="value" id="cp-confidence-value">60%</span>
+                            </div>
+                            <div class="param-row">
+                                <label>入侵检测</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cp-intrusion" checked>
+                                </div>
+                            </div>
+                            <div class="param-row">
+                                <label>检测项目</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="cp-tilt" checked>
+                                <label class="form-check-label" for="cp-tilt">倾斜</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="cp-fallen" checked>
+                                <label class="form-check-label" for="cp-fallen">倒塌</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="cp-missing" checked>
+                                <label class="form-check-label" for="cp-missing">缺失</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="cp-fuse" checked>
+                                <label class="form-check-label" for="cp-fuse">熔丝</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 表计读数控制面板 -->
+                <div class="module-control-panel" id="control-meter">
+                    <div class="control-card">
+                        <div class="control-card-header">表计读数设置</div>
+                        <div class="control-card-body">
+                            <div class="param-row">
+                                <label>置信度阈值</label>
+                                <input type="range" id="mt-confidence" min="30" max="95" value="70">
+                                <span class="value" id="mt-confidence-value">70%</span>
+                            </div>
+                            <div class="param-row">
+                                <label>透视校正</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="mt-perspective" checked>
+                                </div>
+                            </div>
+                            <div class="param-row">
+                                <label>表计类型</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="mt-pointer" checked>
+                                <label class="form-check-label" for="mt-pointer">指针式</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="mt-digital" checked>
+                                <label class="form-check-label" for="mt-digital">数字式</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="mt-dial" checked>
+                                <label class="form-check-label" for="mt-dial">翻牌式</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 鸟类监控控制面板 -->
+                <div class="module-control-panel" id="control-bird">
+                    <div class="control-card">
+                        <div class="control-card-header">鸟类检测设置</div>
+                        <div class="control-card-body">
+                            <div class="param-row">
+                                <label>检测灵敏度</label>
+                                <input type="range" id="bd-sensitivity" min="30" max="95" value="70">
+                                <span class="value" id="bd-sensitivity-value">70%</span>
+                            </div>
+                            <div class="param-row">
+                                <label>声学驱鸟</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bd-acoustic" checked>
+                                </div>
+                            </div>
+                            <div class="param-row">
+                                <label>激光驱鸟</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bd-laser">
+                                </div>
+                            </div>
+                            <div class="param-row">
+                                <label>自动驱离</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="bd-auto-repel" checked>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -702,30 +893,13 @@
                 <!-- 声学监测控制面板 -->
                 <div class="module-control-panel" id="control-acoustic">
                     <div class="control-card">
-                        <div class="control-card-header">
-                            <span class="control-card-title">监测模式</span>
-                        </div>
-                        <div class="control-card-body">
-                            <select class="form-select form-select-sm bg-dark text-light border-secondary">
-                                <option>局放检测</option>
-                                <option>超声波分析</option>
-                                <option>声音异常</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="control-card">
-                        <div class="control-card-header">
-                            <span class="control-card-title">频率范围</span>
-                        </div>
-                        <div class="control-card-body">
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="最小Hz" value="20">
-                                </div>
-                                <div class="col-6">
-                                    <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" placeholder="最大Hz" value="20000">
-                                </div>
-                            </div>
+                        <div class="control-card-header">声学监测</div>
+                        <div class="control-card-body text-center text-muted">
+                            <i class="bi bi-soundwave fs-3"></i>
+                            <p class="mb-2 mt-2 small">声学监测高级参数</p>
+                            <a href="/acoustic" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> 打开专属页面
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -733,32 +907,76 @@
                 <!-- 气体检测控制面板 -->
                 <div class="module-control-panel" id="control-gas">
                     <div class="control-card">
-                        <div class="control-card-header">
-                            <span class="control-card-title">气体类型</span>
-                        </div>
+                        <div class="control-card-header">气体检测设置</div>
                         <div class="control-card-body">
-                            <div class="form-check">
+                            <div class="param-row">
+                                <label>检测气体</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="gas-sf6" checked>
                                 <label class="form-check-label" for="gas-sf6">SF6</label>
                             </div>
-                            <div class="form-check">
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="gas-h2" checked>
                                 <label class="form-check-label" for="gas-h2">H2</label>
                             </div>
-                            <div class="form-check">
+                            <div class="form-check form-check-inline small">
                                 <input class="form-check-input" type="checkbox" id="gas-co" checked>
                                 <label class="form-check-label" for="gas-co">CO</label>
+                            </div>
+                            <div class="form-check form-check-inline small">
+                                <input class="form-check-input" type="checkbox" id="gas-ch4">
+                                <label class="form-check-label" for="gas-ch4">CH4</label>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 通用控制面板 (其他模块) -->
+                <!-- 高光谱检测控制面板 -->
+                <div class="module-control-panel" id="control-hyperspectral">
+                    <div class="control-card">
+                        <div class="control-card-body text-center text-muted">
+                            <i class="bi bi-rainbow fs-3"></i>
+                            <p class="mb-2 mt-2 small">高光谱缺陷分析</p>
+                            <a href="/hyperspectral" class="btn btn-outline-info btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> 打开专属页面
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLAM建图控制面板 -->
+                <div class="module-control-panel" id="control-slam">
+                    <div class="control-card">
+                        <div class="control-card-body text-center text-muted">
+                            <i class="bi bi-map fs-3"></i>
+                            <p class="mb-2 mt-2 small">SLAM导航定位</p>
+                            <a href="/slam" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> 打开专属页面
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 多模态融合控制面板 -->
+                <div class="module-control-panel" id="control-fusion">
+                    <div class="control-card">
+                        <div class="control-card-body text-center text-muted">
+                            <i class="bi bi-diagram-3-fill fs-3"></i>
+                            <p class="mb-2 mt-2 small">多模态综合诊断</p>
+                            <a href="/fusion" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i> 打开专属页面
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 默认控制面板 -->
                 <div class="module-control-panel" id="control-default">
                     <div class="control-card">
                         <div class="control-card-body text-center text-muted">
                             <i class="bi bi-gear fs-3"></i>
-                            <p class="mb-0 mt-2">选择左侧模块查看控制选项</p>
+                            <p class="mb-0 mt-2 small">选择左侧模块查看控制选项</p>
                         </div>
                     </div>
                 </div>
@@ -900,6 +1118,26 @@ function updateDateTime() {
 // 置信度滑块更新
 document.getElementById('tf-confidence')?.addEventListener('input', function() {
     document.getElementById('tf-confidence-value').textContent = this.value + '%';
+});
+
+document.getElementById('sw-confidence')?.addEventListener('input', function() {
+    document.getElementById('sw-confidence-value').textContent = this.value + '%';
+});
+
+document.getElementById('bb-confidence')?.addEventListener('input', function() {
+    document.getElementById('bb-confidence-value').textContent = this.value + '%';
+});
+
+document.getElementById('cp-confidence')?.addEventListener('input', function() {
+    document.getElementById('cp-confidence-value').textContent = this.value + '%';
+});
+
+document.getElementById('mt-confidence')?.addEventListener('input', function() {
+    document.getElementById('mt-confidence-value').textContent = this.value + '%';
+});
+
+document.getElementById('bd-sensitivity')?.addEventListener('input', function() {
+    document.getElementById('bd-sensitivity-value').textContent = this.value + '%';
 });
 
 // 初始化
