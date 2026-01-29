@@ -1177,41 +1177,68 @@ function startAutoRefresh() {
  * 连接WebSocket
  */
 function connectWebSocket() {
+    // 检查 WebSocket 是否可用
+    if (typeof WebSocket === 'undefined') {
+        console.warn('[WebSocket] 浏览器不支持 WebSocket，使用轮询模式');
+        return;
+    }
+
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/indoor`;
-        
+
+        console.log('[WebSocket] 尝试连接:', wsUrl);
+
         IndoorMonitorState.ws = new WebSocket(wsUrl);
-        
+
         IndoorMonitorState.ws.onopen = () => {
-            console.log('[WebSocket] 已连接');
+            console.log('[WebSocket] 连接成功');
             IndoorMonitorState.wsConnected = true;
             updateConnectionStatus(true);
+
+            // 清除重连定时器
+            if (IndoorMonitorState.wsReconnectTimer) {
+                clearTimeout(IndoorMonitorState.wsReconnectTimer);
+                IndoorMonitorState.wsReconnectTimer = null;
+            }
         };
-        
+
         IndoorMonitorState.ws.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
+                console.log('[WebSocket] 收到消息:', message.type);
                 handleWebSocketMessage(message);
             } catch (e) {
-                console.error('[WebSocket] 消息解析错误:', e);
+                console.error('[WebSocket] 消息解析错误:', e, event.data);
             }
         };
-        
-        IndoorMonitorState.ws.onclose = () => {
-            console.log('[WebSocket] 连接关闭');
+
+        IndoorMonitorState.ws.onclose = (event) => {
+            console.log('[WebSocket] 连接关闭', {
+                code: event.code,
+                reason: event.reason,
+                wasClean: event.wasClean
+            });
             IndoorMonitorState.wsConnected = false;
             updateConnectionStatus(false);
-            
-            // 尝试重连
-            IndoorMonitorState.wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+
+            // 尝试重连（避免重复重连）
+            if (!IndoorMonitorState.wsReconnectTimer) {
+                console.log('[WebSocket] 5秒后尝试重连...');
+                IndoorMonitorState.wsReconnectTimer = setTimeout(() => {
+                    IndoorMonitorState.wsReconnectTimer = null;
+                    connectWebSocket();
+                }, 5000);
+            }
         };
-        
+
         IndoorMonitorState.ws.onerror = (error) => {
-            console.error('[WebSocket] 错误:', error);
+            console.error('[WebSocket] 连接错误:', error);
+            console.error('[WebSocket] 可能原因: 1) 服务器未启动 2) 路由未注册 3) CORS问题');
         };
     } catch (e) {
-        console.log('[WebSocket] 不可用，使用轮询模式');
+        console.error('[WebSocket] 创建连接失败:', e);
+        console.log('[WebSocket] 回退到轮询模式');
     }
 }
 
