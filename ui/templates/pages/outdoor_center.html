@@ -863,20 +863,6 @@ function openSettings() {
     window.location.href = '/settings';
 }
 
-// 更新时间显示
-function updateDateTime() {
-    const now = new Date();
-    const dateStr = now.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    document.getElementById('current-datetime').textContent = dateStr;
-}
-
 // 置信度滑块更新
 document.getElementById('tf-confidence')?.addEventListener('input', function() {
     document.getElementById('tf-confidence-value').textContent = this.value + '%';
@@ -884,8 +870,8 @@ document.getElementById('tf-confidence')?.addEventListener('input', function() {
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
-    updateDateTime();
-    setInterval(updateDateTime, 1000);
+    // 3D场景已通过 scene3d_navigation.html 组件自动初始化
+    console.log('室外监测中心已加载 - 3D场景导航已启用');
 });
 </script>
 {% endblock %}
