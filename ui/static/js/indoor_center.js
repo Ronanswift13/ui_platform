@@ -521,7 +521,8 @@ function initIndoor3DIntegration() {
 
     viewer.onAlarmClick((alarm) => {
         if (alarm && alarm.id) {
-            selectIndoorAlarm(alarm.id, { focus: false, openModal: true });
+            // 只更新UI状态，不打开模态框（避免重复打开）
+            selectIndoorAlarm(alarm.id, { focus: false, openModal: false });
         }
     });
 
@@ -943,17 +944,150 @@ function clamp01(value) {
 }
 
 function syncIndoorAlarms(alarms, stats) {
-    Indoor3DState.alarms = Array.isArray(alarms) ? alarms : [];
+    // 处理告警数据，确保每个告警都有位置信息
+    Indoor3DState.alarms = Array.isArray(alarms) ? alarms.map(alarm => {
+        // 如果告警没有位置信息，根据类型和区域生成默认位置
+        if (alarm.x === undefined || alarm.y === undefined) {
+            const position = getAlarmDefaultPosition(alarm);
+            return { ...alarm, x: position.x, y: position.y };
+        }
+        return alarm;
+    }) : [];
     IndoorMonitorState.alarms = Indoor3DState.alarms;
     Indoor3DState.alarmStats = stats || {};
 
     updateAlarmIndicators();
     renderIndoorAlarmList();
 
+    // 同步告警到3D视图
+    syncAlarmsTo3DView();
+
     if (Indoor3DState.activeAlarmId) {
         const active = getAlarmById(Indoor3DState.activeAlarmId);
         updateAlarmProcessUI(active);
     }
+}
+
+/**
+ * 根据告警类型和区域获取默认位置
+ */
+function getAlarmDefaultPosition(alarm) {
+    // 区域位置映射
+    const zonePositions = {
+        'gis室': { x: 0.3, y: 0.4 },
+        'gis': { x: 0.3, y: 0.4 },
+        '主控室': { x: 0.5, y: 0.5 },
+        '控制室': { x: 0.5, y: 0.5 },
+        '继保室': { x: 0.7, y: 0.4 },
+        '蓄电池室': { x: 0.7, y: 0.6 },
+        '配电室': { x: 0.3, y: 0.6 },
+        '黄线警戒区': { x: 0.4, y: 0.5 },
+        '高压危险区': { x: 0.5, y: 0.3 }
+    };
+
+    // 告警类型位置映射
+    const typePositions = {
+        'fence_violation': { x: 0.4, y: 0.5 },
+        'temperature_high': { x: 0.5, y: 0.5 },
+        'animal_intrusion': { x: 0.6, y: 0.4 },
+        'fire_detected': { x: 0.5, y: 0.6 },
+        'gas_leak': { x: 0.4, y: 0.6 }
+    };
+
+    // 尝试从告警详情中获取区域
+    const zone = alarm.details?.zone || alarm.details?.area || alarm.zone || '';
+    const zoneLower = zone.toLowerCase();
+
+    for (const [key, pos] of Object.entries(zonePositions)) {
+        if (zoneLower.includes(key.toLowerCase())) {
+            // 添加一些随机偏移避免重叠
+            return {
+                x: pos.x + (Math.random() - 0.5) * 0.1,
+                y: pos.y + (Math.random() - 0.5) * 0.1
+            };
+        }
+    }
+
+    // 根据告警类型获取位置
+    const alarmType = typeof alarm.type === 'string' ? alarm.type.toLowerCase() : '';
+    if (typePositions[alarmType]) {
+        const pos = typePositions[alarmType];
+        return {
+            x: pos.x + (Math.random() - 0.5) * 0.1,
+            y: pos.y + (Math.random() - 0.5) * 0.1
+        };
+    }
+
+    // 默认位置（中心附近）
+    return {
+        x: 0.5 + (Math.random() - 0.5) * 0.2,
+        y: 0.5 + (Math.random() - 0.5) * 0.2
+    };
+}
+
+/**
+ * 同步告警到3D视图
+ */
+function syncAlarmsTo3DView() {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer) return;
+
+    // 获取所有未解决的告警
+    const activeAlarms = Indoor3DState.alarms.filter(a =>
+        String(a.status).toLowerCase() !== 'resolved'
+    );
+
+    // 在3D视图中显示所有告警标记
+    if (typeof viewer.updateAlarmMarkers === 'function') {
+        viewer.updateAlarmMarkers(activeAlarms);
+    }
+
+    // 更新告警区域高亮
+    const pendingAlarms = activeAlarms.filter(a =>
+        String(a.status).toLowerCase() === 'pending'
+    );
+
+    if (pendingAlarms.length > 0) {
+        const alarmZones = pendingAlarms.map(alarm => ({
+            id: `alarm-zone-${alarm.id}`,
+            name: alarm.message || '告警区域',
+            type: 'danger',
+            polygon: generateAlarmZonePolygon(alarm.x, alarm.y, 0.05)
+        }));
+
+        // 合并现有区域和告警区域
+        const existingZones = viewer.state?.zones ?
+            Array.from(viewer.state.zones.values())
+                .map(z => z.userData)
+                .filter(z => !z.id?.startsWith('alarm-zone-')) : [];
+
+        viewer.updateZones([...existingZones, ...alarmZones]);
+    } else {
+        // 如果没有待处理告警，清除告警区域
+        const existingZones = viewer.state?.zones ?
+            Array.from(viewer.state.zones.values())
+                .map(z => z.userData)
+                .filter(z => !z.id?.startsWith('alarm-zone-')) : [];
+        viewer.updateZones(existingZones);
+    }
+
+    console.log('[Indoor3D] 同步告警到3D视图:', activeAlarms.length, '个活动告警');
+}
+
+/**
+ * 生成告警区域多边形
+ */
+function generateAlarmZonePolygon(x, y, radius) {
+    const points = [];
+    const segments = 6;
+    for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        points.push([
+            x + Math.cos(angle) * radius,
+            y + Math.sin(angle) * radius
+        ]);
+    }
+    return points;
 }
 
 function updateAlarmIndicators() {
@@ -1028,21 +1162,68 @@ function renderIndoorAlarmList() {
 function selectIndoorAlarm(alarmId, options = {}) {
     const { focus = true, openModal = false } = options;
     const alarm = getAlarmById(alarmId);
-    if (!alarm) return;
+    if (!alarm) {
+        console.warn('[Indoor3D] 告警不存在:', alarmId);
+        return;
+    }
+
+    console.log('[Indoor3D] 选中告警:', alarm.id, alarm.message);
 
     Indoor3DState.activeAlarmId = alarmId;
     renderIndoorAlarmList();
     updateAlarmProcessUI(alarm);
 
+    // 高亮对应的监测模块
+    highlightRelatedModule(alarm);
+
     if (focus) {
         const viewer = ensureIndoor3DViewer();
         if (viewer) {
+            // 确保告警有位置信息
+            if (alarm.x === undefined || alarm.y === undefined) {
+                const position = getAlarmDefaultPosition(alarm);
+                alarm.x = position.x;
+                alarm.y = position.y;
+            }
             viewer.focusOnAlarm(alarm);
+            console.log('[Indoor3D] 聚焦到告警位置:', alarm.x, alarm.y);
         }
     }
 
     if (openModal) {
         openAlarmDetailModal(alarm);
+    }
+}
+
+/**
+ * 高亮与告警相关的监测模块
+ */
+function highlightRelatedModule(alarm) {
+    // 移除所有模块的高亮
+    document.querySelectorAll('.monitor-card').forEach(card => {
+        card.classList.remove('alarm-highlight');
+    });
+
+    // 根据告警类型确定相关模块
+    const typeModuleMap = {
+        'fence_violation': 'fence',
+        'temperature_high': 'temperature',
+        'animal_intrusion': 'animal',
+        'fire_detected': 'fire',
+        'gas_leak': 'environment',
+        'device_fault': 'device'
+    };
+
+    const alarmType = typeof alarm.type === 'string' ? alarm.type.toLowerCase() : '';
+    const moduleId = typeModuleMap[alarmType];
+
+    if (moduleId) {
+        const card = document.getElementById(`card-${moduleId}`);
+        if (card) {
+            card.classList.add('alarm-highlight');
+            // 滚动到可见区域
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
     }
 }
 
@@ -1218,7 +1399,11 @@ function openAlarmDetailModal(alarm) {
         requestAnimationFrame(() => renderAlarmHistoryChart(historySeries));
     }
 
-    const bsModal = new bootstrap.Modal(modal);
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(modal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(modal);
+    }
     bsModal.show();
 }
 
@@ -2238,9 +2423,12 @@ function openModuleDetail(moduleId) {
             }
         }, 100);
     }
-    
-    // 显示模态框
-    const bsModal = new bootstrap.Modal(modal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(modal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(modal);
+    }
     bsModal.show();
 }
 
@@ -2399,8 +2587,12 @@ function viewHistory(moduleId) {
         `;
         document.body.appendChild(historyModal);
     }
-    
-    const bsModal = new bootstrap.Modal(historyModal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(historyModal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(historyModal);
+    }
     bsModal.show();
 }
 
@@ -2535,7 +2727,11 @@ function viewAlarms() {
         };
     }
 
-    const bsModal = new bootstrap.Modal(alarmModal);
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(alarmModal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(alarmModal);
+    }
     bsModal.show();
 }
 
@@ -2607,8 +2803,12 @@ function toggleFence(moduleId) {
         `;
         document.body.appendChild(configModal);
     }
-    
-    const bsModal = new bootstrap.Modal(configModal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(configModal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(configModal);
+    }
     bsModal.show();
 }
 
