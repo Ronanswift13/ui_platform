@@ -110,6 +110,34 @@ const IndoorMonitorState = {
 };
 
 // =============================================================================
+// 3D数字孪生状态
+// =============================================================================
+const Indoor3DState = {
+    viewer: null,
+    alarmManager: null,
+    alarms: [],
+    alarmStats: {},
+    activeAlarmId: null,
+    refreshTimer: null,
+    lastSceneSync: 0,
+    lastOverlaySync: 0,
+    lastAlarmSync: 0,
+    sceneSyncInterval: 15000,
+    overlaySyncInterval: 4000,
+    alarmSyncInterval: 4000,
+    trackHistory: new Map(),
+    useServerTrajectories: false,
+    pointCloudLoaded: false,
+    modelLoaded: false,
+    controlsBound: false,
+    targetCounts: {
+        persons: 0,
+        animals: 0,
+        fires: 0
+    }
+};
+
+// =============================================================================
 // 初始化
 // =============================================================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -129,6 +157,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 绑定事件
     bindEvents();
+
+    // 初始化3D数字孪生联动
+    initIndoor3DIntegration();
     
     console.log('[IndoorMonitor] 初始化完成');
 });
@@ -255,6 +286,9 @@ async function loadModuleData(moduleId) {
     // 渲染模块
     renderModule(moduleId);
     updateModuleStatus(moduleId);
+
+    // 同步到3D场景
+    syncIndoor3DWithModule(moduleId, module.data);
 }
 
 /**
@@ -470,6 +504,1024 @@ function generateEnvironmentData(timestamp) {
         humidity: 45 + Math.random() * 10,
         pressure: 1013 + Math.random() * 5
     };
+}
+
+// =============================================================================
+// 3D数字孪生联动
+// =============================================================================
+
+function initIndoor3DIntegration() {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer) {
+        console.warn('[Indoor3D] Three.js未就绪，跳过3D联动');
+        return;
+    }
+
+    Indoor3DState.viewer = viewer;
+
+    viewer.onAlarmClick((alarm) => {
+        if (alarm && alarm.id) {
+            // 只更新UI状态，不打开模态框（避免重复打开）
+            selectIndoorAlarm(alarm.id, { focus: false, openModal: false });
+        }
+    });
+
+    bindIndoor3DControls();
+    updateAlarmProcessUI(null);
+    renderIndoorAlarmList();
+    loadIndoor3DScene();
+    scheduleIndoor3DRefresh();
+}
+
+function ensureIndoor3DViewer() {
+    if (Indoor3DState.viewer) {
+        return Indoor3DState.viewer;
+    }
+    if (window.indoor3DViewer) {
+        Indoor3DState.viewer = window.indoor3DViewer;
+        return Indoor3DState.viewer;
+    }
+
+    const container = document.getElementById('indoor-3d-container');
+    if (!container || !window.Indoor3DViewer || !window.THREE) {
+        return null;
+    }
+
+    window.indoor3DViewer = new Indoor3DViewer('indoor-3d-container');
+    container.classList.add('viewer-ready');
+    Indoor3DState.viewer = window.indoor3DViewer;
+    return Indoor3DState.viewer;
+}
+
+function bindIndoor3DControls() {
+    if (Indoor3DState.controlsBound) return;
+
+    const resetBtn = document.getElementById('indoor-3d-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            const viewer = ensureIndoor3DViewer();
+            if (viewer) {
+                viewer.resetCamera();
+            }
+        });
+    }
+
+    const alarmList = document.getElementById('indoor-alarm-list');
+    if (alarmList) {
+        alarmList.addEventListener('click', (event) => {
+            const item = event.target.closest('[data-alarm-id]');
+            if (!item) return;
+            selectIndoorAlarm(item.dataset.alarmId, { openModal: true });
+        });
+    }
+
+    const actionButtons = document.querySelectorAll('[data-alarm-action]');
+    actionButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            handleAlarmAction(btn.dataset.alarmAction);
+        });
+    });
+
+    Indoor3DState.controlsBound = true;
+}
+
+function scheduleIndoor3DRefresh() {
+    if (Indoor3DState.refreshTimer) return;
+
+    Indoor3DState.refreshTimer = setInterval(() => {
+        if (!IndoorMonitorState.autoRefresh) return;
+
+        const now = Date.now();
+        if (now - Indoor3DState.lastOverlaySync > Indoor3DState.overlaySyncInterval) {
+            refreshIndoor3DOverlays();
+            Indoor3DState.lastOverlaySync = now;
+        }
+
+        if (now - Indoor3DState.lastAlarmSync > Indoor3DState.alarmSyncInterval) {
+            refreshIndoor3DAlarms();
+            Indoor3DState.lastAlarmSync = now;
+        }
+
+        if (now - Indoor3DState.lastSceneSync > Indoor3DState.sceneSyncInterval) {
+            loadIndoor3DScene();
+            Indoor3DState.lastSceneSync = now;
+        }
+    }, 1000);
+}
+
+async function loadIndoor3DScene() {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer) return;
+
+    Indoor3DState.lastSceneSync = Date.now();
+
+    const container = document.getElementById('indoor-3d-container');
+    const modelUrl = container?.dataset?.modelUrl;
+    if (modelUrl && !Indoor3DState.modelLoaded) {
+        viewer.loadModel(modelUrl, { scale: 1 });
+        Indoor3DState.modelLoaded = true;
+    }
+
+    try {
+        const data = await fetchJson('/api/indoor/3d/scene');
+        if (!data) return;
+
+        const sceneModelUrl = data.model_url || data.modelUrl || data.pointcloud?.url;
+        if (sceneModelUrl && !Indoor3DState.modelLoaded) {
+            viewer.loadModel(sceneModelUrl, { scale: 1 });
+            Indoor3DState.modelLoaded = true;
+        }
+
+        if (data.pointcloud?.points?.length && !Indoor3DState.pointCloudLoaded) {
+            viewer.loadPointCloud(data.pointcloud, { colorMode: 'height' });
+            Indoor3DState.pointCloudLoaded = true;
+        }
+
+        if (Array.isArray(data.zones)) {
+            viewer.updateZones(data.zones);
+        }
+
+        if (Array.isArray(data.trajectories) && data.trajectories.length) {
+            viewer.updateTrajectories(data.trajectories);
+            Indoor3DState.useServerTrajectories = true;
+        } else {
+            Indoor3DState.useServerTrajectories = false;
+            updateLocalTrajectories();
+        }
+
+        updateHeatmapLayers(data.heatmaps);
+        if (Array.isArray(data.alarms)) {
+            syncIndoorAlarms(data.alarms, data.statistics);
+        }
+    } catch (error) {
+        console.warn('[Indoor3D] 场景数据加载失败:', error);
+    }
+}
+
+async function refreshIndoor3DOverlays() {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer) return;
+
+    Indoor3DState.lastOverlaySync = Date.now();
+
+    const [tempRes, gasRes, trajRes] = await Promise.allSettled([
+        fetchJson('/api/indoor/3d/heatmap/temperature'),
+        fetchJson('/api/indoor/3d/heatmap/gas'),
+        fetchJson('/api/indoor/3d/trajectories')
+    ]);
+
+    const tempData = tempRes.status === 'fulfilled' ? tempRes.value : null;
+    const gasData = gasRes.status === 'fulfilled' ? gasRes.value : null;
+    const trajData = trajRes.status === 'fulfilled' ? trajRes.value : null;
+
+    updateHeatmapLayers({
+        temperature: tempData?.heatmap,
+        gas: gasData?.heatmap
+    });
+
+    if (trajData?.trajectories?.length) {
+        viewer.updateTrajectories(trajData.trajectories);
+        Indoor3DState.useServerTrajectories = true;
+    } else {
+        Indoor3DState.useServerTrajectories = false;
+        updateLocalTrajectories();
+    }
+}
+
+async function refreshIndoor3DAlarms() {
+    Indoor3DState.lastAlarmSync = Date.now();
+    const data = await fetchJson('/api/indoor/3d/alarms');
+    if (data?.alarms) {
+        syncIndoorAlarms(data.alarms, data.statistics);
+    }
+}
+
+function updateHeatmapLayers(heatmaps) {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer || !heatmaps) return;
+
+    const temperature = heatmaps.temperature?.heatmap || heatmaps.temperature;
+    const gas = heatmaps.gas?.heatmap || heatmaps.gas;
+
+    let cleared = false;
+    if (temperature?.data?.length) {
+        viewer.updateHeatmap(temperature, {
+            type: 'temperature',
+            heightOffset: 0,
+            clear: true,
+            layerId: 'temperature',
+            opacity: 0.55
+        });
+        cleared = true;
+    }
+
+    if (gas?.data?.length) {
+        viewer.updateHeatmap(gas, {
+            type: 'gas',
+            heightOffset: 0.6,
+            clear: !cleared,
+            layerId: 'gas',
+            opacity: 0.45
+        });
+        cleared = true;
+    }
+
+    if (!cleared) {
+        const tempModule = IndoorMonitorState.modules.temperature?.data;
+        if (tempModule?.heatmap) {
+            viewer.updateHeatmap({ type: 'temperature', data: tempModule.heatmap }, {
+                type: 'temperature',
+                heightOffset: 0,
+                clear: true,
+                layerId: 'temperature',
+                opacity: 0.55
+            });
+        }
+    }
+}
+
+function syncIndoor3DWithModule(moduleId, data) {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer || !data) return;
+
+    if (moduleId === 'fence' && Array.isArray(data.persons)) {
+        const persons = normalizeEntityPositions(data.persons);
+        viewer.updatePersons(persons);
+        Indoor3DState.targetCounts.persons = persons.length;
+        recordTrackPoints(persons, 'person');
+    }
+
+    if (moduleId === 'animal' && Array.isArray(data.detections)) {
+        const animals = normalizeEntityPositions(mapAnimalDetections(data.detections));
+        viewer.updateAnimals(animals);
+        Indoor3DState.targetCounts.animals = animals.length;
+        recordTrackPoints(animals, 'animal');
+    }
+
+    if (moduleId === 'fire') {
+        const fires = normalizeEntityPositions(mapFireDetections(data));
+        viewer.updateFires(fires);
+        Indoor3DState.targetCounts.fires = fires.length;
+        recordTrackPoints(fires, 'fire');
+    }
+
+    updateIndoor3DTargets();
+    updateLocalTrajectories();
+}
+
+function updateIndoor3DTargets() {
+    const total = Indoor3DState.targetCounts.persons +
+                  Indoor3DState.targetCounts.animals +
+                  Indoor3DState.targetCounts.fires;
+    const targetsEl = document.getElementById('indoor-3d-targets');
+    if (targetsEl) {
+        targetsEl.textContent = total;
+    }
+}
+
+function updateLocalTrajectories() {
+    if (Indoor3DState.useServerTrajectories) return;
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer) return;
+
+    const trajectories = buildTrajectoriesFromTracks();
+    viewer.updateTrajectories(trajectories);
+}
+
+function recordTrackPoints(objects, type) {
+    if (!Array.isArray(objects) || objects.length === 0) return;
+
+    const now = Date.now();
+    const viewer = ensureIndoor3DViewer();
+    const gridSize = viewer?.options?.gridSize || 20;
+
+    objects.forEach(obj => {
+        if (obj.x === undefined || obj.y === undefined) return;
+
+        const trackId = `${type}-${obj.id}`;
+        const track = Indoor3DState.trackHistory.get(trackId) || {
+            id: trackId,
+            type,
+            points: [],
+            lastTimestamp: 0,
+            speed: 0
+        };
+
+        track.points.push({ x: clamp01(obj.x), y: clamp01(obj.y), timestamp: now });
+        if (track.points.length > 30) {
+            track.points.shift();
+        }
+
+        if (track.points.length > 1) {
+            const prev = track.points[track.points.length - 2];
+            const distance = Math.hypot(obj.x - prev.x, obj.y - prev.y) * gridSize;
+            const delta = (now - prev.timestamp) / 1000;
+            if (delta > 0) {
+                track.speed = distance / delta;
+            }
+        }
+
+        track.lastTimestamp = now;
+        Indoor3DState.trackHistory.set(trackId, track);
+    });
+
+    Indoor3DState.trackHistory.forEach((track, key) => {
+        if (now - track.lastTimestamp > 20000) {
+            Indoor3DState.trackHistory.delete(key);
+        }
+    });
+}
+
+function buildTrajectoriesFromTracks() {
+    const trajectories = [];
+    Indoor3DState.trackHistory.forEach(track => {
+        if (track.points.length < 2) return;
+        trajectories.push({
+            id: `traj-${track.id}`,
+            type: track.type,
+            points: track.points.map(p => ({ x: p.x, y: p.y })),
+            speed: track.speed
+        });
+    });
+    return trajectories;
+}
+
+function mapAnimalDetections(detections) {
+    return detections.map((det, index) => ({
+        id: det.id || `animal-${index}`,
+        type: det.type || 'animal',
+        x: det.bbox?.x ?? det.x ?? 0.5,
+        y: det.bbox?.y ?? det.y ?? 0.5,
+        status: det.confidence >= 0.85 ? 'danger' : 'warning',
+        confidence: det.confidence
+    })).filter(item => Number.isFinite(item.x) && Number.isFinite(item.y));
+}
+
+function mapFireDetections(data) {
+    const fires = [];
+    if (!data) return fires;
+
+    if (Array.isArray(data.recentDetections) && data.recentDetections.length) {
+        data.recentDetections.forEach((det, index) => {
+            fires.push({
+                id: det.id || `fire-${index}`,
+                x: det.x ?? det.position?.x ?? 0.5,
+                y: det.y ?? det.position?.y ?? 0.5,
+                level: det.level || 'alarm'
+            });
+        });
+        return fires;
+    }
+
+    if (Array.isArray(data.zones)) {
+        const activeZones = data.zones.filter(zone => {
+            const status = typeof zone.status === 'string' ? zone.status.toLowerCase() : zone.status;
+            return (status && status !== 'normal') || zone.fireDetected || zone.smokeDetected;
+        });
+
+        activeZones.forEach((zone, index) => {
+            const pos = deriveGridPosition(index, activeZones.length || 1);
+            const status = typeof zone.status === 'string' ? zone.status.toLowerCase() : zone.status;
+            fires.push({
+                id: zone.id || `fire-${index}`,
+                x: pos.x,
+                y: pos.y,
+                level: status || 'alarm'
+            });
+        });
+    }
+
+    return fires.filter(item => Number.isFinite(item.x) && Number.isFinite(item.y));
+}
+
+function deriveGridPosition(index, total) {
+    const columns = Math.ceil(Math.sqrt(total));
+    const rows = Math.ceil(total / columns);
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    return {
+        x: (col + 1) / (columns + 1),
+        y: (row + 1) / (rows + 1)
+    };
+}
+
+function normalizeEntityPositions(items, xKey = 'x', yKey = 'y') {
+    if (!Array.isArray(items)) return [];
+
+    const xs = items.map(item => item[xKey]).filter(Number.isFinite);
+    const ys = items.map(item => item[yKey]).filter(Number.isFinite);
+    if (!xs.length || !ys.length) return items;
+
+    const needsNormalize = xs.some(x => x < 0 || x > 1) || ys.some(y => y < 0 || y > 1);
+    if (!needsNormalize) {
+        return items.map(item => ({
+            ...item,
+            x: clamp01(item[xKey]),
+            y: clamp01(item[yKey])
+        }));
+    }
+
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    return items.map(item => ({
+        ...item,
+        x: normalizeValue(item[xKey], minX, maxX),
+        y: normalizeValue(item[yKey], minY, maxY)
+    }));
+}
+
+function normalizeValue(value, min, max) {
+    if (!Number.isFinite(value)) return 0.5;
+    if (max === min) return 0.5;
+    return clamp01((value - min) / (max - min));
+}
+
+function clamp01(value) {
+    return Math.max(0, Math.min(1, value));
+}
+
+function syncIndoorAlarms(alarms, stats) {
+    // 处理告警数据，确保每个告警都有位置信息
+    Indoor3DState.alarms = Array.isArray(alarms) ? alarms.map(alarm => {
+        // 如果告警没有位置信息，根据类型和区域生成默认位置
+        if (alarm.x === undefined || alarm.y === undefined) {
+            const position = getAlarmDefaultPosition(alarm);
+            return { ...alarm, x: position.x, y: position.y };
+        }
+        return alarm;
+    }) : [];
+    IndoorMonitorState.alarms = Indoor3DState.alarms;
+    Indoor3DState.alarmStats = stats || {};
+
+    updateAlarmIndicators();
+    renderIndoorAlarmList();
+
+    // 同步告警到3D视图
+    syncAlarmsTo3DView();
+
+    if (Indoor3DState.activeAlarmId) {
+        const active = getAlarmById(Indoor3DState.activeAlarmId);
+        updateAlarmProcessUI(active);
+    }
+}
+
+/**
+ * 根据告警类型和区域获取默认位置
+ */
+function getAlarmDefaultPosition(alarm) {
+    // 区域位置映射
+    const zonePositions = {
+        'gis室': { x: 0.3, y: 0.4 },
+        'gis': { x: 0.3, y: 0.4 },
+        '主控室': { x: 0.5, y: 0.5 },
+        '控制室': { x: 0.5, y: 0.5 },
+        '继保室': { x: 0.7, y: 0.4 },
+        '蓄电池室': { x: 0.7, y: 0.6 },
+        '配电室': { x: 0.3, y: 0.6 },
+        '黄线警戒区': { x: 0.4, y: 0.5 },
+        '高压危险区': { x: 0.5, y: 0.3 }
+    };
+
+    // 告警类型位置映射
+    const typePositions = {
+        'fence_violation': { x: 0.4, y: 0.5 },
+        'temperature_high': { x: 0.5, y: 0.5 },
+        'animal_intrusion': { x: 0.6, y: 0.4 },
+        'fire_detected': { x: 0.5, y: 0.6 },
+        'gas_leak': { x: 0.4, y: 0.6 }
+    };
+
+    // 尝试从告警详情中获取区域
+    const zone = alarm.details?.zone || alarm.details?.area || alarm.zone || '';
+    const zoneLower = zone.toLowerCase();
+
+    for (const [key, pos] of Object.entries(zonePositions)) {
+        if (zoneLower.includes(key.toLowerCase())) {
+            // 添加一些随机偏移避免重叠
+            return {
+                x: pos.x + (Math.random() - 0.5) * 0.1,
+                y: pos.y + (Math.random() - 0.5) * 0.1
+            };
+        }
+    }
+
+    // 根据告警类型获取位置
+    const alarmType = typeof alarm.type === 'string' ? alarm.type.toLowerCase() : '';
+    if (typePositions[alarmType]) {
+        const pos = typePositions[alarmType];
+        return {
+            x: pos.x + (Math.random() - 0.5) * 0.1,
+            y: pos.y + (Math.random() - 0.5) * 0.1
+        };
+    }
+
+    // 默认位置（中心附近）
+    return {
+        x: 0.5 + (Math.random() - 0.5) * 0.2,
+        y: 0.5 + (Math.random() - 0.5) * 0.2
+    };
+}
+
+/**
+ * 同步告警到3D视图
+ */
+function syncAlarmsTo3DView() {
+    const viewer = ensureIndoor3DViewer();
+    if (!viewer) return;
+
+    // 获取所有未解决的告警
+    const activeAlarms = Indoor3DState.alarms.filter(a =>
+        String(a.status).toLowerCase() !== 'resolved'
+    );
+
+    // 在3D视图中显示所有告警标记
+    if (typeof viewer.updateAlarmMarkers === 'function') {
+        viewer.updateAlarmMarkers(activeAlarms);
+    }
+
+    // 更新告警区域高亮
+    const pendingAlarms = activeAlarms.filter(a =>
+        String(a.status).toLowerCase() === 'pending'
+    );
+
+    if (pendingAlarms.length > 0) {
+        const alarmZones = pendingAlarms.map(alarm => ({
+            id: `alarm-zone-${alarm.id}`,
+            name: alarm.message || '告警区域',
+            type: 'danger',
+            polygon: generateAlarmZonePolygon(alarm.x, alarm.y, 0.05)
+        }));
+
+        // 合并现有区域和告警区域
+        const existingZones = viewer.state?.zones ?
+            Array.from(viewer.state.zones.values())
+                .map(z => z.userData)
+                .filter(z => !z.id?.startsWith('alarm-zone-')) : [];
+
+        viewer.updateZones([...existingZones, ...alarmZones]);
+    } else {
+        // 如果没有待处理告警，清除告警区域
+        const existingZones = viewer.state?.zones ?
+            Array.from(viewer.state.zones.values())
+                .map(z => z.userData)
+                .filter(z => !z.id?.startsWith('alarm-zone-')) : [];
+        viewer.updateZones(existingZones);
+    }
+
+    console.log('[Indoor3D] 同步告警到3D视图:', activeAlarms.length, '个活动告警');
+}
+
+/**
+ * 生成告警区域多边形
+ */
+function generateAlarmZonePolygon(x, y, radius) {
+    const points = [];
+    const segments = 6;
+    for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        points.push([
+            x + Math.cos(angle) * radius,
+            y + Math.sin(angle) * radius
+        ]);
+    }
+    return points;
+}
+
+function updateAlarmIndicators() {
+    const alarms = Indoor3DState.alarms;
+    const pending = alarms.filter(a => String(a.status).toLowerCase() === 'pending').length;
+    const total = Indoor3DState.alarmStats?.total ?? alarms.length;
+
+    IndoorMonitorState.totalAlarms = pending;
+
+    const badge = document.getElementById('total-alarms');
+    if (badge) badge.textContent = pending;
+
+    const bottomCount = document.getElementById('alarm-count');
+    if (bottomCount) bottomCount.textContent = pending;
+
+    const panelCount = document.getElementById('indoor-alarm-count-badge');
+    if (panelCount) panelCount.textContent = pending;
+
+    const viewerCount = document.getElementById('indoor-3d-alarms');
+    if (viewerCount) viewerCount.textContent = total;
+}
+
+function renderIndoorAlarmList() {
+    const listEl = document.getElementById('indoor-alarm-list');
+    if (!listEl) return;
+
+    if (!Indoor3DState.alarms.length) {
+        listEl.innerHTML = `
+            <div class="alarm-item notice">
+                <div class="alarm-header">
+                    <span>暂无告警</span>
+                    <span>--</span>
+                </div>
+                <div class="alarm-title">当前室内监测运行正常</div>
+                <div class="alarm-meta">
+                    <span><i class="bi bi-check-circle"></i> 全部安全</span>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = Indoor3DState.alarms.map(alarm => {
+        const level = typeof alarm.level === 'string' ? alarm.level.toLowerCase() : alarm.level;
+        const levelClass = level === 'critical' || level === 'alarm' ? 'critical' :
+            level === 'warning' ? '' : 'notice';
+        const activeClass = alarm.id === Indoor3DState.activeAlarmId ? 'active' : '';
+        const zone = alarm.details?.zone || alarm.details?.area;
+        const person = alarm.details?.person_name || alarm.details?.person;
+        const locationMeta = zone || person ? `
+            ${zone ? `<span><i class="bi bi-geo-alt"></i> ${zone}</span>` : ''}
+            ${person ? `<span><i class="bi bi-person"></i> ${person}</span>` : ''}
+        ` : '';
+
+        return `
+            <div class="alarm-item ${levelClass} ${activeClass}" data-alarm-id="${alarm.id}">
+                <div class="alarm-header">
+                    <span>${formatAlarmTypeLabel(alarm.type)}</span>
+                    <span>${formatAlarmTime(alarm.timestamp)}</span>
+                </div>
+                <div class="alarm-title">${alarm.message || '未命名告警'}</div>
+                <div class="alarm-meta">
+                    <span><i class="bi bi-exclamation-circle"></i> ${formatAlarmLevelLabel(alarm.level)}</span>
+                    <span><i class="bi bi-activity"></i> ${formatAlarmStatusLabel(alarm.status)}</span>
+                    ${locationMeta}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectIndoorAlarm(alarmId, options = {}) {
+    const { focus = true, openModal = false } = options;
+    const alarm = getAlarmById(alarmId);
+    if (!alarm) {
+        console.warn('[Indoor3D] 告警不存在:', alarmId);
+        return;
+    }
+
+    console.log('[Indoor3D] 选中告警:', alarm.id, alarm.message);
+
+    Indoor3DState.activeAlarmId = alarmId;
+    renderIndoorAlarmList();
+    updateAlarmProcessUI(alarm);
+
+    // 高亮对应的监测模块
+    highlightRelatedModule(alarm);
+
+    if (focus) {
+        const viewer = ensureIndoor3DViewer();
+        if (viewer) {
+            // 确保告警有位置信息
+            if (alarm.x === undefined || alarm.y === undefined) {
+                const position = getAlarmDefaultPosition(alarm);
+                alarm.x = position.x;
+                alarm.y = position.y;
+            }
+            viewer.focusOnAlarm(alarm);
+            console.log('[Indoor3D] 聚焦到告警位置:', alarm.x, alarm.y);
+        }
+    }
+
+    if (openModal) {
+        openAlarmDetailModal(alarm);
+    }
+}
+
+/**
+ * 高亮与告警相关的监测模块
+ */
+function highlightRelatedModule(alarm) {
+    // 移除所有模块的高亮
+    document.querySelectorAll('.monitor-card').forEach(card => {
+        card.classList.remove('alarm-highlight');
+    });
+
+    // 根据告警类型确定相关模块
+    const typeModuleMap = {
+        'fence_violation': 'fence',
+        'temperature_high': 'temperature',
+        'animal_intrusion': 'animal',
+        'fire_detected': 'fire',
+        'gas_leak': 'environment',
+        'device_fault': 'device'
+    };
+
+    const alarmType = typeof alarm.type === 'string' ? alarm.type.toLowerCase() : '';
+    const moduleId = typeModuleMap[alarmType];
+
+    if (moduleId) {
+        const card = document.getElementById(`card-${moduleId}`);
+        if (card) {
+            card.classList.add('alarm-highlight');
+            // 滚动到可见区域
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+}
+
+function updateAlarmProcessUI(alarm) {
+    const statusEl = document.getElementById('indoor-process-status');
+    const steps = document.querySelectorAll('#indoor-process-steps .process-step');
+
+    if (!alarm) {
+        if (statusEl) {
+            statusEl.className = 'status-badge attention';
+            statusEl.textContent = '待选择';
+        }
+        steps.forEach(step => step.classList.remove('active'));
+        return;
+    }
+
+    if (statusEl) {
+        const status = typeof alarm.status === 'string' ? alarm.status.toLowerCase() : alarm.status;
+        const statusClass = status === 'pending' ? 'alarm' :
+            status === 'confirmed' || status === 'dispersing' ? 'warning' :
+            status === 'reported' ? 'online' : 'good';
+        statusEl.className = `status-badge ${statusClass}`;
+        statusEl.textContent = formatAlarmStatusLabel(status);
+    }
+
+    const stepMap = {
+        pending: 1,
+        confirmed: 2,
+        dispersing: 2,
+        reported: 3,
+        resolved: 4
+    };
+    const activeStep = stepMap[typeof alarm.status === 'string' ? alarm.status.toLowerCase() : alarm.status] || 1;
+    steps.forEach(step => {
+        const stepIndex = parseInt(step.dataset.step, 10);
+        if (stepIndex <= activeStep) {
+            step.classList.add('active');
+        } else {
+            step.classList.remove('active');
+        }
+    });
+}
+
+async function handleAlarmAction(action) {
+    const alarm = getAlarmById(Indoor3DState.activeAlarmId);
+    if (!alarm) {
+        showToast('请先选择一条告警', 'warning');
+        return;
+    }
+
+    const actionMap = {
+        confirm: 'confirm',
+        disperse: 'disperse',
+        report: 'report',
+        resolve: 'resolve'
+    };
+    const endpoint = actionMap[action];
+    if (!endpoint) return;
+
+    try {
+        const response = await fetch(`/api/indoor/3d/alarms/${alarm.id}/${endpoint}`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error('请求失败');
+        }
+
+        if (action === 'confirm') alarm.status = 'confirmed';
+        if (action === 'disperse') alarm.status = 'dispersing';
+        if (action === 'report') alarm.status = 'reported';
+        if (action === 'resolve') alarm.status = 'resolved';
+
+        updateAlarmIndicators();
+        renderIndoorAlarmList();
+        updateAlarmProcessUI(alarm);
+        showToast('告警处理已提交', 'success');
+    } catch (error) {
+        console.error('[Alarm] 处理失败:', error);
+        showToast('告警处理失败，请稍后再试', 'error');
+    }
+}
+
+async function confirmAllAlarms() {
+    const pendingAlarms = Indoor3DState.alarms.filter(alarm => String(alarm.status).toLowerCase() === 'pending');
+    if (!pendingAlarms.length) {
+        showToast('暂无待处理告警', 'info');
+        return;
+    }
+
+    try {
+        await Promise.all(pendingAlarms.map(async alarm => {
+            const response = await fetch(`/api/indoor/3d/alarms/${alarm.id}/confirm`, { method: 'POST' });
+            if (!response.ok) {
+                throw new Error(`确认失败: ${alarm.id}`);
+            }
+        }));
+        pendingAlarms.forEach(alarm => {
+            alarm.status = 'confirmed';
+        });
+        updateAlarmIndicators();
+        renderIndoorAlarmList();
+        showToast('已批量确认告警', 'success');
+    } catch (error) {
+        console.error('[Alarm] 批量确认失败:', error);
+        showToast('批量确认失败，请稍后再试', 'error');
+    }
+}
+
+function openAlarmDetailModal(alarm) {
+    let modal = document.getElementById('alarm-detail-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'alarm-detail-modal';
+        modal.setAttribute('tabindex', '-1');
+        modal.innerHTML = `
+            <div class="modal-dialog modal-xl modal-dialog-centered">
+                <div class="modal-content bg-dark text-white">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-warning"></i> 告警详情</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="alarm-detail-body"></div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    const detailBody = modal.querySelector('#alarm-detail-body');
+    if (detailBody) {
+        const videoUrl = alarm.details?.video_url || alarm.details?.videoUrl || '';
+        const historySeries = alarm.details?.history || alarm.details?.series || [];
+        detailBody.innerHTML = `
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <div class="p-3 rounded bg-secondary bg-opacity-10">
+                        <div class="small text-muted">告警信息</div>
+                        <div class="fw-semibold mt-1">${formatAlarmTypeLabel(alarm.type)}</div>
+                        <div class="text-muted small mt-2">${alarm.message || '-'}</div>
+                        <div class="small mt-3">
+                            <div>级别: ${formatAlarmLevelLabel(alarm.level)}</div>
+                            <div>状态: ${formatAlarmStatusLabel(alarm.status)}</div>
+                            <div>时间: ${formatAlarmTimestamp(alarm.timestamp)}</div>
+                            <div>位置: (${alarm.x?.toFixed?.(2) ?? '--'}, ${alarm.y?.toFixed?.(2) ?? '--'})</div>
+                        </div>
+                    </div>
+                    <div class="p-3 rounded bg-secondary bg-opacity-10 mt-3">
+                        <div class="small text-muted">处理建议</div>
+                        <ul class="small mb-0 mt-2">
+                            <li>确认现场人员与区域权限</li>
+                            <li>必要时启动驱离或隔离流程</li>
+                            <li>完成处置后提交上报记录</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-lg-8">
+                    <div class="ratio ratio-16x9 bg-black rounded d-flex align-items-center justify-content-center">
+                        ${videoUrl ? `<video src="${videoUrl}" controls style="width: 100%; height: 100%;"></video>` :
+                            `<div class="text-muted small">暂无回放视频</div>`}
+                    </div>
+                    <div class="mt-3 p-2 rounded bg-secondary bg-opacity-10">
+                        <canvas id="alarm-history-chart" height="140" style="width: 100%;"></canvas>
+                        <div id="alarm-history-empty" class="text-muted small text-center mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        requestAnimationFrame(() => renderAlarmHistoryChart(historySeries));
+    }
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(modal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(modal);
+    }
+    bsModal.show();
+}
+
+function renderAlarmHistoryChart(series) {
+    const canvas = document.getElementById('alarm-history-chart');
+    const emptyEl = document.getElementById('alarm-history-empty');
+    if (!canvas) return;
+
+    if (!Array.isArray(series) || series.length < 2) {
+        if (emptyEl) {
+            emptyEl.textContent = '暂无历史曲线';
+        }
+        return;
+    }
+
+    const values = series.map(item => {
+        if (typeof item === 'number') return item;
+        if (item && typeof item.value === 'number') return item.value;
+        return 0;
+    });
+
+    if (emptyEl) emptyEl.textContent = '';
+    const ctx = canvas.getContext('2d');
+    const width = canvas.parentElement?.clientWidth || canvas.clientWidth || 400;
+    const height = canvas.height;
+    canvas.width = width;
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, width, height);
+
+    drawTrendLine(ctx, values, {
+        x: 20,
+        y: 15,
+        width: width - 30,
+        height: height - 30,
+        color: '#3b82f6'
+    });
+}
+
+function getAlarmById(alarmId) {
+    return Indoor3DState.alarms.find(alarm => String(alarm.id) === String(alarmId));
+}
+
+function formatAlarmTime(timestamp) {
+    const ts = formatAlarmTimestamp(timestamp, true);
+    const diff = Date.now() - ts;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`;
+    const date = new Date(ts);
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatAlarmLevelLabel(level) {
+    const key = typeof level === 'string' ? level.toLowerCase() : level;
+    const map = {
+        info: '提示',
+        warning: '预警',
+        alarm: '告警',
+        critical: '严重'
+    };
+    return map[key] || level || '未知';
+}
+
+function formatAlarmTypeLabel(type) {
+    const key = typeof type === 'string' ? type.toLowerCase() : type;
+    const map = {
+        fence_violation: '越线告警',
+        temperature_high: '温度异常',
+        animal_intrusion: '动物入侵',
+        fire_detected: '火情告警',
+        gas_leak: '气体泄漏',
+        device_fault: '设备故障'
+    };
+    return map[key] || type || '告警';
+}
+
+function formatAlarmStatusLabel(status) {
+    const key = typeof status === 'string' ? status.toLowerCase() : status;
+    const map = {
+        pending: '待处理',
+        confirmed: '已确认',
+        dispersing: '驱离中',
+        reported: '已上报',
+        resolved: '已关闭'
+    };
+    return map[key] || status || '未知';
+}
+
+function formatAlarmTimestamp(timestamp, raw = false) {
+    const numeric = Number(timestamp);
+    if (!Number.isFinite(numeric)) {
+        return raw ? Date.now() : '--';
+    }
+    const ts = numeric < 1000000000000 ? numeric * 1000 : numeric;
+    if (raw) return ts;
+    return new Date(ts).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+async function fetchJson(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.warn('[Fetch] 获取失败:', url, error);
+        return null;
+    }
 }
 
 // =============================================================================
@@ -1177,68 +2229,41 @@ function startAutoRefresh() {
  * 连接WebSocket
  */
 function connectWebSocket() {
-    // 检查 WebSocket 是否可用
-    if (typeof WebSocket === 'undefined') {
-        console.warn('[WebSocket] 浏览器不支持 WebSocket，使用轮询模式');
-        return;
-    }
-
     try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws/indoor`;
-
-        console.log('[WebSocket] 尝试连接:', wsUrl);
-
+        
         IndoorMonitorState.ws = new WebSocket(wsUrl);
-
+        
         IndoorMonitorState.ws.onopen = () => {
-            console.log('[WebSocket] 连接成功');
+            console.log('[WebSocket] 已连接');
             IndoorMonitorState.wsConnected = true;
             updateConnectionStatus(true);
-
-            // 清除重连定时器
-            if (IndoorMonitorState.wsReconnectTimer) {
-                clearTimeout(IndoorMonitorState.wsReconnectTimer);
-                IndoorMonitorState.wsReconnectTimer = null;
-            }
         };
-
+        
         IndoorMonitorState.ws.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                console.log('[WebSocket] 收到消息:', message.type);
                 handleWebSocketMessage(message);
             } catch (e) {
-                console.error('[WebSocket] 消息解析错误:', e, event.data);
+                console.error('[WebSocket] 消息解析错误:', e);
             }
         };
-
-        IndoorMonitorState.ws.onclose = (event) => {
-            console.log('[WebSocket] 连接关闭', {
-                code: event.code,
-                reason: event.reason,
-                wasClean: event.wasClean
-            });
+        
+        IndoorMonitorState.ws.onclose = () => {
+            console.log('[WebSocket] 连接关闭');
             IndoorMonitorState.wsConnected = false;
             updateConnectionStatus(false);
-
-            // 尝试重连（避免重复重连）
-            if (!IndoorMonitorState.wsReconnectTimer) {
-                console.log('[WebSocket] 5秒后尝试重连...');
-                IndoorMonitorState.wsReconnectTimer = setTimeout(() => {
-                    IndoorMonitorState.wsReconnectTimer = null;
-                    connectWebSocket();
-                }, 5000);
-            }
+            
+            // 尝试重连
+            IndoorMonitorState.wsReconnectTimer = setTimeout(connectWebSocket, 5000);
         };
-
+        
         IndoorMonitorState.ws.onerror = (error) => {
-            console.error('[WebSocket] 连接错误:', error);
-            console.error('[WebSocket] 可能原因: 1) 服务器未启动 2) 路由未注册 3) CORS问题');
+            console.error('[WebSocket] 错误:', error);
         };
     } catch (e) {
-        console.error('[WebSocket] 创建连接失败:', e);
-        console.log('[WebSocket] 回退到轮询模式');
+        console.log('[WebSocket] 不可用，使用轮询模式');
     }
 }
 
@@ -1253,6 +2278,7 @@ function handleWebSocketMessage(message) {
             module.status = message.data.status || module.status;
             renderModule(message.module);
             updateModuleStatus(message.module);
+            syncIndoor3DWithModule(message.module, message.data);
         }
     } else if (message.type === 'alarm') {
         handleAlarm(message);
@@ -1277,16 +2303,18 @@ function updateConnectionStatus(connected) {
  * 处理告警
  */
 function handleAlarm(alarm) {
-    IndoorMonitorState.alarms.push(alarm);
-    IndoorMonitorState.totalAlarms++;
-    
-    // 更新告警计数
-    const alarmBadge = document.getElementById('total-alarms');
-    if (alarmBadge) {
-        alarmBadge.textContent = IndoorMonitorState.totalAlarms;
+    if (!alarm) return;
+
+    if (!alarm.id) {
+        alarm.id = `alarm-${Date.now()}`;
     }
-    
-    // 显示告警通知
+
+    Indoor3DState.alarms = [alarm, ...Indoor3DState.alarms].slice(0, 50);
+    IndoorMonitorState.alarms = Indoor3DState.alarms;
+
+    updateAlarmIndicators();
+    renderIndoorAlarmList();
+    selectIndoorAlarm(alarm.id, { openModal: false });
     showAlarmNotification(alarm);
 }
 
@@ -1395,9 +2423,12 @@ function openModuleDetail(moduleId) {
             }
         }, 100);
     }
-    
-    // 显示模态框
-    const bsModal = new bootstrap.Modal(modal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(modal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(modal);
+    }
     bsModal.show();
 }
 
@@ -1441,13 +2472,52 @@ function refreshAll() {
     console.log('[Action] 刷新所有模块');
     loadAllModulesData();
     updateLastTime();
-    
+    loadIndoor3DScene();
+    refreshIndoor3DOverlays();
+    refreshIndoor3DAlarms();
+
     // 显示刷新动画
     const refreshBtn = document.querySelector('[onclick="refreshAll()"] i');
     if (refreshBtn) {
         refreshBtn.classList.add('spin');
         setTimeout(() => refreshBtn.classList.remove('spin'), 1000);
     }
+}
+
+/**
+ * 切换所有模块的启用/禁用状态
+ */
+function toggleAllModules() {
+    console.log('[Action] 切换所有模块状态');
+
+    const modules = Object.keys(IndoorMonitorState.modules);
+    const allOnline = modules.every(key => IndoorMonitorState.modules[key].status === 'online');
+
+    modules.forEach(moduleId => {
+        const module = IndoorMonitorState.modules[moduleId];
+        if (allOnline) {
+            module.status = 'offline';
+            if (module.refreshInterval) {
+                clearInterval(module.refreshInterval);
+                module.refreshInterval = null;
+            }
+        } else {
+            module.status = 'online';
+            startModuleRefresh(moduleId);
+        }
+
+        // 更新UI状态
+        const card = document.getElementById(`card-${moduleId}`);
+        if (card) {
+            const badge = card.querySelector('.status-badge');
+            if (badge) {
+                badge.className = `status-badge ${module.status}`;
+                badge.textContent = module.status === 'online' ? '在线' : '离线';
+            }
+        }
+    });
+
+    showToast(allOnline ? '已暂停所有模块' : '已启动所有模块', allOnline ? 'warning' : 'success');
 }
 
 /**
@@ -1517,8 +2587,12 @@ function viewHistory(moduleId) {
         `;
         document.body.appendChild(historyModal);
     }
-    
-    const bsModal = new bootstrap.Modal(historyModal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(historyModal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(historyModal);
+    }
     bsModal.show();
 }
 
@@ -1560,58 +2634,104 @@ function stopMonitoring() {
  */
 function viewAlarms() {
     console.log('[Action] 查看告警');
-    
+
+    const alarms = Indoor3DState.alarms.length ? Indoor3DState.alarms : IndoorMonitorState.alarms;
+    const pending = alarms.filter(a => String(a.status).toLowerCase() === 'pending').length;
+    const resolved = alarms.filter(a => String(a.status).toLowerCase() === 'resolved').length;
+
     let alarmModal = document.getElementById('alarm-modal');
     if (!alarmModal) {
         alarmModal = document.createElement('div');
         alarmModal.className = 'modal fade';
         alarmModal.id = 'alarm-modal';
         alarmModal.setAttribute('tabindex', '-1');
-        alarmModal.innerHTML = `
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content bg-dark text-white">
-                    <div class="modal-header border-secondary bg-danger">
-                        <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 告警管理</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="d-flex justify-content-between mb-3">
-                            <div>
-                                <span class="badge bg-danger me-2">未处理: ${IndoorMonitorState.totalAlarms}</span>
-                                <span class="badge bg-secondary">已处理: 0</span>
-                            </div>
-                            <button class="btn btn-sm btn-outline-success">
-                                <i class="bi bi-check-all"></i> 全部确认
-                            </button>
-                        </div>
-                        <div class="alarm-list">
-                            <div class="alert alert-danger d-flex align-items-center">
-                                <i class="bi bi-exclamation-octagon me-3" style="font-size: 1.5rem;"></i>
-                                <div class="flex-grow-1">
-                                    <strong>越线告警</strong>
-                                    <p class="mb-0 small">李工在机柜#5区域越过黄线</p>
-                                    <small class="text-muted">2026-01-22 14:15:32</small>
-                                </div>
-                                <button class="btn btn-sm btn-outline-light">处理</button>
-                            </div>
-                            <div class="alert alert-warning d-flex align-items-center">
-                                <i class="bi bi-thermometer-high me-3" style="font-size: 1.5rem;"></i>
-                                <div class="flex-grow-1">
-                                    <strong>温度异常</strong>
-                                    <p class="mb-0 small">GIS室温度超过警戒值</p>
-                                    <small class="text-muted">2026-01-22 14:10:15</small>
-                                </div>
-                                <button class="btn btn-sm btn-outline-light">处理</button>
-                            </div>
-                        </div>
-                    </div>
+        document.body.appendChild(alarmModal);
+    }
+
+    const iconMap = {
+        fence_violation: 'bi-exclamation-octagon',
+        temperature_high: 'bi-thermometer-high',
+        animal_intrusion: 'bi-bug',
+        fire_detected: 'bi-fire',
+        gas_leak: 'bi-cloud-haze2',
+        device_fault: 'bi-hdd-stack'
+    };
+
+    const listHtml = alarms.length ? alarms.map(alarm => {
+        const level = typeof alarm.level === 'string' ? alarm.level.toLowerCase() : alarm.level;
+        const levelClass = level === 'critical' || level === 'alarm' ? 'danger' :
+            level === 'warning' ? 'warning' : 'info';
+        const typeKey = typeof alarm.type === 'string' ? alarm.type.toLowerCase() : alarm.type;
+        const icon = iconMap[typeKey] || 'bi-exclamation-triangle';
+        return `
+            <div class="alert alert-${levelClass} d-flex align-items-center" data-alarm-id="${alarm.id}">
+                <i class="bi ${icon} me-3" style="font-size: 1.5rem;"></i>
+                <div class="flex-grow-1">
+                    <strong>${formatAlarmTypeLabel(alarm.type)}</strong>
+                    <p class="mb-0 small">${alarm.message || '-'}</p>
+                    <small class="text-muted">${formatAlarmTimestamp(alarm.timestamp)}</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light" data-alarm-action="focus">定位</button>
+                    <button class="btn btn-sm btn-outline-light" data-alarm-action="detail">详情</button>
                 </div>
             </div>
         `;
-        document.body.appendChild(alarmModal);
+    }).join('') : `
+        <div class="text-muted text-center py-3">暂无告警</div>
+    `;
+
+    alarmModal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark text-white">
+                <div class="modal-header border-secondary bg-danger">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 告警管理</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div>
+                            <span class="badge bg-danger me-2">待处理: ${pending}</span>
+                            <span class="badge bg-secondary">已处理: ${resolved}</span>
+                        </div>
+                        <button class="btn btn-sm btn-outline-success" onclick="confirmAllAlarms()">
+                            <i class="bi bi-check-all"></i> 全部确认
+                        </button>
+                    </div>
+                    <div class="alarm-list" id="alarm-modal-list">
+                        ${listHtml}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const listEl = alarmModal.querySelector('#alarm-modal-list');
+    if (listEl) {
+        listEl.onclick = (event) => {
+            const item = event.target.closest('[data-alarm-id]');
+            if (!item) return;
+
+            const action = event.target.closest('[data-alarm-action]')?.dataset?.alarmAction;
+            if (action === 'focus') {
+                selectIndoorAlarm(item.dataset.alarmId, { openModal: false });
+                return;
+            }
+            if (action === 'detail') {
+                const alarm = getAlarmById(item.dataset.alarmId);
+                if (alarm) openAlarmDetailModal(alarm);
+                return;
+            }
+
+            selectIndoorAlarm(item.dataset.alarmId, { openModal: true });
+        };
     }
-    
-    const bsModal = new bootstrap.Modal(alarmModal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(alarmModal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(alarmModal);
+    }
     bsModal.show();
 }
 
@@ -1683,8 +2803,12 @@ function toggleFence(moduleId) {
         `;
         document.body.appendChild(configModal);
     }
-    
-    const bsModal = new bootstrap.Modal(configModal);
+
+    // 使用 getOrCreateInstance 避免重复创建 Modal 实例导致界面卡死
+    let bsModal = bootstrap.Modal.getInstance(configModal);
+    if (!bsModal) {
+        bsModal = new bootstrap.Modal(configModal);
+    }
     bsModal.show();
 }
 
@@ -1888,6 +3012,7 @@ window.viewHistory = viewHistory;
 window.startMonitoring = startMonitoring;
 window.stopMonitoring = stopMonitoring;
 window.viewAlarms = viewAlarms;
+window.confirmAllAlarms = confirmAllAlarms;
 window.toggleFence = toggleFence;
 window.saveFenceConfig = saveFenceConfig;
 window.activateDeterrent = activateDeterrent;
