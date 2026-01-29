@@ -1,0 +1,995 @@
+<!--
+3D场景化导航组件 V3.5
+输变电激光监测平台 - 室外巡视增强
+
+功能:
+- 变电站3D模型可视化
+- 设备点击交互
+- 缺陷位置标注
+- 巡检路径显示
+- 多视角切换
+-->
+
+<style>
+.scene3d-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    background: linear-gradient(180deg, #0a0a1a 0%, #1a1a2e 100%);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.scene3d-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.scene3d-controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 10;
+}
+
+.scene3d-btn {
+    width: 40px;
+    height: 40px;
+    background: rgba(26, 26, 46, 0.9);
+    border: 1px solid var(--panel-border, #2d3748);
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.scene3d-btn:hover {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: var(--accent-primary, #00d4ff);
+}
+
+.scene3d-btn.active {
+    background: rgba(0, 212, 255, 0.3);
+    border-color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #00d4ff);
+}
+
+.scene3d-info {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.85rem;
+    z-index: 10;
+}
+
+.scene3d-info .label {
+    color: #888;
+    font-size: 0.75rem;
+}
+
+.scene3d-legend {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    z-index: 10;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    color: #ccc;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.legend-dot.normal { background: #10b981; }
+.legend-dot.warning { background: #f59e0b; }
+.legend-dot.critical { background: #ef4444; }
+.legend-dot.patrol { background: #00d4ff; }
+
+.device-tooltip {
+    position: absolute;
+    background: rgba(26, 26, 46, 0.95);
+    border: 1px solid var(--accent-primary, #00d4ff);
+    border-radius: 8px;
+    padding: 1rem;
+    color: #fff;
+    font-size: 0.85rem;
+    max-width: 280px;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.device-tooltip.visible {
+    opacity: 1;
+}
+
+.device-tooltip h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: var(--accent-primary, #00d4ff);
+}
+
+.device-tooltip .status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.device-tooltip .status-badge {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.device-tooltip .status-badge.normal {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.device-tooltip .status-badge.warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.device-tooltip .status-badge.critical {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.device-tooltip .defects {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.device-tooltip .defect-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #aaa;
+    margin-bottom: 0.25rem;
+}
+
+.view-mode-selector {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    display: flex;
+    gap: 0.25rem;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 0.25rem;
+    border-radius: 8px;
+    z-index: 10;
+}
+
+.view-mode-btn {
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.view-mode-btn:hover {
+    color: #fff;
+}
+
+.view-mode-btn.active {
+    background: var(--accent-primary, #00d4ff);
+    color: #000;
+}
+
+.patrol-progress {
+    position: absolute;
+    top: 4rem;
+    left: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    z-index: 10;
+    display: none;
+}
+
+.patrol-progress.active {
+    display: block;
+}
+
+.patrol-progress .title {
+    color: var(--accent-primary, #00d4ff);
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.patrol-progress .bar {
+    width: 200px;
+    height: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.patrol-progress .bar-fill {
+    height: 100%;
+    background: var(--accent-primary, #00d4ff);
+    transition: width 0.3s;
+}
+
+.patrol-progress .stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #888;
+    margin-top: 0.25rem;
+}
+</style>
+
+<div class="scene3d-container" id="scene3d-container">
+    <canvas class="scene3d-canvas" id="scene3d-canvas"></canvas>
+
+    <!-- 视图模式选择 -->
+    <div class="view-mode-selector">
+        <button class="view-mode-btn active" data-view="3d" onclick="Scene3D.setViewMode('3d')">
+            <i class="bi bi-box"></i> 3D
+        </button>
+        <button class="view-mode-btn" data-view="top" onclick="Scene3D.setViewMode('top')">
+            <i class="bi bi-grid-3x3"></i> 俯视
+        </button>
+        <button class="view-mode-btn" data-view="front" onclick="Scene3D.setViewMode('front')">
+            <i class="bi bi-square"></i> 正视
+        </button>
+    </div>
+
+    <!-- 巡检进度 -->
+    <div class="patrol-progress" id="patrol-progress">
+        <div class="title"><i class="bi bi-play-circle"></i> 巡检进行中</div>
+        <div class="bar">
+            <div class="bar-fill" id="patrol-progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="stats">
+            <span id="patrol-current">0/0</span>
+            <span id="patrol-time">00:00</span>
+        </div>
+    </div>
+
+    <!-- 控制按钮 -->
+    <div class="scene3d-controls">
+        <button class="scene3d-btn" onclick="Scene3D.resetCamera()" title="重置视角">
+            <i class="bi bi-house"></i>
+        </button>
+        <button class="scene3d-btn" onclick="Scene3D.zoomIn()" title="放大">
+            <i class="bi bi-zoom-in"></i>
+        </button>
+        <button class="scene3d-btn" onclick="Scene3D.zoomOut()" title="缩小">
+            <i class="bi bi-zoom-out"></i>
+        </button>
+        <button class="scene3d-btn" id="btn-patrol" onclick="Scene3D.togglePatrol()" title="巡检路径">
+            <i class="bi bi-signpost-2"></i>
+        </button>
+        <button class="scene3d-btn" id="btn-defects" onclick="Scene3D.toggleDefects()" title="缺陷标注">
+            <i class="bi bi-exclamation-triangle"></i>
+        </button>
+        <button class="scene3d-btn" onclick="Scene3D.toggleFullscreen()" title="全屏">
+            <i class="bi bi-fullscreen"></i>
+        </button>
+    </div>
+
+    <!-- 场景信息 -->
+    <div class="scene3d-info">
+        <div class="label">当前场景</div>
+        <div id="scene-name">110kV变电站主区域</div>
+        <div class="label mt-2">设备数量</div>
+        <div id="device-count">加载中...</div>
+    </div>
+
+    <!-- 图例 -->
+    <div class="scene3d-legend">
+        <div class="legend-item">
+            <span class="legend-dot normal"></span>
+            <span>正常设备</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot warning"></span>
+            <span>注意设备</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot critical"></span>
+            <span>告警设备</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot patrol"></span>
+            <span>巡检路径</span>
+        </div>
+    </div>
+
+    <!-- 设备悬浮提示 -->
+    <div class="device-tooltip" id="device-tooltip">
+        <h4 id="tooltip-name">设备名称</h4>
+        <div class="status">
+            <span>状态:</span>
+            <span class="status-badge normal" id="tooltip-status">正常</span>
+        </div>
+        <div id="tooltip-info"></div>
+        <div class="defects" id="tooltip-defects"></div>
+    </div>
+</div>
+
+<script>
+/**
+ * 3D场景导航控制器
+ * 基于Three.js实现变电站3D可视化
+ */
+const Scene3D = (function() {
+    // Three.js 对象
+    let scene, camera, renderer, controls;
+    let raycaster, mouse;
+
+    // 场景数据
+    let devices = {};
+    let defectMarkers = [];
+    let patrolPath = null;
+    let isPatrolVisible = false;
+    let isDefectsVisible = true;
+
+    // 动画
+    let animationId = null;
+    let patrolAnimation = null;
+
+    // DOM 元素
+    const container = document.getElementById('scene3d-container');
+    const canvas = document.getElementById('scene3d-canvas');
+    const tooltip = document.getElementById('device-tooltip');
+
+    /**
+     * 初始化场景
+     */
+    function init() {
+        // 检查 Three.js 是否可用
+        if (typeof THREE === 'undefined') {
+            console.warn('Three.js not loaded, using fallback visualization');
+            initFallback();
+            return;
+        }
+
+        // 创建场景
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a1a);
+        scene.fog = new THREE.Fog(0x0a0a1a, 50, 200);
+
+        // 创建相机
+        const aspect = container.clientWidth / container.clientHeight;
+        camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+        camera.position.set(30, 25, 30);
+        camera.lookAt(0, 0, 0);
+
+        // 创建渲染器
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+
+        // 添加控制器
+        if (typeof THREE.OrbitControls !== 'undefined') {
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 100;
+        }
+
+        // 射线投射器
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+
+        // 添加光源
+        addLights();
+
+        // 添加地面
+        addGround();
+
+        // 加载设备模型
+        loadDevices();
+
+        // 事件监听
+        window.addEventListener('resize', onWindowResize);
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('click', onMouseClick);
+
+        // 开始渲染
+        animate();
+
+        console.log('3D Scene initialized');
+    }
+
+    /**
+     * 备用2D可视化
+     */
+    function initFallback() {
+        const ctx = canvas.getContext('2d');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+
+        // 绘制简化的2D地图
+        drawFallbackMap(ctx);
+
+        document.getElementById('device-count').textContent = '12 台设备 (2D模式)';
+    }
+
+    /**
+     * 绘制备用2D地图
+     */
+    function drawFallbackMap(ctx) {
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // 背景
+        ctx.fillStyle = '#0a0a1a';
+        ctx.fillRect(0, 0, w, h);
+
+        // 网格
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 1;
+        const gridSize = 40;
+        for (let x = 0; x < w; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, h);
+            ctx.stroke();
+        }
+        for (let y = 0; y < h; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(w, y);
+            ctx.stroke();
+        }
+
+        // 设备位置
+        const devicePositions = [
+            { x: w * 0.2, y: h * 0.3, name: '主变压器', status: 'normal' },
+            { x: w * 0.5, y: h * 0.3, name: '110kV开关', status: 'warning' },
+            { x: w * 0.8, y: h * 0.3, name: '母线段A', status: 'normal' },
+            { x: w * 0.2, y: h * 0.6, name: '电容器组', status: 'critical' },
+            { x: w * 0.5, y: h * 0.6, name: '35kV开关', status: 'normal' },
+            { x: w * 0.8, y: h * 0.6, name: '母线段B', status: 'normal' },
+        ];
+
+        devicePositions.forEach(dev => {
+            // 设备圆点
+            ctx.beginPath();
+            ctx.arc(dev.x, dev.y, 15, 0, Math.PI * 2);
+            ctx.fillStyle = dev.status === 'critical' ? '#ef4444' :
+                           dev.status === 'warning' ? '#f59e0b' : '#10b981';
+            ctx.fill();
+
+            // 设备名称
+            ctx.fillStyle = '#fff';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(dev.name, dev.x, dev.y + 30);
+        });
+
+        // 巡检路径
+        ctx.beginPath();
+        ctx.moveTo(devicePositions[0].x, devicePositions[0].y);
+        devicePositions.forEach(dev => {
+            ctx.lineTo(dev.x, dev.y);
+        });
+        ctx.strokeStyle = 'rgba(0, 212, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    /**
+     * 添加光源
+     */
+    function addLights() {
+        // 环境光
+        const ambient = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambient);
+
+        // 主光源
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+        mainLight.position.set(50, 50, 50);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        scene.add(mainLight);
+
+        // 辅助光源
+        const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+        fillLight.position.set(-50, 30, -50);
+        scene.add(fillLight);
+    }
+
+    /**
+     * 添加地面
+     */
+    function addGround() {
+        // 地面网格
+        const gridHelper = new THREE.GridHelper(100, 50, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        // 地面平面
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e,
+            roughness: 0.9
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.1;
+        ground.receiveShadow = true;
+        scene.add(ground);
+    }
+
+    /**
+     * 加载设备模型
+     */
+    function loadDevices() {
+        // 模拟设备数据
+        const deviceData = [
+            { id: 'transformer_1', name: '主变压器 #1', type: 'transformer', position: [0, 0, 0], status: 'normal' },
+            { id: 'transformer_2', name: '主变压器 #2', type: 'transformer', position: [15, 0, 0], status: 'warning' },
+            { id: 'switch_1', name: '110kV开关', type: 'switch', position: [-10, 0, 10], status: 'normal' },
+            { id: 'busbar_1', name: '母线段A', type: 'busbar', position: [0, 0, 20], status: 'normal' },
+            { id: 'busbar_2', name: '母线段B', type: 'busbar', position: [15, 0, 20], status: 'normal' },
+            { id: 'capacitor_1', name: '电容器组', type: 'capacitor', position: [-15, 0, -10], status: 'critical' },
+        ];
+
+        deviceData.forEach(data => {
+            const device = createDeviceModel(data);
+            devices[data.id] = { mesh: device, data: data };
+            scene.add(device);
+        });
+
+        document.getElementById('device-count').textContent = `${deviceData.length} 台设备`;
+
+        // 添加缺陷标记
+        addDefectMarkers();
+    }
+
+    /**
+     * 创建设备模型
+     */
+    function createDeviceModel(data) {
+        let geometry, material;
+        const statusColor = data.status === 'critical' ? 0xef4444 :
+                           data.status === 'warning' ? 0xf59e0b : 0x10b981;
+
+        switch(data.type) {
+            case 'transformer':
+                geometry = new THREE.BoxGeometry(6, 8, 6);
+                material = new THREE.MeshStandardMaterial({
+                    color: 0x4a5568,
+                    emissive: statusColor,
+                    emissiveIntensity: 0.2
+                });
+                break;
+            case 'switch':
+                geometry = new THREE.CylinderGeometry(1.5, 1.5, 6, 8);
+                material = new THREE.MeshStandardMaterial({
+                    color: 0x2d3748,
+                    emissive: statusColor,
+                    emissiveIntensity: 0.2
+                });
+                break;
+            case 'busbar':
+                geometry = new THREE.BoxGeometry(20, 0.5, 1);
+                material = new THREE.MeshStandardMaterial({
+                    color: 0xd69e2e,
+                    emissive: statusColor,
+                    emissiveIntensity: 0.3
+                });
+                break;
+            case 'capacitor':
+                geometry = new THREE.CylinderGeometry(2, 2, 5, 16);
+                material = new THREE.MeshStandardMaterial({
+                    color: 0x718096,
+                    emissive: statusColor,
+                    emissiveIntensity: 0.2
+                });
+                break;
+            default:
+                geometry = new THREE.BoxGeometry(3, 3, 3);
+                material = new THREE.MeshStandardMaterial({ color: 0x666666 });
+        }
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(...data.position);
+        mesh.position.y += geometry.parameters.height ? geometry.parameters.height / 2 : 1.5;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = data;
+
+        return mesh;
+    }
+
+    /**
+     * 添加缺陷标记
+     */
+    function addDefectMarkers() {
+        const defects = [
+            { deviceId: 'transformer_2', position: [15, 6, 0], type: '油位异常', severity: 'warning' },
+            { deviceId: 'capacitor_1', position: [-15, 4, -10], type: '发热异常', severity: 'critical' },
+        ];
+
+        defects.forEach(defect => {
+            const markerGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+            const markerMaterial = new THREE.MeshBasicMaterial({
+                color: defect.severity === 'critical' ? 0xef4444 : 0xf59e0b,
+                transparent: true,
+                opacity: 0.8
+            });
+            const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+            marker.position.set(...defect.position);
+            marker.userData = defect;
+
+            // 脉冲动画
+            marker.userData.pulsePhase = Math.random() * Math.PI * 2;
+
+            defectMarkers.push(marker);
+            scene.add(marker);
+        });
+    }
+
+    /**
+     * 动画循环
+     */
+    function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        // 更新控制器
+        if (controls) controls.update();
+
+        // 缺陷标记脉冲动画
+        defectMarkers.forEach(marker => {
+            if (isDefectsVisible) {
+                marker.userData.pulsePhase += 0.05;
+                const scale = 1 + 0.3 * Math.sin(marker.userData.pulsePhase);
+                marker.scale.set(scale, scale, scale);
+            }
+        });
+
+        // 渲染
+        if (renderer) renderer.render(scene, camera);
+    }
+
+    /**
+     * 窗口大小改变
+     */
+    function onWindowResize() {
+        if (!camera || !renderer) return;
+
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    /**
+     * 鼠标移动
+     */
+    function onMouseMove(event) {
+        if (!raycaster) return;
+
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        const deviceMeshes = Object.values(devices).map(d => d.mesh);
+        const intersects = raycaster.intersectObjects(deviceMeshes);
+
+        if (intersects.length > 0) {
+            const device = intersects[0].object.userData;
+            showTooltip(event, device);
+            canvas.style.cursor = 'pointer';
+        } else {
+            hideTooltip();
+            canvas.style.cursor = 'default';
+        }
+    }
+
+    /**
+     * 鼠标点击
+     */
+    function onMouseClick(event) {
+        if (!raycaster) return;
+
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        const deviceMeshes = Object.values(devices).map(d => d.mesh);
+        const intersects = raycaster.intersectObjects(deviceMeshes);
+
+        if (intersects.length > 0) {
+            const device = intersects[0].object.userData;
+            focusOnDevice(device.id);
+
+            // 触发设备选中事件
+            if (window.onDeviceSelected) {
+                window.onDeviceSelected(device);
+            }
+        }
+    }
+
+    /**
+     * 显示提示框
+     */
+    function showTooltip(event, device) {
+        const tooltipName = document.getElementById('tooltip-name');
+        const tooltipStatus = document.getElementById('tooltip-status');
+        const tooltipInfo = document.getElementById('tooltip-info');
+        const tooltipDefects = document.getElementById('tooltip-defects');
+
+        tooltipName.textContent = device.name;
+        tooltipStatus.textContent = device.status === 'normal' ? '正常' :
+                                   device.status === 'warning' ? '注意' : '告警';
+        tooltipStatus.className = 'status-badge ' + device.status;
+
+        tooltipInfo.innerHTML = `<div>类型: ${device.type}</div><div>ID: ${device.id}</div>`;
+
+        // 查找关联缺陷
+        const relatedDefects = defectMarkers.filter(m => m.userData.deviceId === device.id);
+        if (relatedDefects.length > 0) {
+            tooltipDefects.innerHTML = '<strong>检测缺陷:</strong>' +
+                relatedDefects.map(d =>
+                    `<div class="defect-item"><span>${d.userData.type}</span><span class="${d.userData.severity}">${d.userData.severity}</span></div>`
+                ).join('');
+            tooltipDefects.style.display = 'block';
+        } else {
+            tooltipDefects.style.display = 'none';
+        }
+
+        tooltip.style.left = (event.clientX + 15) + 'px';
+        tooltip.style.top = (event.clientY + 15) + 'px';
+        tooltip.classList.add('visible');
+    }
+
+    /**
+     * 隐藏提示框
+     */
+    function hideTooltip() {
+        tooltip.classList.remove('visible');
+    }
+
+    /**
+     * 聚焦到设备
+     */
+    function focusOnDevice(deviceId) {
+        const device = devices[deviceId];
+        if (!device || !controls) return;
+
+        const position = device.mesh.position;
+        controls.target.set(position.x, position.y, position.z);
+
+        // 平滑移动相机
+        const targetCameraPos = new THREE.Vector3(
+            position.x + 10,
+            position.y + 8,
+            position.z + 10
+        );
+
+        // 简单的插值动画
+        const startPos = camera.position.clone();
+        let t = 0;
+
+        function animateCamera() {
+            t += 0.05;
+            if (t >= 1) {
+                camera.position.copy(targetCameraPos);
+                return;
+            }
+
+            camera.position.lerpVectors(startPos, targetCameraPos, t);
+            requestAnimationFrame(animateCamera);
+        }
+
+        animateCamera();
+    }
+
+    /**
+     * 设置视图模式
+     */
+    function setViewMode(mode) {
+        if (!camera || !controls) return;
+
+        document.querySelectorAll('.view-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === mode);
+        });
+
+        switch(mode) {
+            case '3d':
+                camera.position.set(30, 25, 30);
+                controls.target.set(0, 0, 0);
+                break;
+            case 'top':
+                camera.position.set(0, 50, 0);
+                controls.target.set(0, 0, 0);
+                break;
+            case 'front':
+                camera.position.set(0, 10, 40);
+                controls.target.set(0, 5, 0);
+                break;
+        }
+
+        controls.update();
+    }
+
+    /**
+     * 切换巡检路径显示
+     */
+    function togglePatrol() {
+        isPatrolVisible = !isPatrolVisible;
+        document.getElementById('btn-patrol').classList.toggle('active', isPatrolVisible);
+
+        if (isPatrolVisible && !patrolPath) {
+            // 创建巡检路径
+            const points = Object.values(devices).map(d => d.mesh.position.clone());
+            const curve = new THREE.CatmullRomCurve3(points);
+            const pathGeometry = new THREE.TubeGeometry(curve, 64, 0.2, 8, false);
+            const pathMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00d4ff,
+                transparent: true,
+                opacity: 0.6
+            });
+            patrolPath = new THREE.Mesh(pathGeometry, pathMaterial);
+            scene.add(patrolPath);
+        }
+
+        if (patrolPath) {
+            patrolPath.visible = isPatrolVisible;
+        }
+    }
+
+    /**
+     * 切换缺陷标记显示
+     */
+    function toggleDefects() {
+        isDefectsVisible = !isDefectsVisible;
+        document.getElementById('btn-defects').classList.toggle('active', !isDefectsVisible);
+
+        defectMarkers.forEach(marker => {
+            marker.visible = isDefectsVisible;
+        });
+    }
+
+    /**
+     * 重置相机
+     */
+    function resetCamera() {
+        setViewMode('3d');
+    }
+
+    /**
+     * 放大
+     */
+    function zoomIn() {
+        if (camera) {
+            camera.position.multiplyScalar(0.8);
+        }
+    }
+
+    /**
+     * 缩小
+     */
+    function zoomOut() {
+        if (camera) {
+            camera.position.multiplyScalar(1.2);
+        }
+    }
+
+    /**
+     * 切换全屏
+     */
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            container.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    /**
+     * 更新设备状态
+     */
+    function updateDeviceStatus(deviceId, status, defects) {
+        const device = devices[deviceId];
+        if (!device) return;
+
+        device.data.status = status;
+
+        const statusColor = status === 'critical' ? 0xef4444 :
+                           status === 'warning' ? 0xf59e0b : 0x10b981;
+        device.mesh.material.emissive.setHex(statusColor);
+    }
+
+    /**
+     * 开始巡检动画
+     */
+    function startPatrolAnimation(route) {
+        const progress = document.getElementById('patrol-progress');
+        const progressBar = document.getElementById('patrol-progress-bar');
+        const currentSpan = document.getElementById('patrol-current');
+
+        progress.classList.add('active');
+
+        let current = 0;
+        const total = route.length;
+
+        function nextPoint() {
+            if (current >= total) {
+                progress.classList.remove('active');
+                return;
+            }
+
+            const deviceId = route[current];
+            focusOnDevice(deviceId);
+
+            current++;
+            currentSpan.textContent = `${current}/${total}`;
+            progressBar.style.width = `${(current / total) * 100}%`;
+
+            setTimeout(nextPoint, 3000);
+        }
+
+        nextPoint();
+    }
+
+    // 公开接口
+    return {
+        init,
+        setViewMode,
+        togglePatrol,
+        toggleDefects,
+        resetCamera,
+        zoomIn,
+        zoomOut,
+        toggleFullscreen,
+        focusOnDevice,
+        updateDeviceStatus,
+        startPatrolAnimation
+    };
+})();
+
+// 页面加载后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 延迟初始化以确保容器已渲染
+    setTimeout(() => {
+        Scene3D.init();
+    }, 100);
+});
+</script>

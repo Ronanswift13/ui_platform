@@ -1,0 +1,1024 @@
+<!--
+多模态证据链展示组件 V3.5
+输变电激光监测平台 - 室外巡视增强
+
+功能:
+- 证据时间线可视化
+- 多模态证据聚合
+- 缺陷追溯查询
+- 置信度分析图表
+- 决策流程展示
+-->
+
+<style>
+.evidence-chain-container {
+    background: var(--panel-bg, #1a1a2e);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.evidence-chain-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--panel-border, #2d3748);
+}
+
+.evidence-chain-title {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.evidence-chain-title i {
+    color: var(--accent-primary, #00d4ff);
+}
+
+.evidence-filter {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.evidence-filter-btn {
+    padding: 0.35rem 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--panel-border, #2d3748);
+    border-radius: 6px;
+    color: #888;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.evidence-filter-btn:hover {
+    color: #fff;
+    border-color: var(--accent-primary, #00d4ff);
+}
+
+.evidence-filter-btn.active {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: var(--accent-primary, #00d4ff);
+    color: var(--accent-primary, #00d4ff);
+}
+
+.evidence-chain-body {
+    padding: 1rem;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* 证据时间线 */
+.evidence-timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.evidence-timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, var(--accent-primary, #00d4ff) 0%, rgba(0, 212, 255, 0.2) 100%);
+}
+
+.evidence-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.evidence-item::before {
+    content: '';
+    position: absolute;
+    left: -1.65rem;
+    top: 0.5rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-primary, #00d4ff);
+    border: 2px solid var(--panel-bg, #1a1a2e);
+    z-index: 1;
+}
+
+.evidence-item.warning::before {
+    background: var(--accent-warning, #f59e0b);
+}
+
+.evidence-item.critical::before {
+    background: var(--accent-danger, #ef4444);
+}
+
+.evidence-item.review::before {
+    background: #8b5cf6;
+}
+
+.evidence-item.decision::before {
+    background: #10b981;
+}
+
+.evidence-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--panel-border, #2d3748);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: all 0.2s;
+}
+
+.evidence-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.evidence-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.evidence-type {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.evidence-type-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+}
+
+.evidence-type-icon.visual { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.evidence-type-icon.thermal { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.evidence-type-icon.acoustic { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.evidence-type-icon.texture { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.evidence-type-icon.segmentation { background: rgba(139, 92, 246, 0.2); color: #8b5cf6; }
+.evidence-type-icon.fusion { background: rgba(0, 212, 255, 0.2); color: #00d4ff; }
+.evidence-type-icon.review { background: rgba(236, 72, 153, 0.2); color: #ec4899; }
+.evidence-type-icon.decision { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+
+.evidence-type-name {
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.evidence-source {
+    color: #666;
+    font-size: 0.7rem;
+}
+
+.evidence-time {
+    color: #666;
+    font-size: 0.75rem;
+}
+
+.evidence-card-body {
+    color: #aaa;
+    font-size: 0.85rem;
+}
+
+.evidence-detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+}
+
+.evidence-detail-label {
+    color: #666;
+}
+
+.evidence-detail-value {
+    color: #fff;
+}
+
+.evidence-detail-value.high-confidence {
+    color: var(--accent-success, #10b981);
+}
+
+.evidence-detail-value.medium-confidence {
+    color: var(--accent-warning, #f59e0b);
+}
+
+.evidence-detail-value.low-confidence {
+    color: var(--accent-danger, #ef4444);
+}
+
+/* 证据图像预览 */
+.evidence-preview {
+    margin-top: 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.5rem;
+}
+
+.evidence-preview-item {
+    position: relative;
+    aspect-ratio: 4/3;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.evidence-preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.evidence-preview-item .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.evidence-preview-item:hover .overlay {
+    opacity: 1;
+}
+
+.evidence-preview-item .overlay i {
+    color: #fff;
+    font-size: 1.2rem;
+}
+
+/* 置信度条 */
+.confidence-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.confidence-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s;
+}
+
+.confidence-bar-fill.high { background: linear-gradient(90deg, #10b981, #34d399); }
+.confidence-bar-fill.medium { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.confidence-bar-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+/* 决策节点 */
+.decision-node {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.decision-action {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: rgba(16, 185, 129, 0.2);
+    border-radius: 4px;
+    color: #10b981;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+}
+
+.decision-action.warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.decision-action.critical {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+/* 复核节点 */
+.review-node {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.review-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.review-status.confirmed {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.review-status.false-alarm {
+    background: rgba(107, 114, 128, 0.2);
+    color: #9ca3af;
+}
+
+.review-status.uncertain {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+/* 关联线 */
+.evidence-connections {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* 汇总面板 */
+.evidence-summary {
+    padding: 1rem;
+    border-top: 1px solid var(--panel-border, #2d3748);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.summary-stat {
+    text-align: center;
+}
+
+.summary-stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--accent-primary, #00d4ff);
+}
+
+.summary-stat-label {
+    font-size: 0.7rem;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.modality-contribution {
+    margin-top: 1rem;
+}
+
+.modality-contribution-title {
+    color: #888;
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.modality-bars {
+    display: flex;
+    height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.modality-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: #fff;
+    font-weight: 500;
+    transition: width 0.5s;
+}
+
+.modality-bar.visual { background: #3b82f6; }
+.modality-bar.thermal { background: #ef4444; }
+.modality-bar.acoustic { background: #10b981; }
+.modality-bar.texture { background: #f59e0b; }
+
+/* 导出按钮 */
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--accent-primary, #00d4ff);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.export-btn:hover {
+    background: #33ddff;
+}
+
+/* 空状态 */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #666;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 0.9rem;
+}
+</style>
+
+<div class="evidence-chain-container" id="evidence-chain-container">
+    <div class="evidence-chain-header">
+        <div class="evidence-chain-title">
+            <i class="bi bi-diagram-3"></i>
+            <span>多模态证据链</span>
+            <span class="badge bg-primary" id="evidence-count">0</span>
+        </div>
+        <div class="evidence-filter">
+            <button class="evidence-filter-btn active" data-filter="all" onclick="EvidenceChain.filter('all')">全部</button>
+            <button class="evidence-filter-btn" data-filter="detection" onclick="EvidenceChain.filter('detection')">检测</button>
+            <button class="evidence-filter-btn" data-filter="review" onclick="EvidenceChain.filter('review')">复核</button>
+            <button class="evidence-filter-btn" data-filter="decision" onclick="EvidenceChain.filter('decision')">决策</button>
+        </div>
+    </div>
+
+    <div class="evidence-chain-body" id="evidence-chain-body">
+        <div class="evidence-timeline" id="evidence-timeline">
+            <!-- 证据项将动态生成 -->
+        </div>
+
+        <!-- 空状态 -->
+        <div class="empty-state" id="empty-state" style="display: none;">
+            <i class="bi bi-inbox"></i>
+            <p>暂无证据记录</p>
+            <p class="text-muted">检测到缺陷后，证据将显示在这里</p>
+        </div>
+    </div>
+
+    <div class="evidence-summary" id="evidence-summary">
+        <div class="summary-stats">
+            <div class="summary-stat">
+                <div class="summary-stat-value" id="stat-total">0</div>
+                <div class="summary-stat-label">总证据数</div>
+            </div>
+            <div class="summary-stat">
+                <div class="summary-stat-value" id="stat-confirmed">0</div>
+                <div class="summary-stat-label">已确认</div>
+            </div>
+            <div class="summary-stat">
+                <div class="summary-stat-value" id="stat-pending">0</div>
+                <div class="summary-stat-label">待复核</div>
+            </div>
+            <div class="summary-stat">
+                <div class="summary-stat-value" id="stat-confidence">-</div>
+                <div class="summary-stat-label">平均置信度</div>
+            </div>
+        </div>
+
+        <div class="modality-contribution">
+            <div class="modality-contribution-title">模态贡献度</div>
+            <div class="modality-bars" id="modality-bars">
+                <div class="modality-bar visual" style="width: 25%">可见光</div>
+                <div class="modality-bar thermal" style="width: 25%">红外</div>
+                <div class="modality-bar acoustic" style="width: 25%">声学</div>
+                <div class="modality-bar texture" style="width: 25%">纹理</div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-between align-items-center">
+            <span class="text-muted" style="font-size: 0.75rem;">
+                <i class="bi bi-clock"></i> 最后更新: <span id="last-update">-</span>
+            </span>
+            <button class="export-btn" onclick="EvidenceChain.export()">
+                <i class="bi bi-download"></i> 导出报告
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 证据链管理器
+ */
+const EvidenceChain = (function() {
+    // 证据数据
+    let evidenceList = [];
+    let currentFilter = 'all';
+
+    // DOM 元素
+    const timeline = document.getElementById('evidence-timeline');
+    const emptyState = document.getElementById('empty-state');
+
+    /**
+     * 初始化
+     */
+    function init() {
+        // 加载示例数据
+        loadSampleData();
+        render();
+    }
+
+    /**
+     * 加载示例数据
+     */
+    function loadSampleData() {
+        evidenceList = [
+            {
+                id: 'EV-001',
+                type: 'visual_detection',
+                typeName: '可见光检测',
+                icon: 'bi-eye',
+                iconClass: 'visual',
+                source: 'busbar_inspection',
+                sourceName: '母线巡视插件',
+                timestamp: Date.now() - 3600000,
+                defectType: '裂纹',
+                confidence: 0.92,
+                severity: 'warning',
+                location: { device: '母线段A', preset: 3 },
+                data: { width: 2.5, length: 15.3, depth: 0.8 },
+                images: ['/static/images/defect_sample_1.jpg']
+            },
+            {
+                id: 'EV-002',
+                type: 'thermal_detection',
+                typeName: '红外检测',
+                icon: 'bi-thermometer-half',
+                iconClass: 'thermal',
+                source: 'capacitor_inspection',
+                sourceName: '电容器巡视插件',
+                timestamp: Date.now() - 3000000,
+                defectType: '过热点',
+                confidence: 0.88,
+                severity: 'critical',
+                location: { device: '电容器组 #3', preset: 5 },
+                data: { maxTemp: 85.2, ambientTemp: 25.0, deltaT: 60.2 },
+                images: ['/static/images/thermal_sample_1.jpg']
+            },
+            {
+                id: 'EV-003',
+                type: 'texture_analysis',
+                typeName: '纹理分析',
+                icon: 'bi-grid-3x3',
+                iconClass: 'texture',
+                source: 'transformer_inspection',
+                sourceName: '主变巡视插件',
+                timestamp: Date.now() - 2400000,
+                defectType: '锈蚀',
+                confidence: 0.85,
+                severity: 'warning',
+                location: { device: '主变压器 #1', preset: 1 },
+                data: { area: 125.6, severity: 'moderate' },
+                images: []
+            },
+            {
+                id: 'EV-004',
+                type: 'fusion_result',
+                typeName: '多模态融合',
+                icon: 'bi-diagram-3-fill',
+                iconClass: 'fusion',
+                source: 'multimodal_fusion',
+                sourceName: '融合引擎',
+                timestamp: Date.now() - 1800000,
+                defectType: '综合评估',
+                confidence: 0.91,
+                severity: 'warning',
+                location: { device: '电容器组 #3' },
+                data: {
+                    fusionMethod: 'hybrid',
+                    modalityContributions: { visual: 0.3, thermal: 0.4, texture: 0.15, acoustic: 0.15 }
+                },
+                relatedEvidence: ['EV-002']
+            },
+            {
+                id: 'REV-001',
+                type: 'ptz_review',
+                typeName: 'PTZ复核',
+                icon: 'bi-camera-video',
+                iconClass: 'review',
+                source: 'decision_bus',
+                sourceName: '决策总线',
+                timestamp: Date.now() - 1200000,
+                reviewStatus: 'confirmed',
+                confidence: 0.95,
+                severity: 'critical',
+                location: { device: '电容器组 #3' },
+                data: {
+                    reviewMode: 'multi_angle',
+                    captureCount: 5,
+                    bestQuality: 0.92
+                },
+                relatedEvidence: ['EV-002', 'EV-004']
+            },
+            {
+                id: 'DEC-001',
+                type: 'decision',
+                typeName: '决策结论',
+                icon: 'bi-check-circle',
+                iconClass: 'decision',
+                source: 'decision_bus',
+                sourceName: '决策总线',
+                timestamp: Date.now() - 600000,
+                action: 'schedule_maintenance',
+                actionName: '安排检修',
+                priority: 'high',
+                severity: 'critical',
+                location: { device: '电容器组 #3' },
+                recommendations: [
+                    '建议在24小时内安排检修',
+                    '需要更换发热电容器单元',
+                    '检查相邻电容器温度状态'
+                ],
+                relatedEvidence: ['EV-002', 'EV-004', 'REV-001']
+            }
+        ];
+    }
+
+    /**
+     * 添加新证据
+     */
+    function addEvidence(evidence) {
+        evidence.id = evidence.id || `EV-${Date.now()}`;
+        evidence.timestamp = evidence.timestamp || Date.now();
+        evidenceList.unshift(evidence);
+        render();
+    }
+
+    /**
+     * 渲染时间线
+     */
+    function render() {
+        const filtered = filterEvidence(evidenceList, currentFilter);
+
+        if (filtered.length === 0) {
+            timeline.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+
+        timeline.innerHTML = filtered.map(ev => renderEvidenceItem(ev)).join('');
+
+        // 更新统计
+        updateStats();
+    }
+
+    /**
+     * 过滤证据
+     */
+    function filterEvidence(list, filter) {
+        if (filter === 'all') return list;
+        if (filter === 'detection') return list.filter(e => e.type.includes('detection') || e.type.includes('analysis') || e.type.includes('fusion'));
+        if (filter === 'review') return list.filter(e => e.type === 'ptz_review');
+        if (filter === 'decision') return list.filter(e => e.type === 'decision');
+        return list;
+    }
+
+    /**
+     * 设置过滤器
+     */
+    function filter(type) {
+        currentFilter = type;
+
+        document.querySelectorAll('.evidence-filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === type);
+        });
+
+        render();
+    }
+
+    /**
+     * 渲染单个证据项
+     */
+    function renderEvidenceItem(evidence) {
+        const time = formatTime(evidence.timestamp);
+        const confidenceClass = evidence.confidence >= 0.8 ? 'high' : evidence.confidence >= 0.6 ? 'medium' : 'low';
+        const confidencePercent = Math.round(evidence.confidence * 100);
+
+        let cardClass = 'evidence-card';
+        let itemClass = `evidence-item ${evidence.severity || ''}`;
+
+        if (evidence.type === 'ptz_review') {
+            cardClass += ' review-node';
+            itemClass += ' review';
+        } else if (evidence.type === 'decision') {
+            cardClass += ' decision-node';
+            itemClass += ' decision';
+        }
+
+        let bodyContent = '';
+
+        if (evidence.type === 'decision') {
+            bodyContent = renderDecisionContent(evidence);
+        } else if (evidence.type === 'ptz_review') {
+            bodyContent = renderReviewContent(evidence);
+        } else {
+            bodyContent = renderDetectionContent(evidence);
+        }
+
+        return `
+            <div class="${itemClass}" data-id="${evidence.id}">
+                <div class="${cardClass}">
+                    <div class="evidence-card-header">
+                        <div class="evidence-type">
+                            <div class="evidence-type-icon ${evidence.iconClass}">
+                                <i class="${evidence.icon}"></i>
+                            </div>
+                            <div>
+                                <div class="evidence-type-name">${evidence.typeName}</div>
+                                <div class="evidence-source">${evidence.sourceName}</div>
+                            </div>
+                        </div>
+                        <div class="evidence-time">${time}</div>
+                    </div>
+                    <div class="evidence-card-body">
+                        ${bodyContent}
+                        ${evidence.type !== 'decision' ? `
+                            <div class="confidence-bar">
+                                <div class="confidence-bar-fill ${confidenceClass}" style="width: ${confidencePercent}%"></div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 渲染检测内容
+     */
+    function renderDetectionContent(evidence) {
+        const confidenceClass = evidence.confidence >= 0.8 ? 'high-confidence' : evidence.confidence >= 0.6 ? 'medium-confidence' : 'low-confidence';
+
+        let details = '';
+
+        if (evidence.defectType) {
+            details += `<div class="evidence-detail-row">
+                <span class="evidence-detail-label">缺陷类型</span>
+                <span class="evidence-detail-value">${evidence.defectType}</span>
+            </div>`;
+        }
+
+        if (evidence.location) {
+            details += `<div class="evidence-detail-row">
+                <span class="evidence-detail-label">位置</span>
+                <span class="evidence-detail-value">${evidence.location.device}</span>
+            </div>`;
+        }
+
+        details += `<div class="evidence-detail-row">
+            <span class="evidence-detail-label">置信度</span>
+            <span class="evidence-detail-value ${confidenceClass}">${Math.round(evidence.confidence * 100)}%</span>
+        </div>`;
+
+        // 类型特定数据
+        if (evidence.data) {
+            if (evidence.type === 'thermal_detection' && evidence.data.maxTemp) {
+                details += `<div class="evidence-detail-row">
+                    <span class="evidence-detail-label">最高温度</span>
+                    <span class="evidence-detail-value" style="color: #ef4444;">${evidence.data.maxTemp}°C</span>
+                </div>`;
+            }
+            if (evidence.data.area) {
+                details += `<div class="evidence-detail-row">
+                    <span class="evidence-detail-label">影响面积</span>
+                    <span class="evidence-detail-value">${evidence.data.area} cm²</span>
+                </div>`;
+            }
+        }
+
+        // 图像预览
+        let preview = '';
+        if (evidence.images && evidence.images.length > 0) {
+            preview = `<div class="evidence-preview">
+                ${evidence.images.map(img => `
+                    <div class="evidence-preview-item" onclick="EvidenceChain.showImage('${img}')">
+                        <img src="${img}" alt="证据图像" onerror="this.src='/static/images/placeholder.jpg'">
+                        <div class="overlay"><i class="bi bi-zoom-in"></i></div>
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+
+        return details + preview;
+    }
+
+    /**
+     * 渲染复核内容
+     */
+    function renderReviewContent(evidence) {
+        const statusClass = evidence.reviewStatus === 'confirmed' ? 'confirmed' :
+                           evidence.reviewStatus === 'false_alarm' ? 'false-alarm' : 'uncertain';
+        const statusText = evidence.reviewStatus === 'confirmed' ? '已确认' :
+                          evidence.reviewStatus === 'false_alarm' ? '误报' : '待定';
+
+        return `
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">复核结果</span>
+                <span class="review-status ${statusClass}">
+                    <i class="bi ${statusClass === 'confirmed' ? 'bi-check-circle' : statusClass === 'false-alarm' ? 'bi-x-circle' : 'bi-question-circle'}"></i>
+                    ${statusText}
+                </span>
+            </div>
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">复核模式</span>
+                <span class="evidence-detail-value">${evidence.data?.reviewMode || '标准'}</span>
+            </div>
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">拍摄数量</span>
+                <span class="evidence-detail-value">${evidence.data?.captureCount || 1} 张</span>
+            </div>
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">置信度</span>
+                <span class="evidence-detail-value high-confidence">${Math.round(evidence.confidence * 100)}%</span>
+            </div>
+        `;
+    }
+
+    /**
+     * 渲染决策内容
+     */
+    function renderDecisionContent(evidence) {
+        const priorityClass = evidence.priority === 'critical' ? 'critical' :
+                             evidence.priority === 'high' ? 'warning' : '';
+
+        let recommendations = '';
+        if (evidence.recommendations && evidence.recommendations.length > 0) {
+            recommendations = `<ul class="list-unstyled mt-2 mb-0" style="font-size: 0.8rem;">
+                ${evidence.recommendations.map(r => `<li class="text-muted mb-1"><i class="bi bi-arrow-right me-1"></i>${r}</li>`).join('')}
+            </ul>`;
+        }
+
+        return `
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">决策动作</span>
+                <span class="decision-action ${priorityClass}">${evidence.actionName}</span>
+            </div>
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">优先级</span>
+                <span class="evidence-detail-value">${evidence.priority === 'critical' ? '紧急' : evidence.priority === 'high' ? '高' : '中'}</span>
+            </div>
+            <div class="evidence-detail-row">
+                <span class="evidence-detail-label">设备</span>
+                <span class="evidence-detail-value">${evidence.location?.device || '-'}</span>
+            </div>
+            ${recommendations}
+        `;
+    }
+
+    /**
+     * 更新统计
+     */
+    function updateStats() {
+        const total = evidenceList.length;
+        const confirmed = evidenceList.filter(e => e.type === 'ptz_review' && e.reviewStatus === 'confirmed').length;
+        const pending = evidenceList.filter(e => e.type !== 'decision' && !evidenceList.some(d => d.type === 'ptz_review' && d.relatedEvidence?.includes(e.id))).length;
+
+        const avgConfidence = evidenceList.reduce((sum, e) => sum + (e.confidence || 0), 0) / total;
+
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-confirmed').textContent = confirmed;
+        document.getElementById('stat-pending').textContent = pending;
+        document.getElementById('stat-confidence').textContent = isNaN(avgConfidence) ? '-' : Math.round(avgConfidence * 100) + '%';
+        document.getElementById('evidence-count').textContent = total;
+        document.getElementById('last-update').textContent = formatTime(Date.now());
+
+        // 更新模态贡献度
+        updateModalityBars();
+    }
+
+    /**
+     * 更新模态贡献度
+     */
+    function updateModalityBars() {
+        // 计算各模态贡献
+        const contributions = { visual: 0, thermal: 0, acoustic: 0, texture: 0 };
+        let total = 0;
+
+        evidenceList.forEach(e => {
+            if (e.type === 'visual_detection') { contributions.visual += e.confidence; total += e.confidence; }
+            if (e.type === 'thermal_detection') { contributions.thermal += e.confidence; total += e.confidence; }
+            if (e.type === 'acoustic_detection') { contributions.acoustic += e.confidence; total += e.confidence; }
+            if (e.type === 'texture_analysis') { contributions.texture += e.confidence; total += e.confidence; }
+        });
+
+        if (total > 0) {
+            const bars = document.querySelectorAll('.modality-bar');
+            bars.forEach(bar => {
+                const type = bar.classList[1];
+                const percent = Math.round((contributions[type] / total) * 100);
+                bar.style.width = percent + '%';
+                bar.textContent = percent > 10 ? (type === 'visual' ? '可见光' : type === 'thermal' ? '红外' : type === 'acoustic' ? '声学' : '纹理') : '';
+            });
+        }
+    }
+
+    /**
+     * 格式化时间
+     */
+    function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+
+        if (diff < 60000) return '刚刚';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`;
+
+        return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * 显示图像
+     */
+    function showImage(src) {
+        // 创建模态框显示图像
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10000; cursor: pointer;
+        `;
+        modal.innerHTML = `<img src="${src}" style="max-width: 90%; max-height: 90%; object-fit: contain;">`;
+        modal.onclick = () => modal.remove();
+        document.body.appendChild(modal);
+    }
+
+    /**
+     * 导出报告
+     */
+    function exportReport() {
+        const report = {
+            title: '多模态证据链报告',
+            generated: new Date().toISOString(),
+            summary: {
+                totalEvidence: evidenceList.length,
+                confirmedDefects: evidenceList.filter(e => e.type === 'ptz_review' && e.reviewStatus === 'confirmed').length,
+                decisions: evidenceList.filter(e => e.type === 'decision').length
+            },
+            evidenceChain: evidenceList.map(e => ({
+                id: e.id,
+                type: e.typeName,
+                source: e.sourceName,
+                timestamp: new Date(e.timestamp).toISOString(),
+                confidence: e.confidence,
+                severity: e.severity,
+                details: e.data
+            }))
+        };
+
+        // 下载JSON
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `evidence_chain_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // 公开接口
+    return {
+        init,
+        addEvidence,
+        filter,
+        showImage,
+        export: exportReport,
+        getEvidence: () => evidenceList
+    };
+})();
+
+// 页面加载后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    EvidenceChain.init();
+});
+</script>
