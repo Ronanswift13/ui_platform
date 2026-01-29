@@ -3,6 +3,10 @@
 {% block title %}室外监测中心 - 输变电监测平台{% endblock %}
 
 {% block extra_css %}
+<!-- Three.js for 3D visualization -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+
 <style>
     :root {
         --panel-bg: #1a1a2e;
@@ -552,34 +556,10 @@
         </div>
     </div>
 
-    <!-- 主视频监控区域 -->
+    <!-- 主视频监控区域 - 3D场景导航 -->
     <div class="main-content">
         <div class="video-area">
-            <canvas id="main-video-canvas"></canvas>
-            <div class="video-overlay-info">
-                <span id="current-datetime">2025-04-07 16:53:15</span>
-            </div>
-            <div class="video-bottom-info">
-                <div class="camera-info">
-                    <i class="bi bi-camera-video"></i>
-                    <span id="camera-name">110kV场地7号云台</span> |
-                    <span id="camera-resolution">1920×1080</span>
-                </div>
-                <div class="detection-stats">
-                    <div class="stat-item">
-                        <span>检测:</span>
-                        <span class="stat-value" id="detection-count">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>告警:</span>
-                        <span class="stat-value text-warning" id="alarm-count">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span>FPS:</span>
-                        <span class="stat-value" id="fps-value">25</span>
-                    </div>
-                </div>
-            </div>
+            {% include 'components/scene3d_navigation.html' %}
         </div>
     </div>
 
