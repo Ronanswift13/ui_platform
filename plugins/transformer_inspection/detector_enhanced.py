@@ -1,5 +1,5 @@
 """
-主变自主巡视检测器 - 增强版 V3.0
+主变自主巡视检测器 - 增强版 V3.5
 输变电激光监测平台 (A组) - 全自动AI巡检改造
 
 增强功能:
@@ -13,6 +13,12 @@ V3.0更新:
 - 集成YOLOv8-ViT深度学习模型
 - 支持热成像融合检测
 - 增强小目标检测能力
+
+V3.5更新 (室外监测迭代):
+- SegFormer语义分割: 变压器组件精确分割
+- Gabor纹理分析: 表面锈蚀/油污/涂层剥落检测
+- 多模态分析融合: 检测+分割+纹理综合判定
+- 增强油位/硅胶状态识别精度
 """
 
 from __future__ import annotations
@@ -39,6 +45,38 @@ except ImportError:
     YOLOv8ViTDetector = None
     YOLOv8ViTConfig = None
     DetectionTask = None
+
+# V3.5: 导入SegFormer语义分割模块
+try:
+    from ai_models.deep_learning.segformer import (
+        SegFormerSegmenter,
+        SegFormerConfig,
+        SegmentationTask,
+        SegmentationMask
+    )
+    SEGFORMER_AVAILABLE = True
+except ImportError:
+    SEGFORMER_AVAILABLE = False
+    SegFormerSegmenter = None
+    SegFormerConfig = None
+    SegmentationTask = None
+    SegmentationMask = None
+
+# V3.5: 导入Gabor纹理分析模块
+try:
+    from ai_models.deep_learning.gabor_texture import (
+        GaborTextureAnalyzer,
+        GaborFilterConfig,
+        TextureAnomalyType,
+        TextureAnomaly
+    )
+    GABOR_AVAILABLE = True
+except ImportError:
+    GABOR_AVAILABLE = False
+    GaborTextureAnalyzer = None
+    GaborFilterConfig = None
+    TextureAnomalyType = None
+    TextureAnomaly = None
 
 
 class DefectType(Enum):
@@ -198,8 +236,16 @@ class TransformerDetectorEnhanced:
         self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
         self._dl_initialized = False
 
-        # 版本信息 (V3.0更新)
-        self._model_version = "transformer_enhanced_v3.0"
+        # V3.5: SegFormer语义分割器
+        self._segformer: Optional[Any] = None
+        self._segformer_enabled = config.get("segformer", {}).get("enabled", True)
+
+        # V3.5: Gabor纹理分析器
+        self._gabor_analyzer: Optional[Any] = None
+        self._gabor_enabled = config.get("gabor_texture", {}).get("enabled", True)
+
+        # 版本信息 (V3.5更新)
+        self._model_version = "transformer_enhanced_v3.5"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -215,6 +261,14 @@ class TransformerDetectorEnhanced:
             if self._use_deep_learning and DL_AVAILABLE:
                 self._init_yolov8_vit()
 
+            # V3.5: 初始化SegFormer语义分割器
+            if self._segformer_enabled and SEGFORMER_AVAILABLE:
+                self._init_segformer()
+
+            # V3.5: 初始化Gabor纹理分析器
+            if self._gabor_enabled and GABOR_AVAILABLE:
+                self._init_gabor_analyzer()
+
             # 兼容旧版：如果有模型注册表，预加载模型
             if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
@@ -227,6 +281,61 @@ class TransformerDetectorEnhanced:
             return True
         except Exception as e:
             print(f"[TransformerDetector] 初始化失败: {e}")
+            return False
+
+    def _init_segformer(self) -> bool:
+        """初始化SegFormer语义分割器 (V3.5)"""
+        if not SEGFORMER_AVAILABLE or SegFormerSegmenter is None:
+            print("[TransformerDetector] SegFormer模块不可用")
+            return False
+
+        try:
+            seg_config = self.config.get("segformer", {})
+
+            config = SegFormerConfig(
+                model_path=seg_config.get("model_path"),
+                task=SegmentationTask.TRANSFORMER_COMPONENT,
+                model_size=seg_config.get("model_size", "b0"),
+                input_size=tuple(seg_config.get("input_size", [512, 512])),
+                confidence_threshold=seg_config.get("confidence_threshold", 0.5),
+                min_area=seg_config.get("min_area", 100)
+            )
+
+            self._segformer = SegFormerSegmenter(config)
+            self._segformer.load()
+
+            print("[TransformerDetector] SegFormer语义分割器初始化成功 (V3.5)")
+            return True
+
+        except Exception as e:
+            print(f"[TransformerDetector] SegFormer初始化失败: {e}")
+            return False
+
+    def _init_gabor_analyzer(self) -> bool:
+        """初始化Gabor纹理分析器 (V3.5)"""
+        if not GABOR_AVAILABLE or GaborTextureAnalyzer is None:
+            print("[TransformerDetector] Gabor纹理分析模块不可用")
+            return False
+
+        try:
+            gabor_config = self.config.get("gabor_texture", {})
+
+            filter_config = GaborFilterConfig(
+                wavelengths=gabor_config.get("wavelengths", [4.0, 8.0, 16.0, 32.0]),
+                num_orientations=gabor_config.get("num_orientations", 8)
+            )
+
+            self._gabor_analyzer = GaborTextureAnalyzer(
+                filter_config=filter_config,
+                analysis_window_size=gabor_config.get("window_size", 64),
+                window_stride=gabor_config.get("window_stride", 32)
+            )
+
+            print("[TransformerDetector] Gabor纹理分析器初始化成功 (V3.5)")
+            return True
+
+        except Exception as e:
+            print(f"[TransformerDetector] Gabor分析器初始化失败: {e}")
             return False
 
     def _init_yolov8_vit(self) -> bool:
@@ -1028,6 +1137,323 @@ class TransformerDetectorEnhanced:
         union = area1 + area2 - inter
         
         return inter / union if union > 0 else 0
+
+    # ==================== V3.5 新增方法 ====================
+
+    def segment_components(
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
+        """
+        SegFormer组件分割 (V3.5)
+
+        分割变压器各个组件区域
+
+        Args:
+            image: 输入图像
+            roi_bbox: ROI区域
+
+        Returns:
+            分割结果
+        """
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
+
+        if self._segformer is None:
+            return {
+                "success": False,
+                "error": "SegFormer未初始化",
+                "masks": []
+            }
+
+        try:
+            result = self._segformer.segment(image, return_probabilities=False)
+
+            masks_data = []
+            for mask in result.class_masks:
+                masks_data.append({
+                    "class_id": mask.class_id,
+                    "class_name": mask.class_name,
+                    "bbox": mask.bbox,
+                    "area": mask.area,
+                    "centroid": mask.centroid,
+                    "confidence": mask.confidence
+                })
+
+            return {
+                "success": True,
+                "full_mask": result.full_mask,
+                "masks": masks_data,
+                "inference_time_ms": result.inference_time_ms,
+                "model_version": result.model_version
+            }
+
+        except Exception as e:
+            print(f"[TransformerDetector] 组件分割失败: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "masks": []
+            }
+
+    def analyze_texture(
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None,
+        return_response_maps: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Gabor纹理分析 (V3.5)
+
+        检测表面纹理异常（锈蚀、油污、涂层剥落等）
+
+        Args:
+            image: 输入图像
+            roi_bbox: ROI区域
+            return_response_maps: 是否返回响应图
+
+        Returns:
+            纹理分析结果
+        """
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
+
+        if self._gabor_analyzer is None:
+            return {
+                "success": False,
+                "error": "Gabor分析器未初始化",
+                "anomalies": []
+            }
+
+        try:
+            result = self._gabor_analyzer.analyze(
+                image,
+                return_response_maps=return_response_maps
+            )
+
+            anomalies_data = []
+            for anomaly in result.anomalies:
+                anomalies_data.append({
+                    "type": anomaly.anomaly_type.value,
+                    "bbox": anomaly.bbox,
+                    "confidence": anomaly.confidence,
+                    "severity": anomaly.severity,
+                    "description": anomaly.description,
+                    "feature": {
+                        "energy": anomaly.feature.energy,
+                        "entropy": anomaly.feature.entropy,
+                        "uniformity": anomaly.feature.uniformity
+                    }
+                })
+
+            return {
+                "success": True,
+                "anomalies": anomalies_data,
+                "global_features": {
+                    "mean_response": result.global_features.mean_response,
+                    "energy": result.global_features.energy,
+                    "entropy": result.global_features.entropy,
+                    "uniformity": result.global_features.uniformity,
+                    "dominant_orientation": result.global_features.dominant_orientation
+                },
+                "processing_time_ms": result.processing_time_ms
+            }
+
+        except Exception as e:
+            print(f"[TransformerDetector] 纹理分析失败: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "anomalies": []
+            }
+
+    def analyze_comprehensive(
+        self,
+        image: np.ndarray,
+        thermal_image: Optional[np.ndarray] = None,
+        roi_bbox: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
+        """
+        综合分析 (V3.5)
+
+        融合检测、分割和纹理分析的综合结果
+
+        Args:
+            image: 可见光图像
+            thermal_image: 红外热像 (可选)
+            roi_bbox: ROI区域
+
+        Returns:
+            综合分析结果
+        """
+        start_time = time.perf_counter()
+
+        result = {
+            "defects": [],
+            "segmentation": None,
+            "texture_anomalies": [],
+            "oil_level": None,
+            "silica_gel": None,
+            "thermal": None,
+            "fused_assessment": {},
+            "processing_time_ms": 0.0
+        }
+
+        # 1. 缺陷检测
+        defects = self.detect_defects(image, roi_bbox, thermal_image)
+        result["defects"] = [
+            {
+                "type": d.defect_type.value,
+                "bbox": d.bbox,
+                "confidence": d.confidence,
+                "class_name": d.class_name
+            }
+            for d in defects
+        ]
+
+        # 2. 组件分割
+        if self._segformer is not None:
+            seg_result = self.segment_components(image, roi_bbox)
+            result["segmentation"] = seg_result
+
+        # 3. 纹理分析
+        if self._gabor_analyzer is not None:
+            texture_result = self.analyze_texture(image, roi_bbox)
+            result["texture_anomalies"] = texture_result.get("anomalies", [])
+
+        # 4. 油位检测
+        try:
+            oil_result = self.detect_oil_level(image, roi_bbox)
+            result["oil_level"] = {
+                "level_ratio": oil_result.level_ratio,
+                "status": oil_result.level_status,
+                "confidence": oil_result.confidence
+            }
+        except Exception:
+            pass
+
+        # 5. 硅胶状态
+        try:
+            silica_result = self.detect_silica_gel(image, roi_bbox)
+            result["silica_gel"] = {
+                "state": silica_result.state.value,
+                "confidence": silica_result.confidence,
+                "color_rgb": silica_result.color_rgb
+            }
+        except Exception:
+            pass
+
+        # 6. 热成像分析
+        if thermal_image is not None:
+            try:
+                thermal_result = self.analyze_thermal(thermal_image, roi_bbox)
+                result["thermal"] = {
+                    "max_temperature": thermal_result.max_temperature,
+                    "avg_temperature": thermal_result.avg_temperature,
+                    "level": thermal_result.level.value,
+                    "hotspot_count": thermal_result.hotspot_count
+                }
+            except Exception:
+                pass
+
+        # 7. 融合评估
+        result["fused_assessment"] = self._fuse_analysis_results(
+            result["defects"],
+            result.get("texture_anomalies", []),
+            result.get("segmentation"),
+            result.get("thermal")
+        )
+
+        result["processing_time_ms"] = (time.perf_counter() - start_time) * 1000
+        return result
+
+    def _fuse_analysis_results(
+        self,
+        defects: List[Dict],
+        texture_anomalies: List[Dict],
+        segmentation: Optional[Dict],
+        thermal: Optional[Dict]
+    ) -> Dict[str, Any]:
+        """融合多种分析结果 (V3.5)"""
+        assessment = {
+            "overall_status": "normal",
+            "risk_level": 0,
+            "confidence": 0.0,
+            "findings": [],
+            "recommendations": []
+        }
+
+        findings = []
+        risk_score = 0
+
+        # 缺陷评估
+        for defect in defects:
+            if defect["confidence"] > 0.7:
+                findings.append({
+                    "source": "detection",
+                    "type": defect["type"],
+                    "severity": "high" if defect["confidence"] > 0.85 else "medium"
+                })
+                risk_score += 2 if defect["confidence"] > 0.85 else 1
+
+        # 纹理异常评估
+        for anomaly in texture_anomalies:
+            if anomaly["confidence"] > 0.6:
+                findings.append({
+                    "source": "texture",
+                    "type": anomaly["type"],
+                    "severity": "high" if anomaly["severity"] > 0.7 else "medium"
+                })
+                risk_score += 1 if anomaly["severity"] > 0.7 else 0.5
+
+        # 热成像评估
+        if thermal is not None:
+            if thermal.get("level") in ["alarm", "critical"]:
+                findings.append({
+                    "source": "thermal",
+                    "type": "temperature_anomaly",
+                    "severity": "high"
+                })
+                risk_score += 3
+
+        # 总体状态判定
+        if risk_score >= 5:
+            assessment["overall_status"] = "critical"
+            assessment["recommendations"].append("建议立即停机检查")
+        elif risk_score >= 3:
+            assessment["overall_status"] = "alarm"
+            assessment["recommendations"].append("建议安排检修")
+        elif risk_score >= 1:
+            assessment["overall_status"] = "warning"
+            assessment["recommendations"].append("建议加强监测")
+        else:
+            assessment["overall_status"] = "normal"
+
+        assessment["risk_level"] = min(10, int(risk_score * 2))
+        assessment["confidence"] = min(0.95, 0.5 + len(findings) * 0.1)
+        assessment["findings"] = findings
+
+        return assessment
+
+    def get_segformer_info(self) -> Optional[Dict[str, Any]]:
+        """获取SegFormer分割器信息 (V3.5)"""
+        if self._segformer is None:
+            return None
+        return self._segformer.model_info
+
+    def get_gabor_config(self) -> Optional[Dict[str, Any]]:
+        """获取Gabor分析器配置 (V3.5)"""
+        if self._gabor_analyzer is None:
+            return None
+        config = self._gabor_analyzer.filter_config
+        return {
+            "wavelengths": config.wavelengths,
+            "num_orientations": config.num_orientations,
+            "sigma_ratio": config.sigma_ratio,
+            "window_size": self._gabor_analyzer.window_size,
+            "window_stride": self._gabor_analyzer.window_stride
+        }
 
 
 # 便捷函数

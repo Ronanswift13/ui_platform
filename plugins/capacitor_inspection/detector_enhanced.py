@@ -1,5 +1,5 @@
 """
-电容器自主巡视检测器 - 增强版 V3.0
+电容器自主巡视检测器 - 增强版 V3.5
 输变电激光监测平台 (D组) - 全自动AI巡检改造
 
 增强功能:
@@ -13,6 +13,12 @@ V3.0更新:
 - 集成YOLOv8-ViT深度学习模型
 - 增强鼓包/渗漏检测能力
 - 支持多类型缺陷统一检测
+
+V3.5更新 (室外监测迭代):
+- 红外-可见光图像配准: 多模态融合检测
+- YOLOv8-OBB旋转框检测: 倾斜电容器精确定位
+- 热点异常检测: 自动识别过热区域
+- 多模态证据融合: 可见光+热成像联合判定
 """
 
 from __future__ import annotations
@@ -39,6 +45,38 @@ except ImportError:
     YOLOv8ViTDetector = None
     YOLOv8ViTConfig = None
     DetectionTask = None
+
+# V3.5: 导入红外-可见光配准模块
+try:
+    from ai_models.deep_learning.thermal_visible_registration import (
+        ThermalVisibleRegistration,
+        RegistrationConfig,
+        FusionConfig,
+        FusionMethod
+    )
+    THERMAL_REGISTRATION_AVAILABLE = True
+except ImportError:
+    THERMAL_REGISTRATION_AVAILABLE = False
+    ThermalVisibleRegistration = None
+    RegistrationConfig = None
+    FusionConfig = None
+    FusionMethod = None
+
+# V3.5: 导入YOLOv8-OBB旋转框检测模块
+try:
+    from ai_models.deep_learning.yolov8_obb import (
+        YOLOv8OBBDetector,
+        OBBConfig,
+        OBBDetectionTask,
+        OrientedBox
+    )
+    OBB_AVAILABLE = True
+except ImportError:
+    OBB_AVAILABLE = False
+    YOLOv8OBBDetector = None
+    OBBConfig = None
+    OBBDetectionTask = None
+    OrientedBox = None
 
 
 class CapacitorDefectType(Enum):
@@ -293,8 +331,16 @@ class CapacitorDetectorEnhanced:
         self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
         self._dl_initialized = False
 
-        # 版本信息 (V3.0更新)
-        self._model_version = "capacitor_enhanced_v3.0"
+        # V3.5: 红外-可见光配准模块
+        self._thermal_registration: Optional[Any] = None
+        self._thermal_fusion_enabled = config.get("thermal_fusion", {}).get("enabled", True)
+
+        # V3.5: YOLOv8-OBB旋转框检测器
+        self._obb_detector: Optional[Any] = None
+        self._obb_enabled = config.get("obb_detection", {}).get("enabled", True)
+
+        # 版本信息 (V3.5更新)
+        self._model_version = "capacitor_enhanced_v3.5"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -310,6 +356,14 @@ class CapacitorDetectorEnhanced:
             if self._use_deep_learning and DL_AVAILABLE:
                 self._init_yolov8_vit()
 
+            # V3.5: 初始化红外-可见光配准模块
+            if self._thermal_fusion_enabled and THERMAL_REGISTRATION_AVAILABLE:
+                self._init_thermal_registration()
+
+            # V3.5: 初始化YOLOv8-OBB旋转框检测器
+            if self._obb_enabled and OBB_AVAILABLE:
+                self._init_obb_detector()
+
             # 兼容旧版：如果有模型注册表，预加载模型
             if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
@@ -322,6 +376,69 @@ class CapacitorDetectorEnhanced:
             return True
         except Exception as e:
             print(f"[CapacitorDetector] 初始化失败: {e}")
+            return False
+
+    def _init_thermal_registration(self) -> bool:
+        """初始化红外-可见光配准模块 (V3.5)"""
+        if not THERMAL_REGISTRATION_AVAILABLE or ThermalVisibleRegistration is None:
+            print("[CapacitorDetector] 红外配准模块不可用")
+            return False
+
+        try:
+            thermal_config = self.config.get("thermal_fusion", {})
+
+            reg_config = RegistrationConfig(
+                min_match_count=thermal_config.get("min_match_count", 10),
+                ransac_reproj_threshold=thermal_config.get("ransac_threshold", 5.0),
+                max_features=thermal_config.get("max_features", 1000)
+            )
+
+            fusion_config = FusionConfig(
+                method=FusionMethod.LAPLACIAN_PYRAMID,
+                thermal_weight=thermal_config.get("thermal_weight", 0.4),
+                visible_weight=thermal_config.get("visible_weight", 0.6),
+                enhance_thermal=True
+            )
+
+            self._thermal_registration = ThermalVisibleRegistration(
+                registration_config=reg_config,
+                fusion_config=fusion_config
+            )
+
+            print("[CapacitorDetector] 红外-可见光配准模块初始化成功 (V3.5)")
+            return True
+
+        except Exception as e:
+            print(f"[CapacitorDetector] 红外配准初始化失败: {e}")
+            return False
+
+    def _init_obb_detector(self) -> bool:
+        """初始化YOLOv8-OBB旋转框检测器 (V3.5)"""
+        if not OBB_AVAILABLE or YOLOv8OBBDetector is None:
+            print("[CapacitorDetector] YOLOv8-OBB模块不可用")
+            return False
+
+        try:
+            obb_config = self.config.get("obb_detection", {})
+
+            config = OBBConfig(
+                model_path=obb_config.get("model_path"),
+                task=OBBDetectionTask.CAPACITOR_DEFECT,
+                confidence_threshold=self._confidence_threshold,
+                nms_threshold=self._nms_threshold,
+                tilt_warning_threshold=self._tilt_warning,
+                tilt_critical_threshold=self._tilt_error,
+                device=self.config.get("device", "cpu")
+            )
+
+            self._obb_detector = YOLOv8OBBDetector(config)
+            self._obb_detector.load()
+
+            print("[CapacitorDetector] YOLOv8-OBB旋转框检测器初始化成功 (V3.5)")
+            return True
+
+        except Exception as e:
+            print(f"[CapacitorDetector] OBB检测器初始化失败: {e}")
             return False
 
     def _init_yolov8_vit(self) -> bool:
@@ -895,13 +1012,375 @@ class CapacitorDetectorEnhanced:
         y = int(bbox.get("y", 0) * h)
         bw = int(bbox.get("width", 1) * w)
         bh = int(bbox.get("height", 1) * h)
-        
+
         x = max(0, min(x, w - 1))
         y = max(0, min(y, h - 1))
         bw = max(1, min(bw, w - x))
         bh = max(1, min(bh, h - y))
-        
+
         return image[y:y+bh, x:x+bw]
+
+    # ==================== V3.5 新增方法 ====================
+
+    def detect_with_thermal_fusion(
+        self,
+        visible_image: np.ndarray,
+        thermal_image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
+        """
+        红外-可见光融合检测 (V3.5)
+
+        Args:
+            visible_image: 可见光图像 (BGR)
+            thermal_image: 红外热像
+            roi_bbox: ROI区域
+
+        Returns:
+            融合检测结果
+        """
+        start_time = time.perf_counter()
+
+        if roi_bbox:
+            visible_image = self._crop_roi(visible_image, roi_bbox)
+            thermal_image = self._crop_roi(thermal_image, roi_bbox)
+
+        result = {
+            "structural_defects": [],
+            "hotspots": [],
+            "fused_image": None,
+            "registration_success": False,
+            "processing_time_ms": 0.0
+        }
+
+        # 红外-可见光配准
+        if self._thermal_registration is not None:
+            try:
+                # 执行配准
+                reg_result = self._thermal_registration.register(
+                    thermal_image, visible_image
+                )
+                result["registration_success"] = reg_result.success
+                result["matched_points"] = reg_result.matched_points
+                result["reprojection_error"] = reg_result.reprojection_error
+
+                # 图像融合
+                fusion_result = self._thermal_registration.fuse(
+                    thermal_image, visible_image,
+                    reg_result.transform_matrix if reg_result.success else None
+                )
+
+                result["fused_image"] = fusion_result.fused_image
+                result["hotspots"] = fusion_result.hotspots
+                result["thermal_aligned"] = fusion_result.thermal_aligned
+
+                # 使用融合图像进行检测
+                if fusion_result.fused_image is not None:
+                    defects = self.detect_structural_defects(fusion_result.fused_image)
+                    result["structural_defects"] = defects
+
+                    # 关联热点和缺陷
+                    result["defect_thermal_correlation"] = self._correlate_defects_with_hotspots(
+                        defects, fusion_result.hotspots
+                    )
+
+            except Exception as e:
+                print(f"[CapacitorDetector] 热融合检测失败: {e}")
+                # 回退到单独检测
+                result["structural_defects"] = self.detect_structural_defects(visible_image)
+        else:
+            # 无配准模块，单独检测
+            result["structural_defects"] = self.detect_structural_defects(visible_image)
+
+        result["processing_time_ms"] = (time.perf_counter() - start_time) * 1000
+        return result
+
+    def detect_with_obb(
+        self,
+        image: np.ndarray,
+        roi_bbox: Optional[Dict[str, float]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        OBB旋转框检测 (V3.5)
+
+        用于精确检测倾斜的电容器
+
+        Args:
+            image: 输入图像
+            roi_bbox: ROI区域
+
+        Returns:
+            OBB检测结果列表
+        """
+        if roi_bbox:
+            image = self._crop_roi(image, roi_bbox)
+
+        results = []
+
+        if self._obb_detector is not None:
+            try:
+                obb_result = self._obb_detector.detect(image)
+
+                for det in obb_result.detections:
+                    results.append({
+                        "bbox": det.obb.to_axis_aligned_bbox(),
+                        "obb": {
+                            "cx": det.obb.cx,
+                            "cy": det.obb.cy,
+                            "width": det.obb.width,
+                            "height": det.obb.height,
+                            "angle": det.obb.angle
+                        },
+                        "corners": det.obb.to_corners().tolist(),
+                        "confidence": det.confidence,
+                        "class_name": det.class_name,
+                        "tilt_status": det.tilt_status,
+                        "source": "yolov8_obb_v3.5"
+                    })
+
+            except Exception as e:
+                print(f"[CapacitorDetector] OBB检测失败: {e}")
+                # 回退到普通检测
+                units = self._detect_capacitor_units(image)
+                for unit in units:
+                    tilt_angle = self._calculate_tilt_angle(image, unit["bbox"])
+                    results.append({
+                        "bbox": unit["bbox"],
+                        "obb": None,
+                        "confidence": unit["confidence"],
+                        "class_name": unit.get("class_name", "capacitor"),
+                        "tilt_status": {
+                            "status": "warning" if abs(tilt_angle) >= self._tilt_warning else "normal",
+                            "tilt_angle": tilt_angle
+                        },
+                        "source": "fallback"
+                    })
+        else:
+            # 无OBB检测器，使用普通检测
+            units = self._detect_capacitor_units(image)
+            for unit in units:
+                tilt_angle = self._calculate_tilt_angle(image, unit["bbox"])
+                results.append({
+                    "bbox": unit["bbox"],
+                    "obb": None,
+                    "confidence": unit["confidence"],
+                    "class_name": unit.get("class_name", "capacitor"),
+                    "tilt_status": {
+                        "status": "warning" if abs(tilt_angle) >= self._tilt_warning else "normal",
+                        "tilt_angle": tilt_angle
+                    },
+                    "source": "traditional"
+                })
+
+        return results
+
+    def detect_multimodal(
+        self,
+        visible_image: np.ndarray,
+        thermal_image: Optional[np.ndarray] = None,
+        timestamp: Optional[float] = None,
+        roi_bbox: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
+        """
+        多模态综合检测 (V3.5)
+
+        融合可见光、红外和OBB检测结果
+
+        Args:
+            visible_image: 可见光图像
+            thermal_image: 红外热像 (可选)
+            timestamp: 时间戳
+            roi_bbox: ROI区域
+
+        Returns:
+            多模态检测结果
+        """
+        start_time = time.perf_counter()
+        timestamp = timestamp or time.time()
+
+        result = {
+            "visible_detections": [],
+            "obb_detections": [],
+            "thermal_fusion": None,
+            "intrusions": [],
+            "bank_status": None,
+            "combined_defects": [],
+            "confidence_boost": [],
+            "processing_time_ms": 0.0
+        }
+
+        # 1. OBB旋转框检测
+        obb_results = self.detect_with_obb(visible_image, roi_bbox)
+        result["obb_detections"] = obb_results
+
+        # 2. 常规结构缺陷检测
+        visible_defects = self.detect_structural_defects(visible_image, roi_bbox)
+        result["visible_detections"] = [
+            {
+                "defect_type": d.defect_type.value,
+                "bbox": d.bbox,
+                "confidence": d.confidence,
+                "class_name": d.class_name,
+                "tilt_angle": d.tilt_angle
+            }
+            for d in visible_defects
+        ]
+
+        # 3. 红外融合检测 (如果有热像)
+        if thermal_image is not None:
+            fusion_result = self.detect_with_thermal_fusion(
+                visible_image, thermal_image, roi_bbox
+            )
+            result["thermal_fusion"] = fusion_result
+
+        # 4. 入侵检测
+        intrusions = self.detect_intrusion(visible_image, timestamp)
+        result["intrusions"] = [
+            {
+                "type": i.intrusion_type.value,
+                "bbox": i.bbox,
+                "confidence": i.confidence,
+                "zone": i.zone.value,
+                "confirmed": i.confirmed,
+                "duration_sec": i.duration_sec
+            }
+            for i in intrusions
+        ]
+
+        # 5. 电容器组状态分析
+        bank_status = self.analyze_bank_status(visible_image, roi_bbox)
+        result["bank_status"] = {
+            "total_units": bank_status.total_units,
+            "detected_units": bank_status.detected_units,
+            "missing_positions": bank_status.missing_positions,
+            "tilted_count": len(bank_status.tilted_units),
+            "alignment_score": bank_status.alignment_score
+        }
+
+        # 6. 多模态证据融合
+        result["combined_defects"] = self._fuse_multimodal_evidence(
+            visible_defects,
+            obb_results,
+            result.get("thermal_fusion", {}).get("hotspots", [])
+        )
+
+        result["processing_time_ms"] = (time.perf_counter() - start_time) * 1000
+        return result
+
+    def _correlate_defects_with_hotspots(
+        self,
+        defects: List[CapacitorDetection],
+        hotspots: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """关联缺陷和热点 (V3.5)"""
+        correlations = []
+
+        for defect in defects:
+            best_hotspot = None
+            best_overlap = 0.0
+
+            for hotspot in hotspots:
+                overlap = self._calculate_bbox_overlap(
+                    defect.bbox, hotspot.get("bbox", {})
+                )
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best_hotspot = hotspot
+
+            if best_hotspot and best_overlap > 0.3:
+                correlations.append({
+                    "defect_type": defect.defect_type.value,
+                    "defect_bbox": defect.bbox,
+                    "hotspot_bbox": best_hotspot.get("bbox"),
+                    "max_temperature": best_hotspot.get("max_intensity"),
+                    "overlap_ratio": best_overlap,
+                    "thermal_anomaly": best_hotspot.get("max_intensity", 0) > 200
+                })
+
+        return correlations
+
+    def _calculate_bbox_overlap(self, bbox1: Dict, bbox2: Dict) -> float:
+        """计算边界框重叠率"""
+        x1 = max(bbox1.get("x", 0), bbox2.get("x", 0))
+        y1 = max(bbox1.get("y", 0), bbox2.get("y", 0))
+        x2 = min(
+            bbox1.get("x", 0) + bbox1.get("width", 0),
+            bbox2.get("x", 0) + bbox2.get("width", 0)
+        )
+        y2 = min(
+            bbox1.get("y", 0) + bbox1.get("height", 0),
+            bbox2.get("y", 0) + bbox2.get("height", 0)
+        )
+
+        inter = max(0, x2 - x1) * max(0, y2 - y1)
+        area1 = bbox1.get("width", 0) * bbox1.get("height", 0)
+
+        return inter / (area1 + 1e-8)
+
+    def _fuse_multimodal_evidence(
+        self,
+        visible_defects: List[CapacitorDetection],
+        obb_results: List[Dict],
+        hotspots: List[Dict]
+    ) -> List[Dict[str, Any]]:
+        """融合多模态检测证据 (V3.5)"""
+        fused_defects = []
+
+        # 以可见光检测为基础
+        for defect in visible_defects:
+            fused = {
+                "defect_type": defect.defect_type.value,
+                "bbox": defect.bbox,
+                "confidence": defect.confidence,
+                "tilt_angle": defect.tilt_angle,
+                "sources": ["visible"],
+                "evidence_count": 1
+            }
+
+            # 匹配OBB结果
+            for obb in obb_results:
+                if self._calculate_bbox_overlap(defect.bbox, obb.get("bbox", {})) > 0.5:
+                    fused["obb_angle"] = obb.get("obb", {}).get("angle") if obb.get("obb") else None
+                    fused["obb_tilt_status"] = obb.get("tilt_status")
+                    fused["sources"].append("obb")
+                    fused["evidence_count"] += 1
+
+                    # 置信度提升
+                    if obb.get("confidence", 0) > 0.5:
+                        fused["confidence"] = min(0.99, fused["confidence"] * 1.2)
+                    break
+
+            # 匹配热点
+            for hotspot in hotspots:
+                if self._calculate_bbox_overlap(defect.bbox, hotspot.get("bbox", {})) > 0.3:
+                    fused["thermal_anomaly"] = True
+                    fused["max_temperature"] = hotspot.get("max_intensity")
+                    fused["sources"].append("thermal")
+                    fused["evidence_count"] += 1
+
+                    # 热异常提升置信度
+                    if hotspot.get("max_intensity", 0) > 200:
+                        fused["confidence"] = min(0.99, fused["confidence"] * 1.15)
+                    break
+
+            fused_defects.append(fused)
+
+        return fused_defects
+
+    def get_thermal_registration_info(self) -> Optional[Dict[str, Any]]:
+        """获取红外配准模块信息 (V3.5)"""
+        if self._thermal_registration is None:
+            return None
+        return {
+            "available": True,
+            "cached_transform": self._thermal_registration.get_cached_transform() is not None
+        }
+
+    def get_obb_detector_info(self) -> Optional[Dict[str, Any]]:
+        """获取OBB检测器信息 (V3.5)"""
+        if self._obb_detector is None:
+            return None
+        return self._obb_detector.model_info
 
 
 # 便捷函数

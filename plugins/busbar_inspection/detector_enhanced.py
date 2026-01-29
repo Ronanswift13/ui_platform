@@ -1,5 +1,5 @@
 """
-母线自主巡视检测器 - 增强版 V3.0
+母线自主巡视检测器 - 增强版 V3.5
 输变电激光监测平台 (C组) - 全自动AI巡检改造
 
 增强功能:
@@ -13,6 +13,11 @@ V3.0更新:
 - 集成YOLOv8-ViT深度学习模型
 - 增强远距小目标检测能力
 - 支持多尺度推理
+
+V3.5更新 (室外监测迭代):
+- 时序ReID模块: 跨帧缺陷重识别和轨迹追踪
+- 裂纹增长分析: 扩展趋势预测和风险评估
+- 缺陷轨迹管理: 长期监测和历史对比
 """
 
 from __future__ import annotations
@@ -39,6 +44,24 @@ except ImportError:
     YOLOv8ViTDetector = None
     YOLOv8ViTConfig = None
     DetectionTask = None
+
+# V3.5: 导入时序ReID模块和裂纹增长分析
+try:
+    from ai_models.deep_learning.temporal_reid import (
+        TemporalReIDModule,
+        TemporalReIDConfig,
+        CrackGrowthAnalyzer,
+        CrackGrowthAnalysis,
+        DefectType as ReIDDefectType
+    )
+    TEMPORAL_REID_AVAILABLE = True
+except ImportError:
+    TEMPORAL_REID_AVAILABLE = False
+    TemporalReIDModule = None
+    TemporalReIDConfig = None
+    CrackGrowthAnalyzer = None
+    CrackGrowthAnalysis = None
+    ReIDDefectType = None
 
 
 class BusbarDefectType(Enum):
@@ -108,6 +131,19 @@ class BusbarInspectionResult:
     processing_time_ms: float = 0.0
     model_version: str = ""
     code_hash: str = ""
+    # V3.5: 时序ReID和裂纹增长分析
+    temporal_reid_stats: Optional[Dict[str, Any]] = None
+    crack_growth_analyses: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class DetectROIResult:
+    """detect_roi方法的返回结果 (兼容plugin.py)"""
+    detections: List[BusbarDetection] = field(default_factory=list)
+    quality: Optional[QualityGateResult] = None
+    zoom_suggestion: Optional[ZoomSuggestion] = None
+    reason_code: Optional[int] = None
+    debug_info: Optional[Dict[str, Any]] = None
 
 
 class BusbarDetectorEnhanced:
@@ -188,8 +224,15 @@ class BusbarDetectorEnhanced:
         self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
         self._dl_initialized = False
 
-        # 版本信息 (V3.0更新)
-        self._model_version = "busbar_enhanced_v3.0"
+        # V3.5: 时序ReID模块和裂纹增长分析
+        self._temporal_reid: Optional[Any] = None
+        self._crack_analyzer: Optional[Any] = None
+        self._reid_enabled = config.get("temporal_reid", {}).get("enabled", True)
+        self._growth_analysis_enabled = config.get("crack_growth", {}).get("enabled", True)
+        self._frame_counter = 0
+
+        # 版本信息 (V3.5更新)
+        self._model_version = "busbar_enhanced_v3.5"
         self._code_hash = self._calculate_code_hash()
     
     def _calculate_code_hash(self) -> str:
@@ -205,6 +248,14 @@ class BusbarDetectorEnhanced:
             if self._use_deep_learning and DL_AVAILABLE:
                 self._init_yolov8_vit()
 
+            # V3.5: 初始化时序ReID模块
+            if self._reid_enabled and TEMPORAL_REID_AVAILABLE:
+                self._init_temporal_reid()
+
+            # V3.5: 初始化裂纹增长分析器
+            if self._growth_analysis_enabled and TEMPORAL_REID_AVAILABLE:
+                self._init_crack_analyzer()
+
             # 兼容旧版：如果有模型注册表，预加载模型
             if self._model_registry and self._use_deep_learning and not self._dl_initialized:
                 for model_key, model_id in self.MODEL_IDS.items():
@@ -217,6 +268,50 @@ class BusbarDetectorEnhanced:
             return True
         except Exception as e:
             print(f"[BusbarDetector] 初始化失败: {e}")
+            return False
+
+    def _init_temporal_reid(self) -> bool:
+        """初始化时序ReID模块 (V3.5)"""
+        if not TEMPORAL_REID_AVAILABLE or TemporalReIDModule is None:
+            print("[BusbarDetector] 时序ReID模块不可用")
+            return False
+
+        try:
+            reid_config = self.config.get("temporal_reid", {})
+            config = TemporalReIDConfig(
+                feature_dim=reid_config.get("feature_dim", 256),
+                match_threshold=reid_config.get("match_threshold", 0.7),
+                use_temporal_attention=reid_config.get("use_temporal_attention", True),
+                max_miss_count=reid_config.get("max_miss_count", 10),
+                temporal_window=reid_config.get("temporal_window", 30)
+            )
+
+            self._temporal_reid = TemporalReIDModule(config)
+            print(f"[BusbarDetector] 时序ReID模块初始化成功 (V3.5)")
+            return True
+
+        except Exception as e:
+            print(f"[BusbarDetector] 时序ReID初始化失败: {e}")
+            return False
+
+    def _init_crack_analyzer(self) -> bool:
+        """初始化裂纹增长分析器 (V3.5)"""
+        if not TEMPORAL_REID_AVAILABLE or CrackGrowthAnalyzer is None:
+            print("[BusbarDetector] 裂纹增长分析模块不可用")
+            return False
+
+        try:
+            growth_config = self.config.get("crack_growth", {})
+            self._crack_analyzer = CrackGrowthAnalyzer(
+                pixel_to_mm=growth_config.get("pixel_to_mm", 0.1),
+                critical_length=growth_config.get("critical_length", 50.0),
+                history_window_days=growth_config.get("history_window_days", 30)
+            )
+            print(f"[BusbarDetector] 裂纹增长分析器初始化成功 (V3.5)")
+            return True
+
+        except Exception as e:
+            print(f"[BusbarDetector] 裂纹增长分析器初始化失败: {e}")
             return False
 
     def _init_yolov8_vit(self) -> bool:
@@ -259,50 +354,191 @@ class BusbarDetectorEnhanced:
         image: np.ndarray,
         use_slicing: Optional[bool] = None,
         roi_bbox: Optional[Dict[str, float]] = None,
+        timestamp: Optional[float] = None,
     ) -> List[BusbarDetection]:
         """
         缺陷检测
-        
+
         Args:
             image: BGR图像(支持4K)
             use_slicing: 是否使用切片(默认根据图像大小自动决定)
             roi_bbox: 可选的ROI区域
-            
+            timestamp: 时间戳 (用于时序ReID)
+
         Returns:
             检测结果列表
         """
         start_time = time.perf_counter()
-        
+        timestamp = timestamp or time.time()
+        self._frame_counter += 1
+
         # 裁剪ROI
         if roi_bbox:
             image = self._crop_roi(image, roi_bbox)
-        
+
         h, w = image.shape[:2]
-        
+
         # 自动决定是否切片
         if use_slicing is None:
             use_slicing = self._use_slicing and (w > 2000 or h > 2000)
-        
+
         detections = []
-        
+
         if use_slicing:
             # 切片检测
             detections = self._detect_with_slicing(image)
         else:
             # 整图检测
             detections = self._detect_single(image)
-        
+
         # 过滤环境干扰
         detections = self._filter_environmental_noise(detections)
-        
+
         # NMS合并
         detections = self._apply_global_nms(detections)
-        
+
+        # V3.5: 时序ReID处理 - 跨帧缺陷跟踪
+        if self._temporal_reid is not None and detections:
+            detections = self._apply_temporal_reid(image, detections, timestamp)
+
+        # V3.5: 裂纹增长分析
+        if self._crack_analyzer is not None:
+            detections = self._apply_crack_growth_analysis(detections, timestamp)
+
         processing_time = (time.perf_counter() - start_time) * 1000
         for det in detections:
             det.metadata["processing_time_ms"] = processing_time
-        
+            det.metadata["frame_id"] = self._frame_counter
+
         return detections
+
+    def _apply_temporal_reid(
+        self,
+        image: np.ndarray,
+        detections: List[BusbarDetection],
+        timestamp: float
+    ) -> List[BusbarDetection]:
+        """应用时序ReID处理 (V3.5)"""
+        if self._temporal_reid is None:
+            return detections
+
+        try:
+            # 转换检测格式
+            det_dicts = [{
+                "bbox": det.bbox,
+                "label": det.defect_type.value,
+                "confidence": det.confidence
+            } for det in detections]
+
+            # 执行ReID匹配
+            reid_results = self._temporal_reid.process_frame(
+                frame=image,
+                detections=det_dicts,
+                frame_id=self._frame_counter,
+                timestamp=timestamp
+            )
+
+            # 更新检测结果
+            for i, det in enumerate(detections):
+                if i < len(reid_results):
+                    reid_info = reid_results[i]
+                    det.metadata["track_id"] = reid_info.get("track_id")
+                    det.metadata["match_type"] = reid_info.get("match_type")
+                    det.metadata["track_age"] = reid_info.get("track_age", 1)
+
+            return detections
+
+        except Exception as e:
+            print(f"[BusbarDetector] 时序ReID处理失败: {e}")
+            return detections
+
+    def _apply_crack_growth_analysis(
+        self,
+        detections: List[BusbarDetection],
+        timestamp: float
+    ) -> List[BusbarDetection]:
+        """应用裂纹增长分析 (V3.5)"""
+        if self._crack_analyzer is None:
+            return detections
+
+        try:
+            for det in detections:
+                # 只分析裂纹类型的缺陷
+                if det.defect_type != BusbarDefectType.CRACK:
+                    continue
+
+                # 获取track_id (需要先经过ReID处理)
+                track_id = det.metadata.get("track_id")
+                if not track_id:
+                    continue
+
+                # 添加观测数据
+                self._crack_analyzer.add_observation(
+                    track_id=track_id,
+                    bbox=det.bbox,
+                    timestamp=timestamp
+                )
+
+                # 分析增长趋势
+                analysis = self._crack_analyzer.analyze_growth(track_id)
+                if analysis:
+                    det.metadata["growth_analysis"] = {
+                        "growth_rate": analysis.growth_rate,
+                        "growth_trend": analysis.growth_trend,
+                        "predicted_length": analysis.predicted_length,
+                        "days_to_critical": analysis.days_to_critical,
+                        "risk_level": analysis.risk_level,
+                        "confidence": analysis.confidence,
+                        "current_length": analysis.metadata.get("current_length", 0),
+                        "observation_count": analysis.metadata.get("observation_count", 0)
+                    }
+
+            return detections
+
+        except Exception as e:
+            print(f"[BusbarDetector] 裂纹增长分析失败: {e}")
+            return detections
+
+    def get_temporal_reid_stats(self) -> Optional[Dict[str, Any]]:
+        """获取时序ReID统计信息 (V3.5)"""
+        if self._temporal_reid is None:
+            return None
+        return self._temporal_reid.get_statistics()
+
+    def get_crack_growth_history(self, track_id: str) -> Optional[List[Dict[str, Any]]]:
+        """获取裂纹增长历史 (V3.5)"""
+        if self._crack_analyzer is None:
+            return None
+        history = self._crack_analyzer.get_history(track_id)
+        return [{
+            "timestamp": p.timestamp,
+            "length": p.length,
+            "width": p.width,
+            "area": p.area,
+            "severity": p.severity
+        } for p in history]
+
+    def get_all_crack_analyses(self) -> Dict[str, Dict[str, Any]]:
+        """获取所有裂纹的增长分析 (V3.5)"""
+        if self._crack_analyzer is None:
+            return {}
+
+        results = {}
+        if self._temporal_reid is not None:
+            for track in self._temporal_reid.get_active_tracks():
+                if track.defect_type.value == "crack":
+                    analysis = self._crack_analyzer.analyze_growth(track.track_id)
+                    if analysis:
+                        results[track.track_id] = {
+                            "growth_rate": analysis.growth_rate,
+                            "growth_trend": analysis.growth_trend,
+                            "risk_level": analysis.risk_level,
+                            "days_to_critical": analysis.days_to_critical,
+                            "first_seen": track.first_seen,
+                            "last_seen": track.last_seen,
+                            "observation_count": len(track.features)
+                        }
+        return results
     
     def _detect_with_slicing(self, image: np.ndarray) -> List[BusbarDetection]:
         """切片检测"""
@@ -923,6 +1159,66 @@ class BusbarDetectorEnhanced:
         bh = max(1, min(bh, h - y))
         
         return image[y:y+bh, x:x+bw]
+
+
+    def detect_roi(
+        self,
+        image: np.ndarray,
+        use_tiling: bool = True,
+        timestamp: Optional[float] = None
+    ) -> DetectROIResult:
+        """
+        ROI区域检测 (兼容plugin.py调用)
+
+        Args:
+            image: 输入图像 (BGR格式)
+            use_tiling: 是否使用切片检测
+            timestamp: 时间戳
+
+        Returns:
+            检测结果
+        """
+        timestamp = timestamp or time.time()
+
+        # 质量门禁检查
+        quality = self.check_quality_gate(image)
+
+        if quality.status != QualityGateStatus.PASS:
+            reason_code = int(quality.reason_code) if quality.reason_code else None
+            return DetectROIResult(
+                detections=[],
+                quality=quality,
+                zoom_suggestion=None,
+                reason_code=reason_code,
+                debug_info={"quality_gate": "failed"}
+            )
+
+        # 执行检测
+        detections = self.detect_defects(
+            image,
+            use_slicing=use_tiling and self._use_slicing,
+            timestamp=timestamp
+        )
+
+        # 变焦建议
+        zoom_suggestions = self.compute_zoom_suggestion(image, detections)
+        zoom_suggestion = zoom_suggestions[0] if zoom_suggestions else ZoomSuggestion(
+            current_zoom=1.0, recommended_zoom=1.0, reason="none"
+        )
+
+        return DetectROIResult(
+            detections=detections,
+            quality=quality,
+            zoom_suggestion=zoom_suggestion,
+            reason_code=None,
+            debug_info={
+                "quality_gate": "passed",
+                "frame_id": self._frame_counter,
+                "detection_count": len(detections),
+                "temporal_reid_enabled": self._temporal_reid is not None,
+                "crack_analysis_enabled": self._crack_analyzer is not None
+            }
+        )
 
 
 # 便捷函数
