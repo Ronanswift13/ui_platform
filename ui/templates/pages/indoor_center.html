@@ -750,6 +750,46 @@
     .person-list::-webkit-scrollbar-thumb:hover {
         background: var(--panel-border-light);
     }
+
+    /* 告警高亮效果 */
+    .monitor-card.alarm-highlight {
+        border-color: var(--accent-danger) !important;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.4) !important;
+        animation: alarm-pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes alarm-pulse {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+        }
+    }
+
+    /* 告警项点击效果 */
+    .alarm-item {
+        cursor: pointer;
+    }
+
+    .alarm-item:active {
+        transform: scale(0.98);
+    }
+
+    .alarm-item.active {
+        border-color: var(--accent-primary) !important;
+        background: rgba(59, 130, 246, 0.15) !important;
+    }
+
+    /* 刷新按钮旋转动画 */
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
 </style>
 {% endblock %}
 

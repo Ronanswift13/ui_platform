@@ -1268,11 +1268,20 @@ class Indoor3DViewer {
     // 告警定位
     // =========================================================================
     focusOnAlarm(alarm) {
-        if (!alarm) return;
+        if (!alarm) {
+            console.warn('[Indoor3D] focusOnAlarm: 告警对象为空');
+            return;
+        }
 
-        const x = (alarm.x - 0.5) * this.options.gridSize;
-        const z = (alarm.y - 0.5) * this.options.gridSize;
+        // 确保告警有位置信息，如果没有则使用默认位置
+        const alarmX = alarm.x !== undefined ? alarm.x : 0.5;
+        const alarmY = alarm.y !== undefined ? alarm.y : 0.5;
+
+        const x = (alarmX - 0.5) * this.options.gridSize;
+        const z = (alarmY - 0.5) * this.options.gridSize;
         const y = 1;
+
+        console.log('[Indoor3D] 聚焦告警:', alarm.id, '位置:', { x, y, z });
 
         // 动画移动相机
         this._animateCameraTo({ x, y: y + 5, z: z + 5 }, { x, y, z });
@@ -1290,15 +1299,36 @@ class Indoor3DViewer {
         const oldMarker = this.scene.getObjectByName('alarmMarker');
         if (oldMarker) {
             this.scene.remove(oldMarker);
+            // 清理旧标记的资源
+            oldMarker.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
         }
 
         const group = new THREE.Group();
         group.name = 'alarmMarker';
 
+        // 根据告警级别设置颜色
+        const level = typeof alarm.level === 'string' ? alarm.level.toLowerCase() : 'warning';
+        const colorMap = {
+            critical: 0xff0000,
+            alarm: 0xff4400,
+            warning: 0xffaa00,
+            info: 0x00aaff
+        };
+        const markerColor = colorMap[level] || 0xff0000;
+
         // 脉冲圆环
         const ringGeometry = new THREE.RingGeometry(0.5, 0.7, 32);
         const ringMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: markerColor,
             side: THREE.DoubleSide,
             transparent: true,
             opacity: 0.8,
@@ -1308,10 +1338,23 @@ class Indoor3DViewer {
         ring.position.y = 0.1;
         group.add(ring);
 
+        // 外圈扩散效果
+        const outerRingGeometry = new THREE.RingGeometry(0.8, 0.9, 32);
+        const outerRingMaterial = new THREE.MeshBasicMaterial({
+            color: markerColor,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.4,
+        });
+        const outerRing = new THREE.Mesh(outerRingGeometry, outerRingMaterial);
+        outerRing.rotation.x = -Math.PI / 2;
+        outerRing.position.y = 0.1;
+        group.add(outerRing);
+
         // 垂直光柱
         const beamGeometry = new THREE.CylinderGeometry(0.1, 0.3, 5, 8);
         const beamMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
+            color: markerColor,
             transparent: true,
             opacity: 0.4,
         });
@@ -1319,28 +1362,59 @@ class Indoor3DViewer {
         beam.position.y = 2.5;
         group.add(beam);
 
-        // 告警信息标签
-        const label = this._createTextLabel(alarm.message || '告警', {
-            backgroundColor: 'rgba(255, 0, 0, 0.8)',
+        // 告警图标（三角形警告标志）
+        const iconGeometry = new THREE.ConeGeometry(0.3, 0.4, 3);
+        const iconMaterial = new THREE.MeshBasicMaterial({
+            color: markerColor,
+            transparent: true,
+            opacity: 0.9,
         });
-        label.position.y = 5.5;
+        const icon = new THREE.Mesh(iconGeometry, iconMaterial);
+        icon.position.y = 5.2;
+        icon.rotation.x = Math.PI;
+        group.add(icon);
+
+        // 告警信息标签
+        const labelText = alarm.message || alarm.type || '告警';
+        const label = this._createTextLabel(labelText, {
+            backgroundColor: `rgba(${markerColor === 0xff0000 ? '255,0,0' : markerColor === 0xffaa00 ? '255,170,0' : '255,68,0'}, 0.85)`,
+            fontSize: 36,
+        });
+        label.position.y = 6;
         group.add(label);
 
         group.position.set(position.x, position.y, position.z);
         this.scene.add(group);
 
         // 脉冲动画
+        let animationActive = true;
         const animate = () => {
+            if (!animationActive || !this.scene.getObjectByName('alarmMarker')) {
+                return;
+            }
+
             const time = Date.now() * 0.003;
             ring.scale.setScalar(1 + Math.sin(time) * 0.3);
             ring.material.opacity = 0.5 + Math.sin(time) * 0.3;
+
+            // 外圈扩散动画
+            const expandScale = 1 + ((time * 0.5) % 1) * 0.5;
+            outerRing.scale.setScalar(expandScale);
+            outerRing.material.opacity = 0.4 * (1 - ((time * 0.5) % 1));
+
             beam.material.opacity = 0.2 + Math.sin(time) * 0.2;
 
-            if (this.scene.getObjectByName('alarmMarker')) {
-                requestAnimationFrame(animate);
-            }
+            // 图标上下浮动
+            icon.position.y = 5.2 + Math.sin(time * 2) * 0.1;
+
+            requestAnimationFrame(animate);
         };
         animate();
+
+        // 存储动画状态以便清理
+        group.userData.stopAnimation = () => {
+            animationActive = false;
+        };
     }
 
     _animateCameraTo(targetPosition, lookAtPosition) {
@@ -1372,6 +1446,106 @@ class Indoor3DViewer {
 
     _easeOutCubic(t) {
         return 1 - Math.pow(1 - t, 3);
+    }
+
+    // =========================================================================
+    // 批量告警标记
+    // =========================================================================
+    /**
+     * 更新所有告警标记（在3D场景中显示多个告警点）
+     */
+    updateAlarmMarkers(alarms) {
+        if (!Array.isArray(alarms)) return;
+
+        // 清除旧的告警标记组
+        let alarmMarkersGroup = this.scene.getObjectByName('alarmMarkersGroup');
+        if (alarmMarkersGroup) {
+            this.scene.remove(alarmMarkersGroup);
+            alarmMarkersGroup.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
+
+        alarmMarkersGroup = new THREE.Group();
+        alarmMarkersGroup.name = 'alarmMarkersGroup';
+
+        alarms.forEach(alarm => {
+            if (alarm.status === 'resolved') return;
+
+            const alarmX = alarm.x !== undefined ? alarm.x : 0.5;
+            const alarmY = alarm.y !== undefined ? alarm.y : 0.5;
+
+            const x = (alarmX - 0.5) * this.options.gridSize;
+            const z = (alarmY - 0.5) * this.options.gridSize;
+            const y = 0.1;
+
+            const marker = this._createSmallAlarmMarker(alarm);
+            marker.position.set(x, y, z);
+            marker.userData = { ...alarm, clickable: true, type: 'alarm' };
+            alarmMarkersGroup.add(marker);
+        });
+
+        this.scene.add(alarmMarkersGroup);
+        this.state.alarms = alarms;
+    }
+
+    /**
+     * 创建小型告警标记（用于批量显示）
+     */
+    _createSmallAlarmMarker(alarm) {
+        const group = new THREE.Group();
+
+        const level = typeof alarm.level === 'string' ? alarm.level.toLowerCase() : 'warning';
+        const colorMap = {
+            critical: 0xff0000,
+            alarm: 0xff4400,
+            warning: 0xffaa00,
+            info: 0x00aaff
+        };
+        const markerColor = colorMap[level] || 0xffaa00;
+
+        // 底部圆环
+        const ringGeometry = new THREE.RingGeometry(0.2, 0.3, 16);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: markerColor,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.7,
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.rotation.x = -Math.PI / 2;
+        group.add(ring);
+
+        // 垂直指示柱
+        const poleGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+        const poleMaterial = new THREE.MeshBasicMaterial({
+            color: markerColor,
+            transparent: true,
+            opacity: 0.6,
+        });
+        const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+        pole.position.y = 0.75;
+        group.add(pole);
+
+        // 顶部标记球
+        const sphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+        const sphereMaterial = new THREE.MeshBasicMaterial({
+            color: markerColor,
+            transparent: true,
+            opacity: 0.9,
+        });
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        sphere.position.y = 1.6;
+        group.add(sphere);
+
+        return group;
     }
 
     // =========================================================================
