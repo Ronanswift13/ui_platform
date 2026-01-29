@@ -1,0 +1,220 @@
+# =============================================================================
+# 室内监测平台配置 V3.0
+# Indoor Monitoring Platform Configuration
+# =============================================================================
+
+version: "3.0.0"
+description: "室内监测平台升级配置"
+
+# =============================================================================
+# 全局设置
+# =============================================================================
+global:
+  # 使用GPU加速
+  use_gpu: false
+  # 日志级别
+  log_level: "INFO"
+  # 数据刷新间隔 (ms)
+  refresh_interval: 1000
+
+# =============================================================================
+# 电子围栏插件配置 (V3.0)
+# =============================================================================
+indoor_fence:
+  enabled: true
+  version: "3.0.0"
+  
+  # 跟踪器配置
+  tracker:
+    max_age: 30               # 最大未匹配帧数
+    min_hits: 3               # 确认所需最小帧数
+    iou_threshold: 0.3        # IoU匹配阈值
+    distance_threshold: 1.0   # 距离阈值 (米)
+    feature_threshold: 0.5    # 特征匹配阈值
+  
+  # DeepSORT配置
+  deep_sort:
+    enabled: true
+    reid_model_path: "models/reid/osnet_x0_25.onnx"
+    feature_dim: 128
+  
+  # 姿态估计配置
+  pose_estimation:
+    enabled: true
+    model_type: "movenet"     # movenet, mediapipe
+    model_path: "models/pose/movenet_lightning.onnx"
+  
+  # 行为分析配置
+  behavior_analysis:
+    enabled: true
+    fall_detection_threshold: 2.0    # 跌倒判定时间 (秒)
+    low_operation_threshold: 0.5     # 低位操作高度阈值
+    stay_time_threshold: 300.0       # 滞留时间阈值 (秒)
+  
+  # 风险评估配置
+  risk_analysis:
+    enabled: true
+    unauthorized_stay_threshold: 10.0  # 未授权滞留阈值 (秒)
+    danger_zone_threshold: 5.0         # 危险区停留阈值 (秒)
+
+# =============================================================================
+# 动物入侵检测插件配置 (V1.0)
+# =============================================================================
+animal_detection:
+  enabled: true
+  version: "1.0.0"
+  
+  # 检测器配置
+  detector:
+    model_path: "models/animal/yolov8n_animal.onnx"
+    confidence_threshold: 0.5
+    nms_threshold: 0.4
+    input_size: [640, 640]
+  
+  # 热成像确认配置
+  thermal:
+    enabled: true
+    min_animal_temp: 25.0     # 最低动物体温
+    max_animal_temp: 42.0     # 最高动物体温
+    ambient_temp: 20.0        # 环境温度
+    temp_threshold: 3.0       # 温度差阈值
+  
+  # 跟踪配置
+  tracker:
+    max_age: 30
+    min_hits: 2
+    distance_threshold: 100.0
+  
+  # 驱离配置
+  deterrent:
+    auto_deterrent: true
+    min_interval: 10.0        # 最小驱离间隔 (秒)
+    default_duration: 5.0     # 默认驱离时长 (秒)
+    default_intensity: 0.8    # 默认驱离强度
+
+# =============================================================================
+# 消防监测插件配置 (V1.0)
+# =============================================================================
+fire_detection:
+  enabled: true
+  version: "1.0.0"
+  
+  # 检测器配置
+  detector:
+    model_path: "models/fire/yolov8_fire.onnx"
+    confidence_threshold: 0.4
+    nms_threshold: 0.4
+    input_size: [640, 640]
+  
+  # 多模态融合配置
+  fusion:
+    temp_threshold: 50.0      # 温度报警阈值 (°C)
+    temp_delta_threshold: 5.0 # 温度变化率阈值 (°C/s)
+    smoke_threshold: 0.3      # 烟雾浓度阈值
+    fusion_radius: 2.0        # 融合半径 (米)
+  
+  # 报警评估权重
+  alarm_weights:
+    confidence: 0.3
+    temperature: 0.25
+    smoke: 0.2
+    spread: 0.15
+    duration: 0.1
+
+# =============================================================================
+# 语义SLAM建图插件配置 (V2.0)
+# =============================================================================
+semantic_slam:
+  enabled: true
+  version: "2.0.0"
+  
+  # 语义分割配置
+  segmentation:
+    model_path: "models/slam/randlanet.onnx"
+    num_classes: 12
+    num_points: 8192
+  
+  # 地图配置
+  map:
+    voxel_size: 0.05          # 体素大小 (米)
+    max_points: 1000000       # 最大点数
+  
+  # 变化检测配置
+  change_detection:
+    voxel_size: 0.1           # 变化检测体素大小
+    distance_threshold: 0.2   # 距离阈值
+    min_change_volume: 0.01   # 最小变化体积 (m³)
+    min_cluster_points: 10    # 最小聚类点数
+
+# =============================================================================
+# 温度监测配置
+# =============================================================================
+temperature:
+  enabled: true
+  grid_size: [10, 8]          # 热力图网格大小
+  base_temp: 25.0             # 基础温度
+  warning_threshold: 40.0     # 预警温度
+  alarm_threshold: 50.0       # 报警温度
+
+# =============================================================================
+# 设备监测配置
+# =============================================================================
+device_monitor:
+  enabled: true
+  check_interval: 5.0         # 检查间隔 (秒)
+  health_threshold: 80        # 健康度阈值
+
+# =============================================================================
+# 环境监测配置
+# =============================================================================
+environment:
+  enabled: true
+  
+  # SF6监测
+  sf6:
+    threshold: 1000           # 报警阈值 (ppm)
+    unit: "ppm"
+  
+  # 氧气监测
+  o2:
+    min_threshold: 19.5       # 最低阈值 (%)
+    max_threshold: 23.5       # 最高阈值 (%)
+    unit: "%"
+  
+  # CO监测
+  co:
+    threshold: 50             # 报警阈值 (ppm)
+    unit: "ppm"
+
+# =============================================================================
+# API配置
+# =============================================================================
+api:
+  prefix: "/api/indoor"
+  websocket_path: "/ws/indoor"
+  push_interval: 1.0          # WebSocket推送间隔 (秒)
+
+# =============================================================================
+# 区域配置示例
+# =============================================================================
+zones:
+  # 配电室
+  zone_A:
+    name: "配电室"
+    type: "restricted"
+    polygon: [[0, 0], [5, 0], [5, 4], [0, 4]]
+    cabinets: ["CAB-001", "CAB-002", "CAB-003"]
+  
+  # 控制室
+  zone_B:
+    name: "控制室"
+    type: "normal"
+    polygon: [[5, 0], [10, 0], [10, 4], [5, 4]]
+    cabinets: ["CAB-004", "CAB-005"]
+  
+  # 电缆层
+  zone_C:
+    name: "电缆层"
+    type: "danger"
+    polygon: [[0, 4], [10, 4], [10, 8], [0, 8]]
+    cabinets: []
