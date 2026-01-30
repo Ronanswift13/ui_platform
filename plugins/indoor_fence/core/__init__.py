@@ -40,11 +40,11 @@ from .state_machine import (
     StateMachine,
 )
 
-from .tracking import (
+from .enhanced_tracking import (
     Detection,
     Track,
     KalmanFilter2D,
-    MultiTargetTracker,
+    EnhancedMultiTargetTracker as MultiTargetTracker,
 )
 
 from .fusion import (

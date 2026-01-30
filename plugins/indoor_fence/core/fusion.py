@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .geometry import Point2D, fuse_coordinates, lidar_to_ground, pixel_to_ground
-from .tracking import Detection, Track, MultiTargetTracker
+from .enhanced_tracking import Detection, Track, EnhancedMultiTargetTracker as MultiTargetTracker
 
 logger = logging.getLogger(__name__)
 
