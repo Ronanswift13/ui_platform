@@ -8,27 +8,26 @@
 
 API端点:
 - GET  /api/indoor/fence       - 电子围栏数据
-- GET  /api/indoor/animal      - 动物入侵检测数据
-- GET  /api/indoor/temperature - 温度监测数据
-- GET  /api/indoor/device      - 设备状态数据
-- GET  /api/indoor/fire        - 消防监测数据
+- GET  /api/indoor/slam         - SLAM建图数据
 - GET  /api/indoor/environment - 环境监测数据
 - WS   /ws/indoor              - 实时数据推送
 
-版本: 1.0.0
+版本: 2.0.0 - 重构版（移除模拟数据，接入真实插件）
 """
 
 from __future__ import annotations
 import asyncio
 import json
 import logging
-import random
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+
+# 导入插件管理器
+from platform_core.plugin_manager import PluginManager
 
 logger = logging.getLogger(__name__)
 
@@ -66,303 +65,29 @@ class FenceData(BaseModel):
     alarmCount: int
 
 
-class AnimalDetection(BaseModel):
-    """动物检测"""
-    id: int
-    type: str  # mouse, bird, snake, etc.
-    confidence: float
-    bbox: Dict[str, float]
-
-
-class AnimalData(BaseModel):
-    """动物入侵数据"""
-    timestamp: int
-    status: str
-    detections: List[AnimalDetection]
-    todayCount: int
-    deterrentActive: bool
-
-
-class TemperatureData(BaseModel):
-    """温度监测数据"""
-    timestamp: int
-    status: str
-    heatmap: List[List[float]]
-    maxTemp: float
-    minTemp: float
-    avgTemp: float
-    hotspots: List[Dict[str, Any]]
-
-
-class DeviceInfo(BaseModel):
-    """设备信息"""
-    id: str
-    name: str
-    type: str
-    status: str
-    health: int
-
-
-class DeviceData(BaseModel):
-    """设备状态数据"""
-    timestamp: int
-    status: str
-    devices: List[DeviceInfo]
-    totalDevices: int
-    onlineDevices: int
-    avgHealth: int
-
-
-class FireZone(BaseModel):
-    """消防区域"""
-    id: str
-    name: str
-    status: str
-    smokeLevel: float
-    temp: float
-
-
-class FireData(BaseModel):
-    """消防监测数据"""
-    timestamp: int
-    status: str
-    zones: List[FireZone]
-    lastTest: str
-    sprinklerStatus: str
-    alarmStatus: str
-
-
-class GasData(BaseModel):
-    """气体数据"""
-    current: float
-    unit: str
-    threshold: Any
-    history: List[float]
-
-
 class EnvironmentData(BaseModel):
     """环境监测数据"""
     timestamp: int
     status: str
-    sf6: GasData
-    o2: GasData
-    co: GasData
+    temperature: float
     humidity: float
     pressure: float
+    gas_levels: Dict[str, Any]
 
 
 # =============================================================================
-# 数据生成器（模拟数据）
+# 插件管理器实例
 # =============================================================================
 
-class IndoorDataGenerator:
-    """室内监测数据生成器"""
-    
-    def __init__(self):
-        self._fence_persons = [
-            {"id": 1, "name": "张工", "x": 0.3, "y": 0.5, "cabinet": 2, "status": "safe", "authorized": True},
-            {"id": 2, "name": "李工", "x": 0.7, "y": 0.2, "cabinet": 5, "status": "danger", "authorized": True},
-        ]
-        self._animal_detection_chance = 0.1
-        self._history_length = 30
-        
-        # 初始化历史数据
-        self._sf6_history = [5 + random.random() * 3 for _ in range(self._history_length)]
-        self._o2_history = [20.5 + random.random() * 0.5 for _ in range(self._history_length)]
-        self._co_history = [random.random() * 2 for _ in range(self._history_length)]
-    
-    def generate_fence_data(self) -> Dict[str, Any]:
-        """生成电子围栏数据"""
-        timestamp = int(time.time() * 1000)
-        
-        # 随机更新人员位置
-        for person in self._fence_persons:
-            person["x"] = max(0.1, min(0.9, person["x"] + (random.random() - 0.5) * 0.02))
-            person["y"] = max(0.1, min(0.9, person["y"] + (random.random() - 0.5) * 0.02))
-            
-            # 检查越线
-            if person["y"] < 0.15:
-                person["status"] = "danger"
-            elif person["y"] < 0.25:
-                person["status"] = "warning"
-            else:
-                person["status"] = "safe"
-        
-        # 生成机柜状态
-        cabinets = []
-        for i in range(1, 7):
-            person = next((p for p in self._fence_persons if p["cabinet"] == i), None)
-            status = "idle"
-            if person:
-                status = "alarm" if person["status"] == "danger" else "occupied"
-            
-            cabinets.append({
-                "id": i,
-                "name": f"机柜-{str(i).zfill(2)}",
-                "status": status,
-                "person": person["name"] if person else None
-            })
-        
-        alarm_count = sum(1 for p in self._fence_persons if p["status"] == "danger")
-        
-        return {
-            "timestamp": timestamp,
-            "status": "alarm" if alarm_count > 0 else "online",
-            "persons": self._fence_persons,
-            "cabinets": cabinets,
-            "yellowLine": {"y": 0.15},
-            "totalPersons": len(self._fence_persons),
-            "alarmCount": alarm_count
-        }
-    
-    def generate_animal_data(self) -> Dict[str, Any]:
-        """生成动物入侵数据"""
-        timestamp = int(time.time() * 1000)
-        
-        detections = []
-        if random.random() < self._animal_detection_chance:
-            detections.append({
-                "id": 1,
-                "type": random.choice(["mouse", "bird", "cat"]),
-                "confidence": 0.75 + random.random() * 0.2,
-                "bbox": {
-                    "x": 0.3 + random.random() * 0.4,
-                    "y": 0.3 + random.random() * 0.4,
-                    "width": 0.1,
-                    "height": 0.08
-                }
-            })
-        
-        return {
-            "timestamp": timestamp,
-            "status": "alarm" if detections else "online",
-            "detections": detections,
-            "todayCount": random.randint(0, 5),
-            "deterrentActive": len(detections) > 0
-        }
-    
-    def generate_temperature_data(self) -> Dict[str, Any]:
-        """生成温度监测数据"""
-        timestamp = int(time.time() * 1000)
-        
-        # 生成热力图 (8x6)
-        heatmap = []
-        for y in range(6):
-            row = []
-            for x in range(8):
-                temp = 25 + random.random() * 5
-                # 创建热点
-                if (x == 3 and y == 2) or (x == 6 and y == 4):
-                    temp += 15 + random.random() * 10
-                row.append(round(temp, 1))
-            heatmap.append(row)
-        
-        flat = [t for row in heatmap for t in row]
-        max_temp = max(flat)
-        min_temp = min(flat)
-        avg_temp = sum(flat) / len(flat)
-        
-        hotspots = []
-        if max_temp > 40:
-            hotspots.append({"x": 3, "y": 2, "temp": max_temp})
-        
-        return {
-            "timestamp": timestamp,
-            "status": "warning" if max_temp > 45 else "attention",
-            "heatmap": heatmap,
-            "maxTemp": round(max_temp, 1),
-            "minTemp": round(min_temp, 1),
-            "avgTemp": round(avg_temp, 1),
-            "hotspots": hotspots
-        }
-    
-    def generate_device_data(self) -> Dict[str, Any]:
-        """生成设备状态数据"""
-        timestamp = int(time.time() * 1000)
-        
-        devices = [
-            {"id": "cam-01", "name": "摄像机-01", "type": "camera", "status": "online", "health": 98},
-            {"id": "cam-02", "name": "摄像机-02", "type": "camera", "status": "online", "health": 95},
-            {"id": "lidar-01", "name": "激光雷达", "type": "lidar", "status": "online", "health": 100},
-            {"id": "sensor-01", "name": "温湿度传感器", "type": "sensor", "status": "online", "health": 92},
-            {"id": "relay-01", "name": "继电器模块", "type": "relay", "status": "online", "health": 100},
-            {"id": "speaker-01", "name": "声光报警器", "type": "alarm", "status": "standby", "health": 100},
-        ]
-        
-        # 随机波动健康度
-        for device in devices:
-            device["health"] = max(80, min(100, device["health"] + random.randint(-2, 2)))
-        
-        online_count = sum(1 for d in devices if d["status"] in ["online", "standby"])
-        avg_health = sum(d["health"] for d in devices) // len(devices)
-        
-        return {
-            "timestamp": timestamp,
-            "status": "online" if online_count == len(devices) else "warning",
-            "devices": devices,
-            "totalDevices": len(devices),
-            "onlineDevices": online_count,
-            "avgHealth": avg_health
-        }
-    
-    def generate_fire_data(self) -> Dict[str, Any]:
-        """生成消防监测数据"""
-        timestamp = int(time.time() * 1000)
-        
-        zones = [
-            {"id": "zone-a", "name": "A区-主控室", "status": "normal", "smokeLevel": 0.02 + random.random() * 0.01, "temp": 24 + random.random() * 2},
-            {"id": "zone-b", "name": "B区-GIS室", "status": "normal", "smokeLevel": 0.01 + random.random() * 0.01, "temp": 23 + random.random() * 2},
-            {"id": "zone-c", "name": "C区-继保室", "status": "normal", "smokeLevel": 0.015 + random.random() * 0.01, "temp": 25 + random.random() * 2},
-            {"id": "zone-d", "name": "D区-蓄电池室", "status": "normal", "smokeLevel": 0.03 + random.random() * 0.02, "temp": 26 + random.random() * 2},
-        ]
-        
-        return {
-            "timestamp": timestamp,
-            "status": "online",
-            "zones": zones,
-            "lastTest": "2026-01-20 09:00:00",
-            "sprinklerStatus": "ready",
-            "alarmStatus": "armed"
-        }
-    
-    def generate_environment_data(self) -> Dict[str, Any]:
-        """生成环境监测数据"""
-        timestamp = int(time.time() * 1000)
-        
-        # 更新历史数据
-        self._sf6_history.pop(0)
-        self._sf6_history.append(5 + random.random() * 3)
-        
-        self._o2_history.pop(0)
-        self._o2_history.append(20.5 + random.random() * 0.5)
-        
-        self._co_history.pop(0)
-        self._co_history.append(random.random() * 2)
-        
-        return {
-            "timestamp": timestamp,
-            "status": "good",
-            "sf6": {
-                "current": self._sf6_history[-1],
-                "unit": "ppm",
-                "threshold": 1000,
-                "history": self._sf6_history.copy()
-            },
-            "o2": {
-                "current": self._o2_history[-1],
-                "unit": "%",
-                "threshold": {"min": 19.5, "max": 23.5},
-                "history": self._o2_history.copy()
-            },
-            "co": {
-                "current": self._co_history[-1],
-                "unit": "ppm",
-                "threshold": 50,
-                "history": self._co_history.copy()
-            },
-            "humidity": 45 + random.random() * 10,
-            "pressure": 1013 + random.random() * 5
-        }
+_plugin_manager: Optional[PluginManager] = None
+
+
+def get_plugin_manager() -> PluginManager:
+    """获取插件管理器单例"""
+    global _plugin_manager
+    if _plugin_manager is None:
+        _plugin_manager = PluginManager()
+    return _plugin_manager
 
 
 # =============================================================================
@@ -371,9 +96,6 @@ class IndoorDataGenerator:
 
 router = APIRouter(prefix="/api/indoor", tags=["室内监测中心"])
 
-# 数据生成器实例
-_data_generator = IndoorDataGenerator()
-
 # WebSocket连接管理
 _websocket_connections: List[WebSocket] = []
 
@@ -381,49 +103,108 @@ _websocket_connections: List[WebSocket] = []
 @router.get("/fence")
 async def get_fence_data():
     """获取电子围栏数据"""
-    return _data_generator.generate_fence_data()
+    pm = get_plugin_manager()
+
+    try:
+        # 尝试获取室内围栏插件
+        plugin = pm.get_plugin("indoor_fence")
+        if plugin is None:
+            plugin = pm.load_plugin("indoor_fence")
+
+        if plugin and hasattr(plugin, 'get_current_state'):
+            # 调用插件获取真实数据
+            state = plugin.get_current_state()
+            return {
+                "timestamp": int(time.time() * 1000),
+                "status": state.get("status", "online"),
+                "persons": state.get("persons", []),
+                "cabinets": state.get("cabinets", []),
+                "yellowLine": state.get("yellowLine", {"y": 0.15}),
+                "totalPersons": len(state.get("persons", [])),
+                "alarmCount": state.get("alarmCount", 0)
+            }
+    except Exception as e:
+        logger.error(f"获取电子围栏数据失败: {e}")
+
+    # 返回空数据（插件未就绪）
+    return {
+        "timestamp": int(time.time() * 1000),
+        "status": "offline",
+        "persons": [],
+        "cabinets": [],
+        "yellowLine": {"y": 0.15},
+        "totalPersons": 0,
+        "alarmCount": 0
+    }
 
 
-@router.get("/animal")
-async def get_animal_data():
-    """获取动物入侵检测数据"""
-    return _data_generator.generate_animal_data()
+@router.get("/slam")
+async def get_slam_data():
+    """获取SLAM建图数据"""
+    pm = get_plugin_manager()
 
+    try:
+        plugin = pm.get_plugin("slam_mapping")
+        if plugin is None:
+            plugin = pm.load_plugin("slam_mapping")
 
-@router.get("/temperature")
-async def get_temperature_data():
-    """获取温度监测数据"""
-    return _data_generator.generate_temperature_data()
+        if plugin and hasattr(plugin, 'get_map_data'):
+            map_data = plugin.get_map_data()
+            return {
+                "timestamp": int(time.time() * 1000),
+                "status": "online",
+                "map": map_data
+            }
+    except Exception as e:
+        logger.error(f"获取SLAM数据失败: {e}")
 
-
-@router.get("/device")
-async def get_device_data():
-    """获取设备状态数据"""
-    return _data_generator.generate_device_data()
-
-
-@router.get("/fire")
-async def get_fire_data():
-    """获取消防监测数据"""
-    return _data_generator.generate_fire_data()
+    return {
+        "timestamp": int(time.time() * 1000),
+        "status": "offline",
+        "map": None
+    }
 
 
 @router.get("/environment")
 async def get_environment_data():
     """获取环境监测数据"""
-    return _data_generator.generate_environment_data()
+    pm = get_plugin_manager()
+
+    try:
+        plugin = pm.get_plugin("gas_detection")
+        if plugin is None:
+            plugin = pm.load_plugin("gas_detection")
+
+        if plugin and hasattr(plugin, 'get_readings'):
+            readings = plugin.get_readings()
+            return {
+                "timestamp": int(time.time() * 1000),
+                "status": readings.get("status", "good"),
+                "temperature": readings.get("temperature", 25.0),
+                "humidity": readings.get("humidity", 50.0),
+                "pressure": readings.get("pressure", 1013.0),
+                "gas_levels": readings.get("gas_levels", {})
+            }
+    except Exception as e:
+        logger.error(f"获取环境数据失败: {e}")
+
+    return {
+        "timestamp": int(time.time() * 1000),
+        "status": "offline",
+        "temperature": 0.0,
+        "humidity": 0.0,
+        "pressure": 0.0,
+        "gas_levels": {}
+    }
 
 
 @router.get("/all")
 async def get_all_data():
     """获取所有模块数据"""
     return {
-        "fence": _data_generator.generate_fence_data(),
-        "animal": _data_generator.generate_animal_data(),
-        "temperature": _data_generator.generate_temperature_data(),
-        "device": _data_generator.generate_device_data(),
-        "fire": _data_generator.generate_fire_data(),
-        "environment": _data_generator.generate_environment_data()
+        "fence": await get_fence_data(),
+        "slam": await get_slam_data(),
+        "environment": await get_environment_data()
     }
 
 
@@ -435,60 +216,58 @@ async def broadcast_update(module: str, data: Dict[str, Any]):
     """广播更新到所有连接的客户端"""
     if not _websocket_connections:
         return
-    
+
     message = json.dumps({
         "type": "update",
         "module": module,
         "data": data
     })
-    
+
     disconnected = []
     for ws in _websocket_connections:
         try:
             await ws.send_text(message)
         except Exception:
             disconnected.append(ws)
-    
+
     for ws in disconnected:
         _websocket_connections.remove(ws)
 
 
 async def indoor_data_pusher():
     """定时推送数据"""
-    modules = ["fence", "animal", "temperature", "device", "fire", "environment"]
-    generators = {
-        "fence": _data_generator.generate_fence_data,
-        "animal": _data_generator.generate_animal_data,
-        "temperature": _data_generator.generate_temperature_data,
-        "device": _data_generator.generate_device_data,
-        "fire": _data_generator.generate_fire_data,
-        "environment": _data_generator.generate_environment_data,
-    }
-    
     while True:
-        for module in modules:
-            data = generators[module]()
-            await broadcast_update(module, data)
+        try:
+            # 获取所有模块数据
+            all_data = await get_all_data()
+
+            # 广播每个模块的数据
+            for module, data in all_data.items():
+                await broadcast_update(module, data)
+
+        except Exception as e:
+            logger.error(f"数据推送失败: {e}")
+
         await asyncio.sleep(1)
 
 
 # WebSocket端点需要在主应用中注册
 def create_websocket_route(app):
     """创建WebSocket路由"""
-    
+
     @app.websocket("/ws/indoor")
     async def websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
         _websocket_connections.append(websocket)
         logger.info(f"WebSocket连接: {len(_websocket_connections)}个活跃连接")
-        
+
         try:
             # 发送初始数据
             await websocket.send_json({
                 "type": "connected",
                 "message": "室内监测中心 WebSocket 已连接"
             })
-            
+
             # 保持连接并接收消息
             while True:
                 data = await websocket.receive_text()
@@ -499,7 +278,7 @@ def create_websocket_route(app):
                         await websocket.send_json({"type": "pong"})
                 except json.JSONDecodeError:
                     pass
-                    
+
         except WebSocketDisconnect:
             _websocket_connections.remove(websocket)
             logger.info(f"WebSocket断开: 剩余{len(_websocket_connections)}个连接")
@@ -512,23 +291,23 @@ def create_websocket_route(app):
 def integrate_indoor_api(app):
     """
     将室内监测API集成到FastAPI应用
-    
+
     使用方法:
         from apps.indoor_api import integrate_indoor_api
         integrate_indoor_api(app)
     """
     # 注册REST API路由
     app.include_router(router)
-    
+
     # 注册WebSocket路由
     create_websocket_route(app)
-    
+
     # 启动后台数据推送任务
     @app.on_event("startup")
     async def start_indoor_pusher():
         asyncio.create_task(indoor_data_pusher())
-    
-    logger.info("室内监测中心API已集成")
+
+    logger.info("室内监测中心API已集成 (V2.0 - 真实插件版本)")
 
 
 # =============================================================================
@@ -536,23 +315,24 @@ def integrate_indoor_api(app):
 # =============================================================================
 
 if __name__ == "__main__":
-    # 测试数据生成
-    generator = IndoorDataGenerator()
-    
-    print("=== 电子围栏数据 ===")
-    print(json.dumps(generator.generate_fence_data(), indent=2, ensure_ascii=False))
-    
-    print("\n=== 动物入侵数据 ===")
-    print(json.dumps(generator.generate_animal_data(), indent=2, ensure_ascii=False))
-    
-    print("\n=== 温度监测数据 ===")
-    print(json.dumps(generator.generate_temperature_data(), indent=2, ensure_ascii=False))
-    
-    print("\n=== 设备状态数据 ===")
-    print(json.dumps(generator.generate_device_data(), indent=2, ensure_ascii=False))
-    
-    print("\n=== 消防监测数据 ===")
-    print(json.dumps(generator.generate_fire_data(), indent=2, ensure_ascii=False))
-    
-    print("\n=== 环境监测数据 ===")
-    print(json.dumps(generator.generate_environment_data(), indent=2, ensure_ascii=False))
+    import sys
+    from pathlib import Path
+
+    # 添加项目根目录到路径
+    PROJECT_ROOT = Path(__file__).parent.parent
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+    # 测试插件连接
+    pm = get_plugin_manager()
+
+    print("=== 室内监测插件状态 ===")
+    for plugin_id in ["indoor_fence", "slam_mapping", "gas_detection"]:
+        try:
+            plugin = pm.get_plugin(plugin_id)
+            if plugin:
+                print(f"✓ {plugin_id}: {plugin.status.value}")
+            else:
+                print(f"✗ {plugin_id}: 未加载")
+        except Exception as e:
+            print(f"✗ {plugin_id}: 错误 - {e}")
+
