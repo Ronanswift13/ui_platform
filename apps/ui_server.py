@@ -126,6 +126,14 @@ def create_app() -> FastAPI:
     except ImportError as e:
         print(f"✗ 室内监测中心API导入失败: {e}")
 
+    # ============== 集成室外监测中心API (V4.0) ==============
+    try:
+        from apps.outdoor_api import integrate_outdoor_api
+        integrate_outdoor_api(app)
+        print("✓ 室外监测中心API已集成 (V4.0)")
+    except ImportError as e:
+        print(f"✗ 室外监测中心API导入失败: {e}")
+
     # ============== 页面路由 ==============
 
     @app.get("/", response_class=HTMLResponse)
@@ -249,16 +257,16 @@ def create_app() -> FastAPI:
             },
         )
 
-    # ============== 室外监测中心 (V3.5新增) ==============
+    # ============== 室外监测中心 (V4.0升级) ==============
     @app.get("/outdoor", response_class=HTMLResponse)
     async def outdoor_center_page(request: Request):
-        """室外监测中心页面 - 融合基础巡视和高级监测"""
+        """室外监测中心页面 - V4.0 融合11个核心监测插件"""
         return templates.TemplateResponse(
-            "pages/outdoor_center.html",
+            "pages/outdoor_center_v4.html",
             {
                 "request": request,
                 "active_tab": "outdoor",
-                "version": "3.5.0",
+                "version": "4.0.0",
             },
         )
 

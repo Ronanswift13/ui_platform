@@ -9,6 +9,7 @@
 - extended_model_registry_manager: 扩展模型注册管理器
 - auto_roi_detector: 自动ROI检测器
 - fusion_engine: 多证据融合引擎
+- spatial_math: 空间数学库（SE3变换、消失点计算）
 - ptz_controller: 云台联动控制器
 - api_routes: 增强版API路由
 - voltage_adapter_extended: 全电压等级适配管理器
@@ -17,7 +18,7 @@
 from __future__ import annotations
 
 # 版本
-__version__ = "2.0.0"
+__version__ = "4.0.0"
 
 # 显式导入 - 推理引擎
 from platform_core.inference_engine import (
@@ -111,6 +112,31 @@ from platform_core.voltage_adapter_extended import (
     MODEL_LIBRARIES,
     PLUGIN_CAPABILITIES,
     VOLTAGE_CATEGORY_MAPPING,
+)
+
+# 显式导入 - 空间数学库
+from platform_core.spatial_math import (
+    SpatialMath,
+    Point2D,
+    Point3D,
+    CameraIntrinsics,
+    pixel2world,
+    world2pixel,
+    compute_vanishing_point,
+    compute_tilt_angle,
+)
+
+# 显式导入 - 增强型融合引擎 (D-S理论)
+from platform_core.enhanced_fusion_engine import (
+    SensorType,
+    FaultType,
+    LogicConflictError,
+    SensorReading,
+    FusionResult as EnhancedFusionResult,
+    DempsterShafer,
+    PhysicalLogicChecker,
+    FusionEngine as EnhancedFusionEngine,
+    create_fusion_engine as create_enhanced_fusion_engine,
 )
 
 # 显式导入 - 电压等级管理 API (可选)
@@ -212,4 +238,25 @@ __all__ = [
     "create_voltage_router",
     "integrate_voltage_routes",
     "global_voltage_manager",
+
+    # 空间数学库
+    "SpatialMath",
+    "Point2D",
+    "Point3D",
+    "CameraIntrinsics",
+    "pixel2world",
+    "world2pixel",
+    "compute_vanishing_point",
+    "compute_tilt_angle",
+
+    # 增强型融合引擎 (D-S理论)
+    "SensorType",
+    "FaultType",
+    "LogicConflictError",
+    "SensorReading",
+    "EnhancedFusionResult",
+    "DempsterShafer",
+    "PhysicalLogicChecker",
+    "EnhancedFusionEngine",
+    "create_enhanced_fusion_engine",
 ]

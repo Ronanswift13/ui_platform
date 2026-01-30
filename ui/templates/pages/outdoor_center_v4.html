@@ -1,0 +1,718 @@
+{% extends "base.html" %}
+
+{% block title %}室外监测中心 - 输变电监测平台 V4.0{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --panel-bg: #1a1a2e;
+        --panel-border: #2d3748;
+        --accent-primary: #00d4ff;
+        --accent-success: #10b981;
+        --accent-warning: #f59e0b;
+        --accent-danger: #ef4444;
+    }
+
+    body { background: #0f0f1a; }
+
+    .outdoor-container {
+        display: grid;
+        grid-template-columns: 260px 1fr 320px;
+        grid-template-rows: auto 1fr auto;
+        height: calc(100vh - 60px);
+        gap: 0;
+    }
+
+    /* 顶部工具栏 */
+    .top-toolbar {
+        grid-column: 1 / -1;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 0.6rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--panel-border);
+    }
+
+    .toolbar-title {
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .version-badge {
+        font-size: 0.65rem;
+        background: var(--accent-primary);
+        color: #000;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+    }
+
+    .toolbar-controls {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .toolbar-select {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid var(--panel-border);
+        color: #fff;
+        padding: 0.35rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+    }
+
+    .btn-patrol {
+        background: linear-gradient(135deg, var(--accent-primary), #0099cc);
+        border: none;
+        color: #fff;
+        padding: 0.4rem 1rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-patrol:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,212,255,0.3); }
+
+    /* 左侧模块导航 */
+    .module-sidebar {
+        background: var(--panel-bg);
+        border-right: 1px solid var(--panel-border);
+        overflow-y: auto;
+        padding: 0.5rem 0;
+    }
+
+    .module-group { margin-bottom: 0.5rem; }
+
+    .module-group-header {
+        color: #888;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .module-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        color: #ccc;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+        text-decoration: none;
+        gap: 0.6rem;
+    }
+
+    .module-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .module-item.active {
+        background: rgba(0,212,255,0.1);
+        border-left-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .module-item i { font-size: 1rem; width: 20px; text-align: center; }
+
+    .module-item-info { flex: 1; min-width: 0; }
+    .module-item-name { font-size: 0.85rem; font-weight: 500; }
+    .module-item-status { font-size: 0.65rem; color: #666; }
+    .module-item-status.ready { color: var(--accent-success); }
+    .module-item-status.warning { color: var(--accent-warning); }
+    .module-item-status.alarm { color: var(--accent-danger); }
+
+    .module-item .badge {
+        font-size: 0.6rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 10px;
+    }
+
+    /* 主视图区域 */
+    .main-content {
+        background: #0d1117;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .view-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: rgba(0,0,0,0.3);
+        border-bottom: 1px solid var(--panel-border);
+    }
+
+    .view-btn {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid var(--panel-border);
+        color: #ccc;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .view-btn.active, .view-btn:hover {
+        background: var(--accent-primary);
+        color: #000;
+        border-color: var(--accent-primary);
+    }
+
+    .video-area {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #main-video-canvas {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%);
+    }
+
+    .video-overlay-info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: #fff;
+        font-size: 0.75rem;
+        background: rgba(0,0,0,0.5);
+        padding: 0.3rem 0.6rem;
+        border-radius: 4px;
+    }
+
+    .video-bottom-info {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        padding: 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+
+    .camera-info { color: #aaa; font-size: 0.75rem; }
+    .camera-info i { margin-right: 0.3rem; }
+
+    .detection-stats { display: flex; gap: 1rem; }
+    .stat-item { font-size: 0.75rem; color: #888; }
+    .stat-value { color: var(--accent-primary); font-weight: 600; }
+
+    /* 右侧控制面板 */
+    .control-panel {
+        background: var(--panel-bg);
+        border-left: 1px solid var(--panel-border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .panel-header {
+        padding: 0.8rem 1rem;
+        border-bottom: 1px solid var(--panel-border);
+        font-size: 0.85rem;
+        color: #fff;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(0,0,0,0.2);
+    }
+
+    .panel-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.5rem;
+    }
+
+    .control-section {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+    }
+
+    .control-section-title {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.75rem;
+        color: #aaa;
+        border-bottom: 1px solid var(--panel-border);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: rgba(0,0,0,0.2);
+    }
+
+    /* 检测结果列表 */
+    .result-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .result-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0.8rem;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        gap: 0.5rem;
+    }
+
+    .result-item:last-child { border-bottom: none; }
+
+    .result-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+
+    .result-icon.normal { background: rgba(16, 185, 129, 0.2); color: var(--accent-success); }
+    .result-icon.warning { background: rgba(245, 158, 11, 0.2); color: var(--accent-warning); }
+    .result-icon.alarm { background: rgba(239, 68, 68, 0.2); color: var(--accent-danger); }
+
+    .result-info { flex: 1; min-width: 0; }
+    .result-name { font-size: 0.8rem; color: #fff; }
+    .result-detail { font-size: 0.65rem; color: #666; }
+    .result-confidence { font-size: 0.7rem; color: var(--accent-primary); }
+
+    /* 告警列表 */
+    .alarm-list { padding: 0.5rem 0.8rem; }
+
+    .alarm-item {
+        padding: 0.5rem;
+        margin-bottom: 0.4rem;
+        border-radius: 6px;
+        border-left: 3px solid var(--accent-warning);
+        background: rgba(245, 158, 11, 0.1);
+    }
+
+    .alarm-item.critical {
+        border-left-color: var(--accent-danger);
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    .alarm-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.2rem;
+    }
+
+    .alarm-type { color: #fff; font-size: 0.75rem; font-weight: 500; }
+    .alarm-time { color: #666; font-size: 0.65rem; }
+    .alarm-message { color: #aaa; font-size: 0.7rem; }
+
+    /* 监测插件面板 */
+    .plugin-panel {
+        background: rgba(0,0,0,0.2);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+
+    .plugin-header {
+        padding: 0.6rem 0.8rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        border-bottom: 1px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .plugin-header:hover { background: rgba(255,255,255,0.03); }
+    .plugin-header.expanded { border-bottom-color: var(--panel-border); }
+
+    .plugin-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        color: #fff;
+    }
+
+    .plugin-status {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent-success);
+    }
+
+    .status-dot.warning { background: var(--accent-warning); }
+    .status-dot.alarm { background: var(--accent-danger); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .plugin-content {
+        display: none;
+        padding: 0.5rem 0.8rem;
+    }
+
+    .plugin-content.show { display: block; }
+
+    .plugin-metric {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.3rem 0;
+        font-size: 0.75rem;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .plugin-metric:last-child { border-bottom: none; }
+    .metric-label { color: #888; }
+    .metric-value { color: #fff; }
+    .metric-value.good { color: var(--accent-success); }
+    .metric-value.warning { color: var(--accent-warning); }
+    .metric-value.alarm { color: var(--accent-danger); }
+
+    /* 操作按钮 */
+    .action-buttons {
+        padding: 0.5rem;
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .btn-action {
+        width: 100%;
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--accent-primary), #0099cc);
+        border: none;
+        color: #fff;
+    }
+
+    .btn-primary:hover { box-shadow: 0 4px 12px rgba(0,212,255,0.3); }
+
+    .btn-secondary {
+        background: transparent;
+        border: 1px solid var(--panel-border);
+        color: #ccc;
+    }
+
+    .btn-secondary:hover { background: rgba(255,255,255,0.05); }
+
+    /* 底部状态栏 */
+    .bottom-statusbar {
+        grid-column: 1 / -1;
+        background: var(--panel-bg);
+        border-top: 1px solid var(--panel-border);
+        padding: 0.3rem 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.7rem;
+        color: #888;
+    }
+
+    .status-indicators { display: flex; gap: 1.5rem; }
+    .status-item { display: flex; align-items: center; gap: 0.3rem; }
+    .performance-metrics { display: flex; gap: 1rem; }
+    .metric-value { color: var(--accent-primary); font-weight: 600; }
+
+    /* 响应式 */
+    @media (max-width: 1200px) {
+        .outdoor-container { grid-template-columns: 200px 1fr 280px; }
+    }
+
+    @media (max-width: 992px) {
+        .outdoor-container {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto 1fr auto auto;
+        }
+        .module-sidebar {
+            display: flex;
+            overflow-x: auto;
+            border-right: none;
+            border-bottom: 1px solid var(--panel-border);
+            padding: 0.5rem;
+        }
+        .module-group { display: flex; margin: 0; gap: 0.5rem; }
+        .module-group-header { display: none; }
+        .module-item { flex-direction: column; padding: 0.5rem; border-left: none; border-bottom: 3px solid transparent; }
+        .module-item.active { border-bottom-color: var(--accent-primary); }
+        .control-panel { border-left: none; border-top: 1px solid var(--panel-border); max-height: 300px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="outdoor-container">
+    <!-- 顶部工具栏 -->
+    <div class="top-toolbar">
+        <div class="toolbar-title">
+            <i class="bi bi-sun text-warning"></i>
+            室外监测中心
+            <span class="version-badge">V4.0</span>
+        </div>
+        <div class="toolbar-controls">
+            <select class="toolbar-select" id="voltage-select">
+                <option value="110kV">110kV</option>
+                <option value="220kV">220kV</option>
+                <option value="500kV">500kV</option>
+            </select>
+            <select class="toolbar-select" id="site-select">
+                <option>选择站点...</option>
+                <option value="site1">示例变电站A</option>
+                <option value="site2">示例变电站B</option>
+            </select>
+            <button class="btn-patrol" id="btn-start-patrol" onclick="startPatrol()">
+                <i class="bi bi-play-fill"></i> 开始巡检
+            </button>
+            <button class="toolbar-select" style="cursor:pointer" onclick="openSettings()">
+                <i class="bi bi-gear"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 左侧模块导航 -->
+    <div class="module-sidebar">
+        <!-- 基础巡视模块 -->
+        <div class="module-group">
+            <div class="module-group-header">
+                <i class="bi bi-grid-3x3-gap-fill"></i> 基础巡视
+            </div>
+            <a class="module-item active" data-module="transformer" onclick="switchModule('transformer')">
+                <i class="bi bi-box text-warning"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">主变巡视</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="switch" onclick="switchModule('switch')">
+                <i class="bi bi-toggle-on text-success"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">开关巡视</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="busbar" onclick="switchModule('busbar')">
+                <i class="bi bi-diagram-3 text-primary"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">母线巡视</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="capacitor" onclick="switchModule('capacitor')">
+                <i class="bi bi-battery-charging text-info"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">电容器</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="meter" onclick="switchModule('meter')">
+                <i class="bi bi-speedometer2 text-danger"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">表计读数</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="bird" onclick="switchModule('bird')">
+                <i class="bi bi-feather text-cyan"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">鸟类监控</div>
+                    <div class="module-item-status ready">已就绪</div>
+                </div>
+            </a>
+        </div>
+
+        <!-- 高级监测模块 -->
+        <div class="module-group">
+            <div class="module-group-header">
+                <i class="bi bi-cpu-fill"></i> 高级监测
+            </div>
+            <a class="module-item" data-module="acoustic" onclick="switchModule('acoustic')">
+                <i class="bi bi-soundwave text-primary"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">声学监测</div>
+                    <div class="module-item-status">局放检测</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="gas" onclick="switchModule('gas')">
+                <i class="bi bi-cloud-haze2 text-warning"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">气体检测</div>
+                    <div class="module-item-status">SF6/DGA</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="hyperspectral" onclick="switchModule('hyperspectral')">
+                <i class="bi bi-rainbow text-info"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">高光谱检测</div>
+                    <div class="module-item-status">缺陷分析</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="slam" onclick="switchModule('slam')">
+                <i class="bi bi-map text-success"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">SLAM建图</div>
+                    <div class="module-item-status">导航定位</div>
+                </div>
+            </a>
+            <a class="module-item" data-module="fusion" onclick="switchModule('fusion')">
+                <i class="bi bi-diagram-3-fill text-danger"></i>
+                <div class="module-item-info">
+                    <div class="module-item-name">多模态融合</div>
+                    <div class="module-item-status">综合诊断</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 主视频区域 -->
+    <div class="main-content">
+        <div class="view-toolbar">
+            <button class="view-btn active" onclick="setView('3d')"><i class="bi bi-box"></i> 3D</button>
+            <button class="view-btn" onclick="setView('grid')"><i class="bi bi-grid-3x3"></i> 俯视</button>
+            <label class="view-btn" style="cursor:pointer">
+                <input type="checkbox" id="ortho-view" style="margin-right:4px"> 正视
+            </label>
+            <div style="flex:1"></div>
+            <button class="view-btn" onclick="zoomIn()"><i class="bi bi-zoom-in"></i></button>
+            <button class="view-btn" onclick="zoomOut()"><i class="bi bi-zoom-out"></i></button>
+            <button class="view-btn" onclick="resetView()"><i class="bi bi-arrows-angle-contract"></i></button>
+        </div>
+        <div class="video-area">
+            <canvas id="main-video-canvas"></canvas>
+            <div class="video-overlay-info">
+                <span id="current-datetime">2026-01-29 16:00:00</span>
+            </div>
+            <div class="video-bottom-info">
+                <div class="camera-info">
+                    <i class="bi bi-camera-video"></i>
+                    <span id="camera-name">110kV场地7号云台</span> |
+                    <span id="camera-resolution">1920×1080</span>
+                </div>
+                <div class="detection-stats">
+                    <div class="stat-item">检测: <span class="stat-value" id="detection-count">0</span></div>
+                    <div class="stat-item">告警: <span class="stat-value text-warning" id="alarm-count">0</span></div>
+                    <div class="stat-item">FPS: <span class="stat-value" id="fps-value">25</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧控制面板 -->
+    <div class="control-panel">
+        <div class="panel-header">
+            <i class="bi bi-sliders"></i>
+            <span id="current-module-name">主变巡视</span> - 控制面板
+        </div>
+        <div class="panel-body">
+            <!-- 识别结果 -->
+            <div class="control-section">
+                <div class="control-section-title">
+                    <i class="bi bi-bounding-box"></i> 识别结果
+                </div>
+                <ul class="result-list" id="result-list">
+                    <li class="result-item">
+                        <div class="result-icon normal"><i class="bi bi-check"></i></div>
+                        <div class="result-info">
+                            <div class="result-name">加载中...</div>
+                            <div class="result-detail">请稍候</div>
+                        </div>
+                        <span class="result-confidence">--</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- 告警信息 -->
+            <div class="control-section">
+                <div class="control-section-title">
+                    <i class="bi bi-exclamation-triangle"></i> 告警信息
+                </div>
+                <div class="alarm-list" id="alarm-list">
+                    <div class="text-muted text-center" style="padding:1rem;font-size:0.75rem">
+                        暂无告警
+                    </div>
+                </div>
+            </div>
+
+            <!-- 监测插件状态 -->
+            <div class="control-section">
+                <div class="control-section-title">
+                    <i class="bi bi-gear"></i> 监测插件
+                </div>
+                <div id="plugin-list">
+                    <!-- 动态生成插件状态 -->
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+                <button class="btn-action btn-primary" onclick="startDetection()">
+                    <i class="bi bi-play-fill"></i> 开始检测
+                </button>
+                <button class="btn-action btn-secondary" onclick="captureImage()">
+                    <i class="bi bi-camera"></i> 截图保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="bottom-statusbar">
+        <div class="status-indicators">
+            <div class="status-item">
+                <span class="status-dot" id="system-status-dot"></span>
+                <span id="system-status-text">系统正常</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>AI模型: 已加载</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>摄像头: 在线</span>
+            </div>
+        </div>
+        <div class="performance-metrics">
+            <span>延迟: <span class="metric-value" id="latency-value">45ms</span></span>
+            <span>GPU: <span class="metric-value" id="gpu-value">62%</span></span>
+            <span>内存: <span class="metric-value" id="memory-value">4.2GB</span></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/outdoor_center_v4.js"></script>
+{% endblock %}
