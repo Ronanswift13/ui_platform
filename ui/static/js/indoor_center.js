@@ -160,7 +160,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初始化3D数字孪生联动
     initIndoor3DIntegration();
-    
+
+    // 初始化融合证据链
+    updateFusionEvidence();
+
+    // 加载默认设备的控制面板
+    selectDevice('fence');
+
     console.log('[IndoorMonitor] 初始化完成');
 });
 
@@ -3003,8 +3009,352 @@ styleSheet.textContent = `
 document.head.appendChild(styleSheet);
 
 // =============================================================================
+// 设备选择和动态控制面板
+// =============================================================================
+let currentSelectedDevice = 'fence';
+
+// 设备ID到插件ID的映射
+const deviceToPluginMap = {
+    'fence': 'indoor_fence',
+    'animal': 'animal_detection',
+    'temperature': 'temperature_monitoring',
+    'device': 'device_monitoring',
+    'fire': 'fire_detection',
+    'environment': 'gas_detection'
+};
+
+async function selectDevice(moduleId) {
+    currentSelectedDevice = moduleId;
+
+    // 更新设备列表选中状态
+    document.querySelectorAll('.device-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    const selectedItem = document.querySelector(`.device-item[data-module="${moduleId}"]`);
+    if (selectedItem) {
+        selectedItem.classList.add('active');
+    }
+
+    // 更新主视频画面
+    updateMainVideo(moduleId);
+
+    // 加载动态控制面板（使用正确的插件ID）
+    const pluginId = deviceToPluginMap[moduleId] || moduleId;
+    await loadControlPanel(pluginId);
+}
+
+function updateMainVideo(moduleId) {
+    const moduleNames = {
+        'fence': '电子围栏',
+        'animal': '动物入侵检测',
+        'temperature': '温度监测',
+        'device': '设备状态监测',
+        'fire': '消防监测',
+        'environment': '环境监测'
+    };
+
+    const moduleNameEl = document.getElementById('current-module-name');
+    if (moduleNameEl) {
+        moduleNameEl.textContent = moduleNames[moduleId] || moduleId;
+    }
+
+    // 更新主画布
+    const canvas = document.getElementById('main-video-canvas');
+    if (canvas && IndoorMonitorState.modules[moduleId]) {
+        const module = IndoorMonitorState.modules[moduleId];
+        if (module.canvas && module.ctx) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+
+            // 复制模块画布内容到主画布
+            try {
+                ctx.drawImage(module.canvas, 0, 0, canvas.width, canvas.height);
+            } catch (e) {
+                console.warn('无法复制画布内容:', e);
+            }
+        }
+    }
+}
+
+async function loadControlPanel(moduleId) {
+    const panelContent = document.getElementById('control-panel-content');
+    const panelTitle = document.getElementById('control-panel-module-name');
+
+    if (!panelContent) return;
+
+    // 显示加载状态
+    panelContent.innerHTML = '<div class="control-placeholder"><i class="bi bi-hourglass-split"></i><div>加载中...</div></div>';
+
+    try {
+        // 获取插件能力配置
+        const response = await fetch(`/api/indoor/plugin/${moduleId}/capabilities`);
+        if (!response.ok) {
+            throw new Error('获取插件能力失败');
+        }
+
+        const capabilities = await response.json();
+
+        // 更新标题
+        if (panelTitle) {
+            panelTitle.textContent = capabilities.name || '控制面板';
+        }
+
+        // 渲染控制面板
+        renderControlPanel(capabilities, panelContent);
+
+    } catch (error) {
+        console.error('加载控制面板失败:', error);
+        panelContent.innerHTML = `
+            <div class="control-placeholder">
+                <i class="bi bi-exclamation-triangle text-warning"></i>
+                <div>控制面板加载失败</div>
+                <div style="font-size: 0.7rem; margin-top: 0.5rem;">${error.message}</div>
+            </div>
+        `;
+    }
+}
+
+function renderControlPanel(capabilities, container) {
+    let html = '';
+
+    // 渲染控制项
+    if (capabilities.controls && capabilities.controls.length > 0) {
+        capabilities.controls.forEach(control => {
+            html += '<div class="control-group">';
+            html += `<label class="control-label">${control.label}</label>`;
+
+            if (control.type === 'slider') {
+                const value = control.default || control.min || 0;
+                html += `
+                    <input type="range"
+                           class="control-slider"
+                           id="control-${control.id}"
+                           min="${control.min}"
+                           max="${control.max}"
+                           step="${control.step || 1}"
+                           value="${value}"
+                           data-control-id="${control.id}">
+                    <div class="control-value" id="value-${control.id}">${value}</div>
+                `;
+            } else if (control.type === 'select') {
+                html += `<select class="control-select" id="control-${control.id}" data-control-id="${control.id}">`;
+                control.options.forEach(option => {
+                    const selected = option === control.default ? 'selected' : '';
+                    html += `<option value="${option}" ${selected}>${option}</option>`;
+                });
+                html += '</select>';
+            }
+
+            html += '</div>';
+        });
+    }
+
+    // 渲染操作按钮
+    if (capabilities.operations && capabilities.operations.length > 0) {
+        html += '<div class="control-group"><label class="control-label">操作</label>';
+        html += '<div class="control-operations">';
+
+        capabilities.operations.forEach(operation => {
+            html += `
+                <button class="control-operation-btn"
+                        data-operation="${operation.id}"
+                        onclick="executePluginOperation('${capabilities.plugin_id}', '${operation.id}')">
+                    <i class="bi bi-${operation.icon}"></i>
+                    ${operation.label}
+                </button>
+            `;
+        });
+
+        html += '</div></div>';
+    }
+
+    if (!html) {
+        html = '<div class="control-placeholder"><i class="bi bi-info-circle"></i><div>该设备暂无可配置项</div></div>';
+    }
+
+    container.innerHTML = html;
+
+    // 绑定滑块事件
+    container.querySelectorAll('.control-slider').forEach(slider => {
+        slider.addEventListener('input', (e) => {
+            const valueEl = document.getElementById(`value-${e.target.dataset.controlId}`);
+            if (valueEl) {
+                valueEl.textContent = e.target.value;
+            }
+        });
+
+        slider.addEventListener('change', (e) => {
+            updatePluginControl(capabilities.plugin_id, e.target.dataset.controlId, e.target.value);
+        });
+    });
+
+    // 绑定下拉框事件
+    container.querySelectorAll('.control-select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            updatePluginControl(capabilities.plugin_id, e.target.dataset.controlId, e.target.value);
+        });
+    });
+}
+
+async function updatePluginControl(pluginId, controlId, value) {
+    try {
+        const response = await fetch(`/api/indoor/plugin/${pluginId}/command`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                operation: 'update_control',
+                control_id: controlId,
+                value: value
+            })
+        });
+
+        if (response.ok) {
+            console.log(`✓ 控制参数已更新: ${controlId} = ${value}`);
+        }
+    } catch (error) {
+        console.error('更新控制参数失败:', error);
+    }
+}
+
+async function executePluginOperation(pluginId, operationId) {
+    try {
+        const response = await fetch(`/api/indoor/plugin/${pluginId}/command`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                operation: operationId
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            console.log(`✓ 操作执行成功: ${operationId}`);
+            // 可以添加成功提示
+        } else {
+            console.error(`✗ 操作执行失败: ${result.error}`);
+            // 可以添加错误提示
+        }
+    } catch (error) {
+        console.error('执行操作失败:', error);
+    }
+}
+
+// 定期更新主视频画面
+setInterval(() => {
+    if (currentSelectedDevice) {
+        updateMainVideo(currentSelectedDevice);
+    }
+}, 100);
+
+// =============================================================================
+// 融合证据链更新
+// =============================================================================
+async function updateFusionEvidence() {
+    try {
+        const response = await fetch('/api/indoor/fusion/evidence');
+        if (!response.ok) {
+            console.warn('融合证据链API返回错误');
+            return;
+        }
+
+        const data = await response.json();
+
+        // 更新置信度
+        const confidenceEl = document.getElementById('fusion-confidence');
+        if (confidenceEl && data.confidence !== undefined) {
+            const confidence = (data.confidence * 100).toFixed(0);
+            confidenceEl.textContent = `${confidence}%`;
+
+            // 根据置信度设置颜色
+            if (data.confidence >= 0.8) {
+                confidenceEl.style.background = 'var(--accent-success)';
+            } else if (data.confidence >= 0.6) {
+                confidenceEl.style.background = 'var(--accent-warning)';
+                confidenceEl.style.color = '#000';
+            } else {
+                confidenceEl.style.background = 'var(--accent-danger)';
+            }
+        }
+
+        // 更新模态列表
+        const modalitiesEl = document.getElementById('fusion-modalities');
+        if (modalitiesEl && data.modalities) {
+            modalitiesEl.innerHTML = data.modalities.map(m => {
+                const statusClass = m.result === '正常' ? 'normal' :
+                                   m.result === '注意' ? 'warning' : 'danger';
+                const iconMap = {
+                    'vision': 'bi-eye',
+                    'acoustic': 'bi-soundwave',
+                    'gas': 'bi-cloud-haze2',
+                    'thermal': 'bi-thermometer-half'
+                };
+                const icon = iconMap[m.type] || 'bi-circle';
+                const confidence = (m.confidence * 100).toFixed(0);
+
+                return `
+                    <div class="modality-item">
+                        <div class="modality-info">
+                            <div class="modality-icon ${m.type}">
+                                <i class="bi ${icon}"></i>
+                            </div>
+                            <span>${m.name || m.type}</span>
+                        </div>
+                        <div class="modality-result">
+                            <span class="modality-status ${statusClass}">${m.result}</span>
+                            <span class="modality-confidence">${confidence}%</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 更新综合判定
+        const resultValueEl = document.getElementById('fusion-result-value');
+        if (resultValueEl && data.fusion_result) {
+            resultValueEl.textContent = data.fusion_result;
+
+            // 根据结果设置样式
+            const resultContainer = document.getElementById('fusion-result');
+            if (resultContainer) {
+                if (data.fusion_result === '正常') {
+                    resultContainer.style.background = 'rgba(34, 197, 94, 0.1)';
+                    resultContainer.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                } else if (data.fusion_result === '注意') {
+                    resultContainer.style.background = 'rgba(234, 179, 8, 0.1)';
+                    resultContainer.style.borderColor = 'rgba(234, 179, 8, 0.3)';
+                } else {
+                    resultContainer.style.background = 'rgba(239, 68, 68, 0.1)';
+                    resultContainer.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                }
+            }
+        }
+
+        // 更新建议
+        const recommendationEl = document.getElementById('fusion-recommendation');
+        if (recommendationEl && data.recommendation) {
+            recommendationEl.textContent = data.recommendation;
+        }
+
+    } catch (error) {
+        console.error('更新融合证据链失败:', error);
+    }
+}
+
+// 定期更新融合证据链
+setInterval(updateFusionEvidence, 2000);
+
+// =============================================================================
 // 导出全局函数（确保HTML中的onclick可以调用）
 // =============================================================================
+window.selectDevice = selectDevice;
+window.loadControlPanel = loadControlPanel;
+window.executePluginOperation = executePluginOperation;
 window.openModuleDetail = openModuleDetail;
 window.refreshAll = refreshAll;
 window.refreshModule = refreshModule;
