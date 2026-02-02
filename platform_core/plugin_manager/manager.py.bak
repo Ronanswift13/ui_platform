@@ -129,37 +129,17 @@ class PluginManager:
             if not entrypoint_path.exists():
                 raise PluginLoadError(plugin_id, f"入口文件不存在: {entrypoint_path}")
 
-            # 动态加载模块 - 使用包导入以支持相对导入
-            module_name = f"plugins.{plugin_id}.{manifest.entrypoint.replace('.py', '')}"
-            try:
-                # 先尝试直接导入（如果已经在sys.path中）
-                module = importlib.import_module(module_name)
-            except ModuleNotFoundError:
-                # 如果失败，使用spec_from_file_location但设置正确的包结构
-                spec = importlib.util.spec_from_file_location(
-                    module_name,
-                    entrypoint_path,
-                    submodule_search_locations=[str(plugin_dir)]
-                )
-                if spec is None or spec.loader is None:
-                    raise PluginLoadError(plugin_id, "无法创建模块spec")
+            # 动态加载模块
+            spec = importlib.util.spec_from_file_location(
+                f"plugins.{plugin_id}",
+                entrypoint_path,
+            )
+            if spec is None or spec.loader is None:
+                raise PluginLoadError(plugin_id, "无法创建模块spec")
 
-                module = importlib.util.module_from_spec(spec)
-                # 确保父包存在
-                parent_module_name = f"plugins.{plugin_id}"
-                if parent_module_name not in sys.modules:
-                    parent_spec = importlib.util.spec_from_file_location(
-                        parent_module_name,
-                        plugin_dir / "__init__.py",
-                        submodule_search_locations=[str(plugin_dir)]
-                    )
-                    if parent_spec and parent_spec.loader:
-                        parent_module = importlib.util.module_from_spec(parent_spec)
-                        sys.modules[parent_module_name] = parent_module
-                        parent_spec.loader.exec_module(parent_module)
-
-                sys.modules[module_name] = module
-                spec.loader.exec_module(module)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[f"plugins.{plugin_id}"] = module
+            spec.loader.exec_module(module)
 
             # 获取插件类
             _plugin_class = getattr(module, manifest.plugin_class, None)

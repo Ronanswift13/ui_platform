@@ -1,0 +1,167 @@
+{
+    "id": "animal_detection",
+    "name": "动物入侵检测插件",
+    "version": "1.0.0",
+    "description": "基于YOLOv8深度学习的室内小动物入侵检测，支持热成像融合、行为分类、声光驱离联动与统计报告",
+    "author": "室内监测组",
+    "category": "safety",
+    "enabled": true,
+
+    "entrypoint": "plugin.py",
+    "plugin_class": "AnimalDetectionPlugin",
+
+    "capabilities": [
+        "animal_detection",
+        "species_classification",
+        "thermal_fusion_detection",
+        "behavior_tracking",
+        "deterrent_control",
+        "intrusion_statistics"
+    ],
+
+    "device_types": [
+        "visible_camera",
+        "thermal_camera",
+        "ultrasonic_deterrent",
+        "strobe_light",
+        "audio_alarm"
+    ],
+
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+
+    "min_platform_version": "1.0.0",
+
+    "models_required": [
+        {
+            "model_id": "animal_yolov8",
+            "model_path": "models/animal/animal_yolov8n.onnx",
+            "description": "YOLOv8小动物检测模型",
+            "required": true,
+            "classes": ["rat", "mouse", "cat", "snake", "bird", "insect", "weasel", "unknown_animal"],
+            "input_size": [640, 640]
+        },
+        {
+            "model_id": "species_classifier",
+            "model_path": "models/animal/species_efficientnet.onnx",
+            "description": "动物种类精细分类模型",
+            "required": false,
+            "input_size": [224, 224]
+        },
+        {
+            "model_id": "thermal_animal",
+            "model_path": "models/animal/thermal_animal_cnn.onnx",
+            "description": "热成像活体检测模型",
+            "required": false,
+            "input_size": [224, 224]
+        }
+    ],
+
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "frame": {"type": "image", "description": "可见光图像帧"},
+            "thermal_frame": {"type": "image", "description": "红外热成像帧（可选）"},
+            "zones": {
+                "type": "array",
+                "description": "监测区域",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "zone_id": {"type": "string"},
+                        "zone_name": {"type": "string"},
+                        "polygon": {"type": "array"},
+                        "sensitivity": {"type": "string", "enum": ["low", "medium", "high"]}
+                    }
+                }
+            }
+        },
+        "required": ["frame"]
+    },
+
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "plugin_id": {"type": "string"},
+            "plugin_version": {"type": "string"},
+            "task_id": {"type": "string"},
+            "timestamp": {"type": "string"},
+            "success": {"type": "boolean"},
+            "status": {"type": "string"},
+            "detections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "species": {"type": "string"},
+                        "bbox": {"type": "object"},
+                        "confidence": {"type": "number"},
+                        "is_alive": {"type": "boolean"},
+                        "track_id": {"type": "integer"},
+                        "duration_sec": {"type": "number"},
+                        "zone_id": {"type": "string"},
+                        "risk_level": {"type": "string"}
+                    }
+                }
+            },
+            "deterrent_status": {"type": "object"},
+            "statistics": {"type": "object"},
+            "alarms": {"type": "array"},
+            "inference_time_ms": {"type": "number"}
+        }
+    },
+
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "default": "models/animal/animal_yolov8n.onnx"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"], "default": "cpu"},
+                    "input_size": {"type": "array", "default": [640, 640]}
+                }
+            },
+            "detection": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "default": 0.40},
+                    "nms_threshold": {"type": "number", "default": 0.45},
+                    "multi_scale": {"type": "boolean", "default": true},
+                    "tracking_enabled": {"type": "boolean", "default": true},
+                    "max_track_age": {"type": "integer", "default": 50},
+                    "dwell_alarm_seconds": {"type": "number", "default": 30}
+                }
+            },
+            "thermal_fusion": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "default": true},
+                    "alive_temp_diff": {"type": "number", "default": 3.0},
+                    "fusion_weight": {"type": "number", "default": 0.3}
+                }
+            },
+            "deterrent": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "default": true},
+                    "ultrasonic_enabled": {"type": "boolean", "default": true},
+                    "strobe_enabled": {"type": "boolean", "default": true},
+                    "auto_trigger": {"type": "boolean", "default": true},
+                    "trigger_confidence": {"type": "number", "default": 0.6},
+                    "cooldown_seconds": {"type": "integer", "default": 60}
+                }
+            },
+            "risk_assessment": {
+                "type": "object",
+                "properties": {
+                    "high_risk_species": {"type": "array", "default": ["snake", "rat", "weasel"]},
+                    "equipment_proximity_m": {"type": "number", "default": 0.5},
+                    "cable_zone_weight": {"type": "number", "default": 2.0}
+                }
+            }
+        }
+    }
+}

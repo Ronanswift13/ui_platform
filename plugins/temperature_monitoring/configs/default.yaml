@@ -1,0 +1,51 @@
+# =============================================================================
+# 温度监测插件配置 - temperature_monitoring
+# =============================================================================
+
+sensor:
+  type: "mixed"                     # thermal_camera | sensor_array | mixed
+  resolution: [8, 6]               # 传感器阵列分辨率
+  interpolation: "bilinear"        # 插值方法
+  upsample_size: [64, 48]          # 上采样尺寸
+
+thresholds:
+  normal_max: 45                   # 正常上限 (°C)
+  warning: 55                      # 预警阈值
+  alarm: 70                        # 报警阈值
+  critical: 85                     # 紧急阈值
+  rise_rate_warning: 2.0           # 温升速率预警 (°C/min)
+  rise_rate_alarm: 5.0             # 温升速率报警
+
+hotspot:
+  min_area_ratio: 0.02             # 最小热点面积比
+  z_score_threshold: 2.5           # z-score异常判定
+  merge_distance: 0.05             # 热点合并距离
+
+prediction:
+  enabled: true
+  window_minutes: 60               # 历史窗口
+  forecast_minutes: 30             # 预测窗口
+  method: "linear"                 # arima | lstm | linear
+
+zones:
+  - zone_id: "zone_cabinet_top"
+    zone_name: "机柜顶部"
+    region: [0.0, 0.0, 1.0, 0.3]
+    threshold_offset: -5            # 相对阈值偏移
+  - zone_id: "zone_cable"
+    zone_name: "电缆区"
+    region: [0.0, 0.7, 1.0, 1.0]
+    threshold_offset: 0
+
+linkage:
+  fire_detection_enabled: true
+  fence_plugin_enabled: true
+  ventilation_control: false
+
+history:
+  buffer_size: 3600                # 保存最近1小时 (1条/秒)
+  archive_interval_minutes: 5
+
+performance:
+  max_fps: 5
+  async_processing: true

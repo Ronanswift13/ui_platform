@@ -1,0 +1,135 @@
+{
+    "id": "temperature_monitoring",
+    "name": "温度监测插件",
+    "version": "1.0.0",
+    "description": "基于红外热成像与阵列传感器的室内温度监测，支持热力图生成、热点检测、温升趋势分析、LSTM预测与多模块联动告警",
+    "author": "室内监测组",
+    "category": "monitoring",
+    "enabled": true,
+
+    "entrypoint": "plugin.py",
+    "plugin_class": "TemperatureMonitoringPlugin",
+
+    "capabilities": [
+        "thermal_imaging",
+        "hotspot_detection",
+        "temperature_trend_analysis",
+        "heatmap_generation",
+        "temperature_prediction",
+        "cross_module_linkage",
+        "data_archiving"
+    ],
+
+    "device_types": [
+        "thermal_camera",
+        "temperature_sensor_array",
+        "contact_thermometer",
+        "fiber_optic_sensor"
+    ],
+
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+
+    "min_platform_version": "1.0.0",
+
+    "models_required": [
+        {
+            "model_id": "thermal_anomaly_cnn",
+            "model_path": "models/temperature/thermal_anomaly_cnn.onnx",
+            "description": "热成像异常区域检测CNN模型",
+            "required": false,
+            "input_size": [224, 224]
+        },
+        {
+            "model_id": "temp_lstm_predictor",
+            "model_path": "models/temperature/temp_lstm_predictor.onnx",
+            "description": "LSTM温度趋势预测模型",
+            "required": false
+        }
+    ],
+
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "thermal_frame": {"type": "image", "description": "热成像帧或温度矩阵"},
+            "sensor_readings": {
+                "type": "array",
+                "description": "传感器读数数组",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "sensor_id": {"type": "string"},
+                        "position": {"type": "object"},
+                        "temperature": {"type": "number"},
+                        "timestamp": {"type": "number"}
+                    }
+                }
+            },
+            "zones": {"type": "array", "description": "温度监测区域"}
+        }
+    },
+
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "plugin_id": {"type": "string"},
+            "timestamp": {"type": "string"},
+            "success": {"type": "boolean"},
+            "status": {"type": "string"},
+            "heatmap": {"type": "array", "description": "温度热力图矩阵"},
+            "max_temp": {"type": "number"},
+            "min_temp": {"type": "number"},
+            "avg_temp": {"type": "number"},
+            "hotspots": {"type": "array"},
+            "trend": {"type": "object"},
+            "predictions": {"type": "object"},
+            "alarms": {"type": "array"},
+            "inference_time_ms": {"type": "number"}
+        }
+    },
+
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "sensor": {
+                "type": "object",
+                "properties": {
+                    "type": {"type": "string", "enum": ["thermal_camera", "sensor_array", "mixed"], "default": "mixed"},
+                    "resolution": {"type": "array", "default": [8, 6]},
+                    "interpolation": {"type": "string", "enum": ["bilinear", "bicubic", "nearest"], "default": "bilinear"},
+                    "upsample_size": {"type": "array", "default": [64, 48]}
+                }
+            },
+            "thresholds": {
+                "type": "object",
+                "properties": {
+                    "normal_max": {"type": "number", "default": 45},
+                    "warning": {"type": "number", "default": 55},
+                    "alarm": {"type": "number", "default": 70},
+                    "critical": {"type": "number", "default": 85},
+                    "rise_rate_warning": {"type": "number", "default": 2.0, "description": "°C/min"},
+                    "rise_rate_alarm": {"type": "number", "default": 5.0}
+                }
+            },
+            "prediction": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "default": true},
+                    "window_minutes": {"type": "integer", "default": 60},
+                    "forecast_minutes": {"type": "integer", "default": 30},
+                    "method": {"type": "string", "enum": ["arima", "lstm", "linear"], "default": "linear"}
+                }
+            },
+            "linkage": {
+                "type": "object",
+                "properties": {
+                    "fire_detection_enabled": {"type": "boolean", "default": true},
+                    "fence_plugin_enabled": {"type": "boolean", "default": true},
+                    "ventilation_control": {"type": "boolean", "default": false}
+                }
+            }
+        }
+    }
+}

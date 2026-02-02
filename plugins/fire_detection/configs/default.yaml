@@ -1,0 +1,107 @@
+# =============================================================================
+# 消防监测插件配置 - fire_detection
+# 输变电激光星芒破夜绘明监测平台
+# =============================================================================
+
+# 模型配置
+model:
+  path: "models/fire/fire_smoke_yolov8n.onnx"
+  device: "cpu"                    # cpu | cuda
+  input_size: [640, 640]
+  half_precision: false            # FP16推理 (仅GPU)
+
+# 检测参数
+detection:
+  confidence_threshold: 0.45       # 检测置信度阈值
+  nms_threshold: 0.50              # NMS阈值
+  fire_area_alarm_ratio: 0.05      # 火焰面积占比报警阈值
+  smoke_density_alarm: 0.30        # 烟雾浓度报警阈值
+  tracking_enabled: true           # 启用DeepSORT跟踪
+  max_track_age: 30                # 跟踪最大丢失帧数
+  min_confirm_frames: 3            # 最小确认帧数（防误报）
+  spread_rate_window: 10           # 火势扩散速率计算窗口（帧）
+
+# 传感器融合
+sensor_fusion:
+  enabled: true
+  smoke_sensor_weight: 0.30        # 烟雾传感器权重
+  thermal_sensor_weight: 0.30      # 热成像传感器权重
+  visual_weight: 0.40              # 视觉检测权重
+  co_alarm_ppm: 50                 # CO浓度报警阈值 (ppm)
+  temperature_alarm_celsius: 70    # 温度报警阈值 (°C)
+  temperature_warning_celsius: 55  # 温度预警阈值 (°C)
+  fusion_method: "weighted_ds"     # weighted_ds | weighted_avg | bayesian
+
+# 火灾等级判定
+fire_level:
+  smoldering:                      # 阴燃
+    min_confidence: 0.3
+    max_area_ratio: 0.02
+    smoke_only: true
+  small:                           # 小火
+    min_confidence: 0.5
+    max_area_ratio: 0.05
+  medium:                          # 中火
+    min_confidence: 0.6
+    max_area_ratio: 0.15
+  large:                           # 大火
+    min_confidence: 0.7
+    max_area_ratio: 0.30
+  critical:                        # 紧急
+    min_confidence: 0.8
+    min_area_ratio: 0.30
+
+# 主动灭火与联动
+suppression:
+  auto_sprinkler_enabled: false    # 自动喷淋
+  auto_power_cutoff: false         # 自动断电
+  alarm_sound_enabled: true        # 声光报警
+  alarm_light_enabled: true        # 灯光报警
+  trigger_level: "alarm"           # 触发等级: warning | alarm | critical
+  sprinkler_zones: []              # 喷淋区域映射
+  power_cutoff_zones: []           # 断电区域映射
+
+# 监测区域
+zones:
+  - zone_id: "zone_main_room"
+    zone_name: "主控室"
+    polygon: [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]]
+    priority: "critical"
+  - zone_id: "zone_cable_trench"
+    zone_name: "电缆沟"
+    polygon: [[0.5, 0.0], [1.0, 0.0], [1.0, 0.5], [0.5, 0.5]]
+    priority: "high"
+  - zone_id: "zone_switch_cabinet"
+    zone_name: "开关柜区"
+    polygon: [[0.5, 0.5], [1.0, 0.5], [1.0, 1.0], [0.5, 1.0]]
+    priority: "high"
+
+# 应急疏散
+evacuation:
+  routes:
+    - route_id: "route_main"
+      name: "主通道疏散"
+      waypoints: [[0.5, 1.0], [0.5, 0.5], [0.0, 0.5]]
+    - route_id: "route_emergency"
+      name: "紧急出口"
+      waypoints: [[0.5, 1.0], [1.0, 1.0]]
+  assembly_point: "配电楼东侧空地"
+
+# 演练模式
+drill:
+  enabled: false
+  scenario: "electrical_fire"       # electrical_fire | cable_fire | general
+  auto_reset_seconds: 300           # 演练自动重置时间
+
+# 历史与归档
+history:
+  max_events: 10000                 # 最大事件数
+  retention_days: 365               # 保留天数
+  snapshot_on_alarm: true           # 报警时自动截图
+  video_clip_seconds: 30            # 报警视频剪辑长度
+
+# 性能
+performance:
+  max_fps: 15                       # 最大处理帧率
+  batch_size: 1                     # 批处理大小
+  async_processing: true            # 异步处理

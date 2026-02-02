@@ -1,0 +1,65 @@
+# =============================================================================
+# 设备状态监测插件配置 - device_monitoring
+# =============================================================================
+
+health_weights:
+  cpu_temp: 0.15
+  cpu_usage: 0.15
+  memory_usage: 0.10
+  network_quality: 0.20
+  error_rate: 0.20
+  uptime: 0.20
+
+thresholds:
+  health_warning: 70
+  health_alarm: 50
+  health_critical: 30
+  heartbeat_timeout_sec: 60
+  cpu_temp_warning: 70
+  cpu_temp_alarm: 85
+  memory_warning_percent: 85
+  disk_warning_percent: 90
+  error_rate_warning: 5            # 每小时错误数
+
+prediction:
+  enabled: true
+  method: "statistical"
+  prediction_horizon_hours: 168    # 7天
+  history_window_hours: 720        # 30天
+
+maintenance:
+  auto_ticket: true
+  notification_channels: ["ui", "email"]
+  ticket_priority_map:
+    critical: "P1"
+    alarm: "P2"
+    warning: "P3"
+
+protocols:
+  snmp_enabled: false
+  modbus_enabled: false
+  api_polling_interval_sec: 30
+
+managed_devices:
+  - device_id: "cam_01"
+    device_name: "主控室摄像头-1"
+    device_type: "camera"
+  - device_id: "cam_02"
+    device_name: "电缆沟摄像头-2"
+    device_type: "camera"
+  - device_id: "lidar_01"
+    device_name: "激光雷达-1"
+    device_type: "lidar"
+  - device_id: "temp_array_01"
+    device_name: "温度阵列-1"
+    device_type: "temperature_sensor"
+  - device_id: "smoke_01"
+    device_name: "烟雾传感器-1"
+    device_type: "smoke_sensor"
+  - device_id: "edge_01"
+    device_name: "边缘计算节点"
+    device_type: "edge_computing_node"
+
+performance:
+  scan_interval_sec: 30
+  async_processing: true

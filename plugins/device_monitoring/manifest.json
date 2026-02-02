@@ -1,0 +1,171 @@
+{
+    "id": "device_monitoring",
+    "name": "设备状态监测插件",
+    "version": "1.0.0",
+    "description": "实时监测室内所有设备运行状态与健康指标，支持SNMP/Modbus协议接入、健康指数计算、故障预测、工单自动生成与统计报表导出",
+    "author": "室内监测组",
+    "category": "monitoring",
+    "enabled": true,
+
+    "entrypoint": "plugin.py",
+    "plugin_class": "DeviceMonitoringPlugin",
+
+    "capabilities": [
+        "device_status_monitoring",
+        "health_index_calculation",
+        "fault_prediction",
+        "anomaly_detection",
+        "maintenance_scheduling",
+        "statistics_reporting",
+        "protocol_integration"
+    ],
+
+    "device_types": [
+        "camera",
+        "lidar",
+        "temperature_sensor",
+        "smoke_sensor",
+        "gas_sensor",
+        "relay",
+        "alarm_device",
+        "network_switch",
+        "ups",
+        "plc",
+        "edge_computing_node"
+    ],
+
+    "dependencies": [
+        "numpy"
+    ],
+
+    "min_platform_version": "1.0.0",
+
+    "models_required": [
+        {
+            "model_id": "device_anomaly_autoencoder",
+            "model_path": "models/device/anomaly_autoencoder.onnx",
+            "description": "基于自编码器的设备异常检测模型",
+            "required": false
+        },
+        {
+            "model_id": "failure_predictor",
+            "model_path": "models/device/failure_predictor_lstm.onnx",
+            "description": "LSTM设备故障预测模型",
+            "required": false
+        }
+    ],
+
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "device_readings": {
+                "type": "array",
+                "description": "设备状态读数列表",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "device_id": {"type": "string"},
+                        "device_type": {"type": "string"},
+                        "device_name": {"type": "string"},
+                        "metrics": {
+                            "type": "object",
+                            "properties": {
+                                "cpu_temp": {"type": "number"},
+                                "cpu_usage": {"type": "number"},
+                                "memory_usage": {"type": "number"},
+                                "disk_usage": {"type": "number"},
+                                "network_quality": {"type": "number"},
+                                "uptime_hours": {"type": "number"},
+                                "error_count": {"type": "integer"},
+                                "last_heartbeat": {"type": "number"}
+                            }
+                        },
+                        "status": {"type": "string", "enum": ["online", "standby", "warning", "error", "offline"]}
+                    }
+                }
+            }
+        },
+        "required": ["device_readings"]
+    },
+
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "plugin_id": {"type": "string"},
+            "timestamp": {"type": "string"},
+            "success": {"type": "boolean"},
+            "status": {"type": "string"},
+            "devices": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "device_id": {"type": "string"},
+                        "device_name": {"type": "string"},
+                        "device_type": {"type": "string"},
+                        "status": {"type": "string"},
+                        "health_index": {"type": "number"},
+                        "anomaly_score": {"type": "number"},
+                        "predicted_failure": {"type": "object"},
+                        "recommendations": {"type": "array"}
+                    }
+                }
+            },
+            "summary": {"type": "object"},
+            "alarms": {"type": "array"},
+            "maintenance_tickets": {"type": "array"}
+        }
+    },
+
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "health_weights": {
+                "type": "object",
+                "description": "健康指数权重",
+                "properties": {
+                    "cpu_temp": {"type": "number", "default": 0.15},
+                    "cpu_usage": {"type": "number", "default": 0.15},
+                    "memory_usage": {"type": "number", "default": 0.10},
+                    "network_quality": {"type": "number", "default": 0.20},
+                    "error_rate": {"type": "number", "default": 0.20},
+                    "uptime": {"type": "number", "default": 0.20}
+                }
+            },
+            "thresholds": {
+                "type": "object",
+                "properties": {
+                    "health_warning": {"type": "number", "default": 70},
+                    "health_alarm": {"type": "number", "default": 50},
+                    "health_critical": {"type": "number", "default": 30},
+                    "heartbeat_timeout_sec": {"type": "number", "default": 60},
+                    "cpu_temp_warning": {"type": "number", "default": 70},
+                    "cpu_temp_alarm": {"type": "number", "default": 85}
+                }
+            },
+            "prediction": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "default": true},
+                    "method": {"type": "string", "enum": ["statistical", "autoencoder", "lstm"], "default": "statistical"},
+                    "prediction_horizon_hours": {"type": "integer", "default": 168}
+                }
+            },
+            "maintenance": {
+                "type": "object",
+                "properties": {
+                    "auto_ticket": {"type": "boolean", "default": true},
+                    "notification_channels": {"type": "array", "default": ["ui", "email"]}
+                }
+            },
+            "protocols": {
+                "type": "object",
+                "properties": {
+                    "snmp_enabled": {"type": "boolean", "default": false},
+                    "modbus_enabled": {"type": "boolean", "default": false},
+                    "api_polling_interval_sec": {"type": "integer", "default": 30}
+                }
+            }
+        }
+    }
+}

@@ -60,6 +60,36 @@ class PluginCapability(str, Enum):
     PATH_PLANNING = "path_planning"
     # 多模态融合
     MULTIMODAL_DATA_FUSION = "multimodal_data_fusion"
+    # 动物检测
+    ANIMAL_DETECTION = "animal_detection"
+    SPECIES_CLASSIFICATION = "species_classification"
+    THERMAL_FUSION_DETECTION = "thermal_fusion_detection"
+    BEHAVIOR_TRACKING = "behavior_tracking"
+    INTRUSION_STATISTICS = "intrusion_statistics"
+    # 温度监测
+    THERMAL_IMAGING = "thermal_imaging"
+    HOTSPOT_DETECTION = "hotspot_detection"
+    TEMPERATURE_TREND_ANALYSIS = "temperature_trend_analysis"
+    HEATMAP_GENERATION = "heatmap_generation"
+    TEMPERATURE_PREDICTION = "temperature_prediction"
+    CROSS_MODULE_LINKAGE = "cross_module_linkage"
+    DATA_ARCHIVING = "data_archiving"
+    # 设备监测
+    DEVICE_STATUS_MONITORING = "device_status_monitoring"
+    HEALTH_INDEX_CALCULATION = "health_index_calculation"
+    FAULT_PREDICTION = "fault_prediction"
+    ANOMALY_DETECTION = "anomaly_detection"
+    MAINTENANCE_SCHEDULING = "maintenance_scheduling"
+    STATISTICS_REPORTING = "statistics_reporting"
+    PROTOCOL_INTEGRATION = "protocol_integration"
+    # 消防监测
+    FIRE_DETECTION = "fire_detection"
+    SMOKE_DETECTION = "smoke_detection"
+    THERMAL_ANOMALY_DETECTION = "thermal_anomaly_detection"
+    MULTI_SENSOR_FUSION = "multi_sensor_fusion"
+    ACTIVE_SUPPRESSION_CONTROL = "active_suppression_control"
+    EVACUATION_GUIDANCE = "evacuation_guidance"
+    DRILL_SIMULATION = "drill_simulation"
 
 
 class PluginStatus(str, Enum):

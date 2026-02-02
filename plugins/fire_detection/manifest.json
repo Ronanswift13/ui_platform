@@ -1,0 +1,206 @@
+{
+    "id": "fire_detection",
+    "name": "消防监测插件",
+    "version": "1.0.0",
+    "description": "基于YOLOv8深度学习的火焰与烟雾实时检测，集成多模态传感器融合、DeepSORT火势跟踪、主动灭火联动与应急指导",
+    "author": "室内监测组",
+    "category": "safety",
+    "enabled": true,
+
+    "entrypoint": "plugin.py",
+    "plugin_class": "FireDetectionPlugin",
+
+    "capabilities": [
+        "fire_detection",
+        "smoke_detection",
+        "thermal_anomaly_detection",
+        "multi_sensor_fusion",
+        "active_suppression_control",
+        "evacuation_guidance",
+        "drill_simulation"
+    ],
+
+    "device_types": [
+        "visible_camera",
+        "thermal_camera",
+        "smoke_sensor",
+        "temperature_sensor",
+        "sprinkler_system",
+        "alarm_device",
+        "emergency_lighting"
+    ],
+
+    "dependencies": [
+        "numpy",
+        "opencv-python"
+    ],
+
+    "min_platform_version": "1.0.0",
+
+    "models_required": [
+        {
+            "model_id": "fire_smoke_yolov8",
+            "model_path": "models/fire/fire_smoke_yolov8n.onnx",
+            "description": "YOLOv8火焰烟雾检测模型",
+            "required": true,
+            "classes": ["fire", "smoke", "spark", "ember"],
+            "input_size": [640, 640]
+        },
+        {
+            "model_id": "fire_classification",
+            "model_path": "models/fire/fire_classifier_resnet18.onnx",
+            "description": "火灾等级分类模型",
+            "required": false,
+            "classes": ["no_fire", "smoldering", "small_fire", "large_fire", "explosion"],
+            "input_size": [224, 224]
+        },
+        {
+            "model_id": "thermal_anomaly",
+            "model_path": "models/fire/thermal_anomaly_cnn.onnx",
+            "description": "热成像异常检测模型",
+            "required": false,
+            "classes": ["normal", "hot_spot", "fire_source"],
+            "input_size": [224, 224]
+        }
+    ],
+
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "frame": {
+                "type": "image",
+                "description": "可见光摄像头图像帧"
+            },
+            "thermal_frame": {
+                "type": "image",
+                "description": "红外热成像帧（可选）"
+            },
+            "sensor_data": {
+                "type": "object",
+                "description": "传感器数据（可选）",
+                "properties": {
+                    "smoke_concentration": {"type": "number", "unit": "percent"},
+                    "temperature": {"type": "number", "unit": "celsius"},
+                    "co_concentration": {"type": "number", "unit": "ppm"},
+                    "humidity": {"type": "number", "unit": "percent"}
+                }
+            },
+            "zones": {
+                "type": "array",
+                "description": "监测区域列表",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "zone_id": {"type": "string"},
+                        "zone_name": {"type": "string"},
+                        "polygon": {"type": "array"},
+                        "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]}
+                    }
+                }
+            }
+        },
+        "required": ["frame"]
+    },
+
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "plugin_id": {"type": "string"},
+            "plugin_version": {"type": "string"},
+            "task_id": {"type": "string"},
+            "timestamp": {"type": "string"},
+            "success": {"type": "boolean"},
+            "status": {"type": "string", "enum": ["normal", "warning", "alarm", "critical", "error"]},
+            "detections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string", "enum": ["fire", "smoke", "spark", "ember", "hot_spot"]},
+                        "bbox": {"type": "object"},
+                        "confidence": {"type": "number"},
+                        "zone_id": {"type": "string"},
+                        "area_ratio": {"type": "number"},
+                        "spread_rate": {"type": "number"},
+                        "track_id": {"type": "integer"}
+                    }
+                }
+            },
+            "fire_level": {"type": "string", "enum": ["none", "smoldering", "small", "medium", "large", "critical"]},
+            "fusion_confidence": {"type": "number"},
+            "sensor_status": {"type": "object"},
+            "suppression_actions": {"type": "array"},
+            "evacuation_routes": {"type": "array"},
+            "alarms": {"type": "array"},
+            "inference_time_ms": {"type": "number"},
+            "metadata": {"type": "object"}
+        }
+    },
+
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "default": "models/fire/fire_smoke_yolov8n.onnx"},
+                    "device": {"type": "string", "enum": ["cpu", "cuda"], "default": "cpu"},
+                    "input_size": {"type": "array", "items": {"type": "integer"}, "default": [640, 640]}
+                }
+            },
+            "detection": {
+                "type": "object",
+                "properties": {
+                    "confidence_threshold": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.45},
+                    "nms_threshold": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5},
+                    "fire_area_alarm_ratio": {"type": "number", "default": 0.05},
+                    "smoke_density_alarm": {"type": "number", "default": 0.3},
+                    "tracking_enabled": {"type": "boolean", "default": true},
+                    "max_track_age": {"type": "integer", "default": 30}
+                }
+            },
+            "sensor_fusion": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "default": true},
+                    "smoke_sensor_weight": {"type": "number", "default": 0.3},
+                    "thermal_sensor_weight": {"type": "number", "default": 0.3},
+                    "visual_weight": {"type": "number", "default": 0.4},
+                    "co_alarm_ppm": {"type": "number", "default": 50},
+                    "temperature_alarm_celsius": {"type": "number", "default": 70}
+                }
+            },
+            "suppression": {
+                "type": "object",
+                "properties": {
+                    "auto_sprinkler_enabled": {"type": "boolean", "default": false},
+                    "auto_power_cutoff": {"type": "boolean", "default": false},
+                    "alarm_sound_enabled": {"type": "boolean", "default": true},
+                    "alarm_light_enabled": {"type": "boolean", "default": true},
+                    "trigger_level": {"type": "string", "enum": ["warning", "alarm", "critical"], "default": "alarm"}
+                }
+            },
+            "zones": {
+                "type": "array",
+                "description": "监测区域定义",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "zone_id": {"type": "string"},
+                        "zone_name": {"type": "string"},
+                        "polygon": {"type": "array"},
+                        "priority": {"type": "string"}
+                    }
+                }
+            },
+            "drill": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean", "default": false},
+                    "scenario": {"type": "string", "default": "electrical_fire"},
+                    "auto_reset_seconds": {"type": "integer", "default": 300}
+                }
+            }
+        }
+    }
+}
