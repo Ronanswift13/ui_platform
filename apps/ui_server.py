@@ -134,6 +134,14 @@ def create_app() -> FastAPI:
     except ImportError as e:
         print(f"✗ 室外监测中心API导入失败: {e}")
 
+    # ============== 集成数据上传API (V2.0) ==============
+    try:
+        from apps.data_upload_api import integrate_data_upload_routes
+        integrate_data_upload_routes(app)
+        print("✓ 数据上传API已集成 (V2.0)")
+    except ImportError as e:
+        print(f"✗ 数据上传API导入失败: {e}")
+
     # ============== 页面路由 ==============
 
     @app.get("/", response_class=HTMLResponse)

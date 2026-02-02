@@ -596,33 +596,76 @@ class TrainingManager:
         model_name = model_config["name"]
         input_size = model_config["input_size"]
         num_classes = model_config["num_classes"]
-        
+
         logger.info(f"\n{'='*60}")
         logger.info(f"训练: {plugin_name}/{model_name}")
         logger.info(f"类型: {model_config['type']}, 输入: {input_size}, 类别: {num_classes}")
         logger.info(f"{'='*60}")
-        
+
+        # 尝试使用数据聚合器加载真实数据 (如果可用)
+        data_yaml = None
+        try:
+            from training.data_aggregator import prepare_training_data
+
+            # 尝试聚合真实数据集
+            data_yaml = prepare_training_data(
+                voltage="HV_220kV",  # 默认电压等级，可根据需要调整
+                plugin=plugin_name,
+                split=True,
+                train_ratio=0.8,
+            )
+
+            if data_yaml:
+                logger.info(f"✅ 使用聚合数据集: {data_yaml}")
+            else:
+                logger.info("⚠️ 未找到真实数据集，使用模拟数据")
+        except ImportError as e:
+            logger.info(f"⚠️ 数据聚合器未安装: {e}，使用模拟数据")
+        except Exception as e:
+            logger.info(f"⚠️ 数据聚合失败: {e}，使用模拟数据")
+
         # 创建模型
         model = self.create_model(model_config)
-        
-        # 创建数据集
-        train_dataset = SimulatedDataset(
-            num_samples=500, 
-            input_size=input_size, 
-            num_classes=num_classes
-        )
-        val_dataset = SimulatedDataset(
-            num_samples=100, 
-            input_size=input_size, 
-            num_classes=num_classes
-        )
-        
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-        
-        logger.info(f"训练集: {len(train_dataset)} 样本")
-        logger.info(f"验证集: {len(val_dataset)} 样本")
-        
+
+        # 创建数据集 (如果没有真实数据，使用模拟数据)
+        if not data_yaml:
+            train_dataset = SimulatedDataset(
+                num_samples=500,
+                input_size=input_size,
+                num_classes=num_classes
+            )
+            val_dataset = SimulatedDataset(
+                num_samples=100,
+                input_size=input_size,
+                num_classes=num_classes
+            )
+
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+            logger.info(f"训练集: {len(train_dataset)} 样本 (模拟)")
+            logger.info(f"验证集: {len(val_dataset)} 样本 (模拟)")
+        else:
+            # TODO: 实现真实数据集加载逻辑
+            # 这里需要根据 data_yaml 加载 YOLO 格式的数据集
+            logger.info("⚠️ 真实数据集加载功能待实现，回退到模拟数据")
+            train_dataset = SimulatedDataset(
+                num_samples=500,
+                input_size=input_size,
+                num_classes=num_classes
+            )
+            val_dataset = SimulatedDataset(
+                num_samples=100,
+                input_size=input_size,
+                num_classes=num_classes
+            )
+
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+            logger.info(f"训练集: {len(train_dataset)} 样本")
+            logger.info(f"验证集: {len(val_dataset)} 样本")
+
         # 创建训练器
         save_dir = self.dirs["checkpoints"] / plugin_name
         trainer = Trainer(model, self.device, save_dir)

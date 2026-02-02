@@ -298,17 +298,6 @@
         background: #f8d7da;
         color: #721c24;
     }
-
-    .summary-item {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.95rem;
-    }
-    
-    .summary-item i {
-        font-size: 1.1rem;
-    }
 </style>
 {% endblock %}
 
@@ -414,9 +403,9 @@
         <div class="upload-zone" id="upload-zone">
             <i class="bi bi-cloud-arrow-up"></i>
             <h4>拖放文件到此处上传</h4>
-            <p>支持图片 (JPG, PNG, BMP, TIFF)、视频 (MP4, AVI, MOV, MKV)、音频 (MP3, WAV, FLAC) 和标注文件 (TXT, XML, JSON)</p>
+            <p>支持图片 (JPG, PNG)、视频 (MP4, AVI) 和标注文件 (TXT, XML, JSON)</p>
             <p class="text-muted mt-2">或 <a href="#" onclick="document.getElementById('file-input').click(); return false;">点击选择文件</a></p>
-            <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.bmp,.tif,.tiff,.webp,.mp4,.avi,.mov,.mkv,.flv,.wmv,.webm,.m4v,.mpeg,.mpg,.mp3,.wav,.flac,.aac,.ogg,.m4a,.wma,.opus,.txt,.xml,.json,.zip,.tar,.gz,.tgz" style="display: none;">
+            <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.mp4,.avi,.txt,.xml,.json" style="display: none;">
         </div>
 
         <!-- 文件列表 -->
@@ -435,66 +424,37 @@
         <div class="data-summary" id="data-summary" style="display: none;">
             <h6><i class="bi bi-check-circle"></i> 数据摘要</h6>
             <div class="summary-stats">
-                <span class="summary-item">
-                    <i class="bi bi-image text-success"></i>
-                    图片: <strong id="summary-images">0</strong>
-                </span>
-                <span class="summary-item">
-                    <i class="bi bi-camera-video text-primary"></i>
-                    视频: <strong id="summary-videos">0</strong>
-                </span>
-                <span class="summary-item">
-                    <i class="bi bi-file-text text-warning"></i>
-                    标注: <strong id="summary-labels">0</strong>
-                </span>
-                <span class="summary-item">
-                    <i class="bi bi-file-earmark-zip text-info"></i>
-                    压缩包: <strong id="summary-archives">0</strong>
-                </span>
-                <span class="summary-item">
-                    <i class="bi bi-hdd"></i>
-                    总大小: <strong id="summary-size">0</strong> MB
-                </span>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-images">0</span>
+                    <span class="stat-label">张图片</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-videos">0</span>
+                    <span class="stat-label">个视频</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-labels">0</span>
+                    <span class="stat-label">个标注文件</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="stat-value" id="summary-size">0</span>
+                    <span class="stat-label">MB 总大小</span>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- 操作按钮 -->
     <div class="action-buttons">
-        <button class="btn btn-outline-secondary" onclick="validateData()">
-            <i class="bi bi-check-circle"></i> 验证数据
+        <button class="btn btn-outline-secondary" onclick="clearAllFiles()">
+            <i class="bi bi-trash"></i> 清除全部
         </button>
-        <button class="btn btn-primary" id="btn-upload" onclick="uploadAndSave()">
+        <button class="btn btn-outline-primary" onclick="validateData()">
+            <i class="bi bi-check2-circle"></i> 验证数据
+        </button>
+        <button class="btn btn-primary" onclick="uploadAndSave()" id="btn-upload">
             <i class="bi bi-cloud-upload"></i> 上传并保存
         </button>
-        <button class="btn btn-outline-info" onclick="scanLocalImport()" title="从服务器本地目录导入大文件">
-            <i class="bi bi-hdd-network"></i> 服务器导入
-        </button>
-        <button class="btn btn-outline-success" onclick="aggregateDatasets()" title="聚合所有有效数据集生成训练配置">
-            <i class="bi bi-collection"></i> 聚合数据
-        </button>
-        <button class="btn btn-outline-danger" onclick="clearAllFiles()">
-            <i class="bi bi-trash"></i> 清空
-        </button>
-    </div>
-
-
-    <!-- 大文件导入说明 -->
-    <div class="config-section" style="background: #f0f7ff; border-left: 4px solid #007bff;">
-        <h6><i class="bi bi-info-circle"></i> 大文件导入说明</h6>
-        <p class="text-muted mb-2" style="font-size: 0.9rem;">
-            对于超过 2GB 的大型数据集，推荐使用<strong>服务器端导入</strong>方式：
-        </p>
-        <ol class="text-muted" style="font-size: 0.85rem;">
-            <li>通过 U盘 或 FTP 将压缩包拷贝到服务器 <code>training/data/temp_upload/</code> 目录</li>
-            <li>在上方选择对应的电压等级和插件类型</li>
-            <li>点击 <strong>"服务器导入"</strong> 按钮触发扫描</li>
-            <li>系统将自动解压、校验并入库</li>
-        </ol>
-        <p class="text-muted mb-0" style="font-size: 0.85rem;">
-            <i class="bi bi-lightbulb text-warning"></i>
-            支持的压缩格式: <code>.zip</code> <code>.tar.gz</code> <code>.tar</code>
-        </p>
     </div>
 
     <!-- 历史记录 -->
@@ -505,16 +465,15 @@
                 <tr>
                     <th>时间</th>
                     <th>电压等级</th>
-                    <th>插件类型</th>
-                    <th>数据量</th>
+                    <th>插件</th>
+                    <th>文件数</th>
                     <th>状态</th>
-                    <th>上传者</th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody id="history-tbody">
                 <tr>
-                    <td colspan="7" class="text-center text-muted">暂无导入记录</td>
+                    <td colspan="6" class="text-center text-muted">暂无导入记录</td>
                 </tr>
             </tbody>
         </table>

@@ -1,0 +1,16 @@
+{
+  "20260202_153245_test_user_test_upload": {
+    "dataset_id": "20260202_153245_test_user_test_upload",
+    "uploader": "test_user",
+    "upload_time": "2026-02-02T15:32:45.552211",
+    "voltage_level": "HV_220kV",
+    "plugin_type": "transformer",
+    "dataset_name": "test_upload",
+    "image_count": 0,
+    "label_count": 0,
+    "format": "UNKNOWN",
+    "status": "pending",
+    "validation_report": null,
+    "data_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/data/raw/HV_220kV/transformer/20260202_153245_test_user_test_upload"
+  }
+}
