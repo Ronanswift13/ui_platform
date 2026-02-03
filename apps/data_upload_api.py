@@ -117,6 +117,89 @@ class ValidateRequest(BaseModel):
 
 
 # =============================================================================
+# 电压等级标准化映射 (前端值 → 训练系统内部值)
+# =============================================================================
+VOLTAGE_NORMALIZE = {
+    "1000kv": "UHV_1000kV", "800kv-dc": "UHV_800kV_DC",
+    "500kv": "EHV_500kV", "220kv": "HV_220kV", "110kv": "HV_110kV",
+    "35kv": "MV_35kV", "10kv": "MV_10kV",
+    "UHV_1000kV": "UHV_1000kV", "UHV_800kV_DC": "UHV_800kV_DC",
+    "EHV_500kV": "EHV_500kV", "HV_220kV": "HV_220kV",
+    "HV_110kV": "HV_110kV", "MV_35kV": "MV_35kV", "MV_10kV": "MV_10kV",
+}
+
+# =============================================================================
+# 插件ID标准化
+# =============================================================================
+PLUGIN_NORMALIZE = {
+    "transformer": "transformer", "switch": "switch", "busbar": "busbar",
+    "capacitor": "capacitor", "meter": "meter", "bird": "bird",
+    "acoustic": "acoustic", "gas": "gas", "hyperspectral": "hyperspectral",
+    "slam": "slam", "fusion": "fusion", "indoor_fence": "indoor_fence",
+    "transformer_inspection": "transformer", "switch_inspection": "switch",
+    "busbar_inspection": "busbar", "capacitor_inspection": "capacitor",
+    "meter_reading": "meter", "bird_monitoring": "bird",
+    "acoustic_monitoring": "acoustic", "gas_detection": "gas",
+    "hyperspectral_detection": "hyperspectral", "slam_mapping": "slam",
+    "multimodal_fusion": "fusion",
+}
+
+# =============================================================================
+# 各插件的 YOLO 检测类别
+# =============================================================================
+PLUGIN_CLASSES: Dict[str, List[str]] = {
+    "transformer": [
+        "oil_leak", "rust", "surface_damage", "foreign_object",
+        "silica_gel_normal", "silica_gel_abnormal",
+        "oil_level_normal", "oil_level_abnormal",
+        "bushing_crack", "porcelain_contamination",
+        "thermal_normal", "thermal_warning", "thermal_danger",
+    ],
+    "switch": [
+        "breaker_open", "breaker_closed", "breaker_intermediate",
+        "isolator_open", "isolator_closed",
+        "grounding_switch_open", "grounding_switch_closed",
+        "indicator_red", "indicator_green",
+        "mechanical_damage", "rust", "foreign_object",
+    ],
+    "busbar": [
+        "insulator_normal", "insulator_broken", "insulator_flashover",
+        "insulator_contaminated", "insulator_missing",
+        "connection_normal", "connection_overheating",
+        "foreign_object", "bird_nest",
+    ],
+    "capacitor": [
+        "capacitor_normal", "capacitor_bulging", "capacitor_leaking",
+        "capacitor_discolored", "capacitor_damaged",
+        "connection_loose", "fuse_blown",
+    ],
+    "meter": [
+        "meter_face", "pointer", "scale", "digital_display",
+        "analog_gauge", "reading_normal", "reading_abnormal",
+    ],
+    "bird": [
+        "bird", "bird_nest", "bird_droppings", "small_animal", "foreign_object",
+    ],
+    "acoustic": [
+        "normal_sound", "partial_discharge", "mechanical_fault",
+        "corona_discharge", "arcing",
+    ],
+    "gas": [
+        "sf6_leak", "oil_mist", "smoke", "gas_normal", "gas_abnormal",
+    ],
+    "hyperspectral": [
+        "corrosion", "contamination", "aging", "material_normal", "material_degraded",
+    ],
+    "slam": ["obstacle", "pathway", "equipment", "person", "vehicle"],
+    "fusion": [
+        "defect_visual", "defect_thermal", "defect_acoustic",
+        "normal", "warning", "danger",
+    ],
+    "indoor_fence": ["person", "unauthorized_person", "safety_violation", "normal"],
+}
+
+
+# =============================================================================
 # API 路由
 # =============================================================================
 
@@ -177,6 +260,18 @@ async def upload_data(
     if not plugin_list:
         logger.error("[DataUploadAPI] 未选择插件类型")
         raise HTTPException(status_code=400, detail="至少选择一个插件类型")
+
+    # 标准化电压等级命名 (220kv -> HV_220kV)
+    voltage_level_normalized = VOLTAGE_NORMALIZE.get(voltage_level, voltage_level)
+    if voltage_level != voltage_level_normalized:
+        logger.info(f"[DataUploadAPI] 电压等级标准化: {voltage_level} -> {voltage_level_normalized}")
+        voltage_level = voltage_level_normalized
+
+    # 标准化插件ID (transformer_inspection -> transformer)
+    plugin_list_normalized = [PLUGIN_NORMALIZE.get(p, p) for p in plugin_list]
+    if plugin_list != plugin_list_normalized:
+        logger.info(f"[DataUploadAPI] 插件ID标准化: {plugin_list} -> {plugin_list_normalized}")
+        plugin_list = plugin_list_normalized
 
     # 对每个插件类型创建数据集
     results = []
@@ -427,13 +522,18 @@ async def get_dataset_status(dataset_id: str):
 async def chunk_init(request: ChunkInitRequest):
     """初始化分片上传会话"""
     dm = get_data_manager()
+
+    # 标准化电压等级和插件ID
+    voltage_level = VOLTAGE_NORMALIZE.get(request.voltage_level, request.voltage_level)
+    plugin_type = PLUGIN_NORMALIZE.get(request.plugin_type, request.plugin_type)
+
     session_id = dm.ingestion.init_chunk_upload(
         file_name=request.file_name,
         file_size=request.file_size,
         total_chunks=request.total_chunks,
         file_md5=request.file_md5,
-        voltage_level=request.voltage_level,
-        plugin_type=request.plugin_type,
+        voltage_level=voltage_level,
+        plugin_type=plugin_type,
         uploader=request.uploader,
     )
     return {
@@ -515,9 +615,13 @@ async def import_local(
     """
     dm = get_data_manager()
 
+    # 标准化电压等级和插件ID
+    voltage_level = VOLTAGE_NORMALIZE.get(request.voltage_level, request.voltage_level)
+    plugin_type = PLUGIN_NORMALIZE.get(request.plugin_type, request.plugin_type)
+
     import_results = dm.scan_and_import(
-        voltage_level=request.voltage_level,
-        plugin_type=request.plugin_type,
+        voltage_level=voltage_level,
+        plugin_type=plugin_type,
         uploader=request.uploader,
     )
 
@@ -550,9 +654,13 @@ async def aggregate_datasets(request: AggregateRequest):
     """
     dm = get_data_manager()
 
+    # 标准化电压等级和插件ID
+    voltage_level = VOLTAGE_NORMALIZE.get(request.voltage_level, request.voltage_level)
+    plugin_type = PLUGIN_NORMALIZE.get(request.plugin_type, request.plugin_type)
+
     result = dm.aggregate_for_training(
-        voltage_level=request.voltage_level,
-        plugin_type=request.plugin_type,
+        voltage_level=voltage_level,
+        plugin_type=plugin_type,
     )
 
     return {
@@ -571,9 +679,13 @@ async def prepare_training_split(request: PrepareSplitRequest):
     """
     dm = get_data_manager()
 
+    # 标准化电压等级和插件ID
+    voltage_level = VOLTAGE_NORMALIZE.get(request.voltage_level, request.voltage_level)
+    plugin_type = PLUGIN_NORMALIZE.get(request.plugin_type, request.plugin_type)
+
     result = dm.prepare_training_split(
-        voltage_level=request.voltage_level,
-        plugin_type=request.plugin_type,
+        voltage_level=voltage_level,
+        plugin_type=plugin_type,
         train_ratio=request.train_ratio,
     )
 
