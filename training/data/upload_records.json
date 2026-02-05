@@ -1,0 +1,26 @@
+{
+  "updated_at": "2026-02-04T14:05:22.792345",
+  "records": [
+    {
+      "id": "upload_20260204_140522_68729d4e",
+      "created_at": "2026-02-04T14:05:22.792339",
+      "voltage_level": "HV_220kV",
+      "voltage_level_raw": "220kv",
+      "plugins": [
+        "transformer"
+      ],
+      "plugins_raw": [
+        "transformer_inspection"
+      ],
+      "file_count": 10,
+      "total_size": 1024000,
+      "status": "completed",
+      "data_path": "/test/path",
+      "message": "",
+      "image_count": 0,
+      "video_count": 0,
+      "audio_count": 0,
+      "label_count": 0
+    }
+  ]
+}

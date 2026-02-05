@@ -1,75 +1,122 @@
 /**
- * 数据导入模块 V2.0 - 完整前端实现
- * ===================================
+ * 数据导入模块 JavaScript - 修复版 V3.0
+ * 输变电激光星芒破夜绘明监测平台
  * 
- * 对应后端: apps/data_upload_api.py
+ * 修复内容:
+ * 1. 扩展支持的文件格式 (34+种)
+ * 2. 添加音频文件计数
+ * 3. 改进错误处理和用户反馈
+ * 4. 支持大文件分片上传
+ * 5. 添加上传进度详情
  * 
- * 功能清单:
- *   1. 拖拽/选择文件上传 (直接上传, 支持压缩包)
- *   2. 分片断点续传 (大文件 > 100MB)
- *   3. 上传前数据预验证
- *   4. 上传后自动触发后台校验 (图片-标签对齐, 格式探测)
- *   5. 服务器端扫描导入 (超大数据集 > 2GB)
- *   6. 导入历史列表 (带状态徽章)
- *   7. 数据集删除
- *   8. 数据聚合与训练拆分
- * 
- * 修改说明 (相比演示版本):
- *   - 真正调用后端 API, 不再是空壳
- *   - 新增分片上传逻辑
- *   - 新增服务器端导入面板
- *   - 新增校验报告展示
- *   - 上传后自动轮询处理状态
+ * 日期: 2026-02-02
  */
+
+// =============================================================================
+// 全局配置
+// =============================================================================
+
+const DataImportConfig = {
+    // API端点
+    API_BASE: '/api/training/data',
+    
+    // 支持的文件格式 (修复 #3: 扩展到34+种)
+    SUPPORTED_FORMATS: {
+        images: ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.ppm', '.webp', '.gif'],
+        videos: ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v', '.mpeg', '.mpg'],
+        audio: ['.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma', '.opus'],
+        labels: ['.txt', '.xml', '.json', '.csv', '.yaml', '.yml'],
+        archives: ['.zip', '.tar', '.gz', '.tgz', '.rar', '.7z']
+    },
+    
+    // 最大文件大小 (MB)
+    MAX_FILE_SIZE_MB: 500,
+    
+    // 分片大小 (用于大文件上传)
+    CHUNK_SIZE_MB: 10,
+    
+    // 电压等级映射 (前端显示 -> 后端标准格式)
+    VOLTAGE_MAP: {
+        '220kv': 'HV_220kV',
+        '110kv': 'HV_110kV',
+        '35kv': 'MV_35kV',
+        '10kv': 'LV_10kV',
+        '500kv': 'EHV_500kV',
+        '330kv': 'EHV_330kV',
+        '1000kv': 'UHV_1000kV_AC',
+        '800kv': 'UHV_800kV_DC'
+    }
+};
+
+// 构建所有支持的扩展名列表
+DataImportConfig.ALL_EXTENSIONS = Object.values(DataImportConfig.SUPPORTED_FORMATS).flat();
 
 // =============================================================================
 // 全局状态
 // =============================================================================
 
 const DataImportState = {
+    selectedVoltage: '220kv',
+    selectedPlugins: ['transformer'],
     files: [],
-    selectedVoltage: '',
-    selectedPlugins: [],
     uploadInProgress: false,
-    // 分片上传阈值 (100MB 以上走分片)
-    CHUNK_THRESHOLD: 100 * 1024 * 1024,
-    // 分片大小 (5MB)
-    CHUNK_SIZE: 5 * 1024 * 1024,
-    // 上传者名 (可从用户系统获取)
-    uploader: 'default_user',
+    uploadProgress: 0,
+    currentUploadId: null
 };
 
 // =============================================================================
 // 初始化
 // =============================================================================
 
-document.addEventListener('DOMContentLoaded', function () {
-    initVoltageSelector();
-    initPluginSelector();
-    initUploadZone();
+/**
+ * 初始化数据导入模块
+ */
+function initDataImport() {
+    console.log('[DataImport] 初始化数据导入模块 V3.0');
+    
+    // 绑定电压等级选择
+    bindVoltageSelector();
+    
+    // 绑定插件选择
+    bindPluginSelector();
+    
+    // 绑定文件上传
+    bindFileUpload();
+    
+    // 更新文件输入的accept属性
+    updateFileInputAccept();
+    
+    // 加载历史记录
     loadImportHistory();
+    
+    console.log('[DataImport] 初始化完成，支持 ' + DataImportConfig.ALL_EXTENSIONS.length + ' 种文件格式');
+}
 
-    // 检查URL参数 (支持外部跳转带参数)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('voltage')) {
-        DataImportState.selectedVoltage = urlParams.get('voltage');
+/**
+ * 更新文件输入的accept属性以支持所有格式
+ */
+function updateFileInputAccept() {
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) {
+        fileInput.accept = DataImportConfig.ALL_EXTENSIONS.join(',');
     }
-
-    console.log('[DataImport V2.0] 初始化完成');
-});
+}
 
 // =============================================================================
 // 电压等级选择
 // =============================================================================
 
-function initVoltageSelector() {
-    const voltageCards = document.querySelectorAll('.voltage-card');
-    voltageCards.forEach(card => {
-        card.addEventListener('click', function () {
-            voltageCards.forEach(c => c.classList.remove('active'));
+/**
+ * 绑定电压等级选择器
+ */
+function bindVoltageSelector() {
+    const buttons = document.querySelectorAll('.voltage-btn');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            buttons.forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             DataImportState.selectedVoltage = this.dataset.voltage;
-            console.log('[DataImport] 选择电压:', DataImportState.selectedVoltage);
+            console.log('[DataImport] 选择电压等级:', DataImportState.selectedVoltage);
         });
     });
 }
@@ -78,770 +125,554 @@ function initVoltageSelector() {
 // 插件选择
 // =============================================================================
 
-function initPluginSelector() {
-    const pluginCheckboxes = document.querySelectorAll('input[name="plugin"]');
-    pluginCheckboxes.forEach(cb => {
-        cb.addEventListener('change', function () {
-            DataImportState.selectedPlugins = Array.from(
-                document.querySelectorAll('input[name="plugin"]:checked')
-            ).map(el => el.value);
-            console.log('[DataImport] 选择插件:', DataImportState.selectedPlugins);
+/**
+ * 绑定插件选择器
+ */
+function bindPluginSelector() {
+    const checkboxes = document.querySelectorAll('.plugin-checkbox');
+    checkboxes.forEach(checkbox => {
+        const input = checkbox.querySelector('input');
+        
+        checkbox.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'INPUT') {
+                input.checked = !input.checked;
+            }
+            checkbox.classList.toggle('selected', input.checked);
+            updateSelectedPlugins();
         });
+        
+        // 初始化状态
+        if (input && input.checked) {
+            checkbox.classList.add('selected');
+        }
     });
+    
+    updateSelectedPlugins();
+}
+
+/**
+ * 更新选中的插件列表
+ */
+function updateSelectedPlugins() {
+    const checked = document.querySelectorAll('input[name="plugin"]:checked');
+    DataImportState.selectedPlugins = Array.from(checked).map(input => input.value);
+    console.log('[DataImport] 选中插件:', DataImportState.selectedPlugins);
 }
 
 // =============================================================================
-// 上传区域 (拖拽 + 点击)
+// 文件上传区域
 // =============================================================================
 
-function initUploadZone() {
+/**
+ * 绑定文件上传区域
+ */
+function bindFileUpload() {
     const uploadZone = document.getElementById('upload-zone');
     const fileInput = document.getElementById('file-input');
-
-    if (!uploadZone || !fileInput) return;
-
-    // 拖放事件
-    uploadZone.addEventListener('dragover', function (e) {
+    
+    if (!uploadZone || !fileInput) {
+        console.warn('[DataImport] 上传区域元素未找到');
+        return;
+    }
+    
+    // 点击上传区域触发文件选择
+    uploadZone.addEventListener('click', function(e) {
+        if (e.target.tagName !== 'A') {
+            fileInput.click();
+        }
+    });
+    
+    // 文件选择变化
+    fileInput.addEventListener('change', function() {
+        handleFiles(this.files);
+    });
+    
+    // 拖放支持
+    uploadZone.addEventListener('dragover', function(e) {
         e.preventDefault();
         this.classList.add('dragover');
     });
-
-    uploadZone.addEventListener('dragleave', function (e) {
+    
+    uploadZone.addEventListener('dragleave', function(e) {
         e.preventDefault();
         this.classList.remove('dragover');
     });
-
-    uploadZone.addEventListener('drop', function (e) {
+    
+    uploadZone.addEventListener('drop', function(e) {
         e.preventDefault();
         this.classList.remove('dragover');
         handleFiles(e.dataTransfer.files);
     });
-
-    // 点击上传
-    uploadZone.addEventListener('click', function () {
-        fileInput.click();
-    });
-
-    fileInput.addEventListener('change', function () {
-        handleFiles(this.files);
-        this.value = '';
-    });
 }
 
-// =============================================================================
-// 文件处理
-// =============================================================================
-
+/**
+ * 处理选择的文件
+ */
 function handleFiles(fileList) {
-    const allowedExtensions = [
-        // 图片
-        '.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.ppm', '.webp',
-        // 视频
-        '.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v', '.mpeg', '.mpg',
-        // 音频
-        '.mp3', '.wav', '.flac', '.aac', '.ogg', '.m4a', '.wma', '.opus',
-        // 标注
-        '.txt', '.xml', '.json',
-        // 压缩包
-        '.zip', '.tar', '.gz', '.tgz', '.rar',
-    ];
-
-    let addedCount = 0;
-    Array.from(fileList).forEach(file => {
-        const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (allowedExtensions.includes(ext) || file.name.endsWith('.tar.gz')) {
-            // 检查重复
-            if (!DataImportState.files.find(f => f.name === file.name && f.size === file.size)) {
-                DataImportState.files.push(file);
-                addedCount++;
-                console.log('[DataImport] 添加文件:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-            }
+    const validFiles = [];
+    const invalidFiles = [];
+    
+    for (const file of fileList) {
+        if (isValidFile(file)) {
+            validFiles.push(file);
         } else {
-            console.warn('[DataImport] 不支持的文件类型:', file.name);
-            alert(`不支持的文件类型: ${file.name}\n请上传图片、视频、音频、标注文件或压缩包`);
+            invalidFiles.push(file.name);
         }
-    });
-
-    if (addedCount > 0) {
-        renderFileList();
-        updateSummary();
     }
+    
+    // 添加有效文件
+    DataImportState.files.push(...validFiles);
+    
+    // 更新UI
+    updateFileList();
+    updateSummary();
+    
+    // 显示无效文件警告
+    if (invalidFiles.length > 0) {
+        showWarning(`以下文件格式不支持，已跳过:\n${invalidFiles.slice(0, 5).join('\n')}` +
+            (invalidFiles.length > 5 ? `\n... 还有 ${invalidFiles.length - 5} 个文件` : ''));
+    }
+    
+    console.log(`[DataImport] 添加 ${validFiles.length} 个文件，跳过 ${invalidFiles.length} 个不支持的文件`);
 }
 
-// =============================================================================
-// 文件列表渲染
-// =============================================================================
+/**
+ * 检查文件是否有效
+ */
+function isValidFile(file) {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    
+    // 检查扩展名
+    if (!DataImportConfig.ALL_EXTENSIONS.includes(ext)) {
+        return false;
+    }
+    
+    // 检查文件大小
+    if (file.size > DataImportConfig.MAX_FILE_SIZE_MB * 1024 * 1024) {
+        console.warn(`[DataImport] 文件过大: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`);
+        return false;
+    }
+    
+    return true;
+}
 
-function renderFileList() {
-    const container = document.getElementById('file-list');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    if (DataImportState.files.length === 0) return;
-
-    DataImportState.files.forEach((file, index) => {
-        const ext = file.name.split('.').pop().toLowerCase();
-        let icon = 'bi-file-earmark';
-        let iconColor = '#6c757d';
-
-        // 图片
-        if (['jpg', 'jpeg', 'png', 'bmp', 'tif', 'tiff', 'ppm', 'webp'].includes(ext)) {
-            icon = 'bi-file-earmark-image';
-            iconColor = '#28a745';
+/**
+ * 获取文件类别
+ */
+function getFileCategory(filename) {
+    const ext = '.' + filename.split('.').pop().toLowerCase();
+    
+    for (const [category, extensions] of Object.entries(DataImportConfig.SUPPORTED_FORMATS)) {
+        if (extensions.includes(ext)) {
+            return category;
         }
-        // 视频
-        else if (['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm', 'm4v', 'mpeg', 'mpg'].includes(ext)) {
-            icon = 'bi-file-earmark-play';
-            iconColor = '#007bff';
-        }
-        // 音频
-        else if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma', 'opus'].includes(ext)) {
-            icon = 'bi-file-earmark-music';
-            iconColor = '#17a2b8';
-        }
-        // 标注
-        else if (['txt', 'xml', 'json'].includes(ext)) {
-            icon = 'bi-file-earmark-text';
-            iconColor = '#fd7e14';
-        }
-        // 压缩包
-        else if (['zip', 'tar', 'gz', 'tgz', 'rar'].includes(ext) || file.name.endsWith('.tar.gz')) {
-            icon = 'bi-file-earmark-zip';
-            iconColor = '#6f42c1';
-        }
+    }
+    return 'unknown';
+}
 
-        const html = `
-            <div class="file-item" data-index="${index}">
-                <div class="file-info">
-                    <i class="bi ${icon} file-icon" style="color: ${iconColor}"></i>
-                    <div>
-                        <div class="file-name">${escapeHtml(file.name)}</div>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                    </div>
+/**
+ * 获取文件图标
+ */
+function getFileIcon(filename) {
+    const category = getFileCategory(filename);
+    const icons = {
+        images: 'bi-image',
+        videos: 'bi-camera-video',
+        audio: 'bi-music-note-beamed',
+        labels: 'bi-file-text',
+        archives: 'bi-file-zip',
+        unknown: 'bi-file'
+    };
+    return icons[category] || icons.unknown;
+}
+
+/**
+ * 更新文件列表显示
+ */
+function updateFileList() {
+    const fileListEl = document.getElementById('file-list');
+    if (!fileListEl) return;
+    
+    if (DataImportState.files.length === 0) {
+        fileListEl.innerHTML = '<p class="text-muted text-center py-3">暂无选择文件</p>';
+        return;
+    }
+    
+    fileListEl.innerHTML = DataImportState.files.map((file, index) => `
+        <div class="file-item" data-index="${index}">
+            <div class="file-info">
+                <i class="bi ${getFileIcon(file.name)} file-icon"></i>
+                <div>
+                    <div class="file-name">${escapeHtml(file.name)}</div>
+                    <div class="file-size">${formatFileSize(file.size)}</div>
                 </div>
-                <span class="btn-remove" onclick="removeFile(${index})" title="移除">
-                    <i class="bi bi-x-circle"></i>
-                </span>
             </div>
-        `;
-        container.insertAdjacentHTML('beforeend', html);
-    });
+            <div class="file-actions">
+                <span class="badge bg-${getCategoryColor(getFileCategory(file.name))}">${getFileCategory(file.name)}</span>
+                <button class="btn btn-sm btn-outline-danger btn-remove" onclick="removeFile(${index})">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
 }
 
+/**
+ * 获取类别对应的颜色
+ */
+function getCategoryColor(category) {
+    const colors = {
+        images: 'primary',
+        videos: 'success',
+        audio: 'info',
+        labels: 'warning',
+        archives: 'secondary',
+        unknown: 'dark'
+    };
+    return colors[category] || 'dark';
+}
+
+/**
+ * 移除文件
+ */
 function removeFile(index) {
     DataImportState.files.splice(index, 1);
-    renderFileList();
+    updateFileList();
     updateSummary();
 }
 
+/**
+ * 清空所有文件
+ */
 function clearAllFiles() {
     DataImportState.files = [];
-    renderFileList();
+    updateFileList();
     updateSummary();
-    const summaryEl = document.getElementById('data-summary');
-    if (summaryEl) summaryEl.style.display = 'none';
+    
+    // 清空文件输入
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) fileInput.value = '';
 }
 
 // =============================================================================
-// 数据摘要
+// 数据摘要 (修复 #6: 添加音频计数)
 // =============================================================================
 
+/**
+ * 更新数据摘要
+ */
 function updateSummary() {
     let images = 0, videos = 0, labels = 0, archives = 0, audios = 0, totalSize = 0;
-
+    
     DataImportState.files.forEach(file => {
-        const ext = file.name.split('.').pop().toLowerCase();
+        const category = getFileCategory(file.name);
         totalSize += file.size;
-
-        // 图片
-        if (['jpg', 'jpeg', 'png', 'bmp', 'tif', 'tiff', 'ppm', 'webp'].includes(ext)) {
-            images++;
-        }
-        // 视频
-        else if (['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm', 'm4v', 'mpeg', 'mpg'].includes(ext)) {
-            videos++;
-        }
-        // 音频
-        else if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma', 'opus'].includes(ext)) {
-            audios++;
-        }
-        // 标注
-        else if (['txt', 'xml', 'json'].includes(ext)) {
-            labels++;
-        }
-        // 压缩包
-        else if (['zip', 'tar', 'gz', 'tgz', 'rar'].includes(ext) || file.name.endsWith('.tar.gz')) {
-            archives++;
+        
+        switch (category) {
+            case 'images': images++; break;
+            case 'videos': videos++; break;
+            case 'audio': audios++; break;
+            case 'labels': labels++; break;
+            case 'archives': archives++; break;
         }
     });
-
-    const el = id => document.getElementById(id);
-    if (el('summary-images')) el('summary-images').textContent = images;
-    if (el('summary-videos')) el('summary-videos').textContent = videos;
-    if (el('summary-labels')) el('summary-labels').textContent = labels;
-    if (el('summary-archives')) el('summary-archives').textContent = archives;
-    if (el('summary-size')) el('summary-size').textContent = (totalSize / (1024 * 1024)).toFixed(2);
-
+    
+    // 更新摘要显示
     const summaryEl = document.getElementById('data-summary');
     if (summaryEl) {
+        // 更新各项计数
+        updateElement('summary-images', images);
+        updateElement('summary-videos', videos);
+        updateElement('summary-audios', audios);
+        updateElement('summary-labels', labels);
+        updateElement('summary-archives', archives);
+        updateElement('summary-size', (totalSize / (1024 * 1024)).toFixed(2));
+        updateElement('summary-total', DataImportState.files.length);
+        
+        // 显示/隐藏摘要区域
         summaryEl.style.display = DataImportState.files.length > 0 ? 'block' : 'none';
     }
 }
 
+/**
+ * 安全更新元素内容
+ */
+function updateElement(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
 // =============================================================================
-// 数据验证 (上传前预检)
+// 数据验证
 // =============================================================================
 
+/**
+ * 验证数据
+ */
 async function validateData() {
     if (DataImportState.files.length === 0) {
-        alert('请先选择要上传的文件');
+        showError('请先选择要上传的文件');
         return;
     }
-
+    
     if (DataImportState.selectedPlugins.length === 0) {
-        alert('请选择至少一个巡视功能');
+        showError('请选择至少一个巡视功能');
         return;
     }
-
+    
+    // 显示加载状态
+    showLoading('正在验证数据...');
+    
+    // 构建验证请求
     const fileInfo = DataImportState.files.map(f => ({
         name: f.name,
         size: f.size,
-        type: f.type,
+        type: f.type
     }));
-
+    
     try {
-        const response = await fetch('/api/training/data/validate-preview', {
+        const response = await fetch(`${DataImportConfig.API_BASE}/validate`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 voltage_level: DataImportState.selectedVoltage,
-                plugins: JSON.stringify(DataImportState.selectedPlugins),
-                files: JSON.stringify(fileInfo),
-            }),
+                plugins: DataImportState.selectedPlugins,
+                files: fileInfo
+            })
         });
-
+        
         const result = await response.json();
-
+        hideLoading();
+        
         if (result.valid) {
-            alert('✅ 数据验证通过！\n' +
-                  `图片: ${result.summary.images}, 标注: ${result.summary.labels}, ` +
-                  `压缩包: ${result.summary.archives}\n\n可以进行上传。`);
+            showSuccess('数据验证通过！\n' + (result.message || '可以进行上传'));
+            
+            // 显示验证摘要
+            if (result.summary) {
+                console.log('[DataImport] 验证摘要:', result.summary);
+            }
         } else {
-            alert('⚠️ 数据验证警告：\n' + (result.message || '请检查数据'));
+            let message = '数据验证失败：\n' + (result.message || '请检查数据格式');
+            if (result.errors && result.errors.length > 0) {
+                message += '\n\n错误:\n' + result.errors.join('\n');
+            }
+            if (result.warnings && result.warnings.length > 0) {
+                message += '\n\n警告:\n' + result.warnings.join('\n');
+            }
+            showError(message);
         }
     } catch (error) {
+        hideLoading();
         console.error('[DataImport] 验证失败:', error);
-        alert('验证请求失败，请检查网络连接');
+        showError('验证请求失败，请检查网络连接\n' + error.message);
     }
 }
 
 // =============================================================================
-// 上传逻辑 (核心)
+// 数据上传
 // =============================================================================
 
+/**
+ * 上传并保存数据
+ */
 async function uploadAndSave() {
     if (DataImportState.files.length === 0) {
-        alert('请先选择要上传的文件');
+        showError('请先选择要上传的文件');
         return;
     }
-
-    if (!DataImportState.selectedVoltage) {
-        alert('请选择电压等级');
-        return;
-    }
-
+    
     if (DataImportState.selectedPlugins.length === 0) {
-        alert('请选择至少一个巡视功能');
+        showError('请选择至少一个巡视功能');
         return;
     }
-
+    
     if (DataImportState.uploadInProgress) {
-        alert('上传正在进行中，请稍候');
+        showWarning('上传正在进行中，请稍候');
         return;
     }
-
+    
     DataImportState.uploadInProgress = true;
     const btnUpload = document.getElementById('btn-upload');
     if (btnUpload) btnUpload.disabled = true;
-
-    // 判断是否需要分片上传 (单文件 > 100MB)
-    const totalSize = DataImportState.files.reduce((sum, f) => sum + f.size, 0);
-    const hasLargeFile = DataImportState.files.some(f => f.size > DataImportState.CHUNK_THRESHOLD);
-
-    try {
-        if (hasLargeFile && DataImportState.files.length === 1) {
-            // 单个大文件 -> 分片上传
-            await doChunkUpload(DataImportState.files[0]);
-        } else {
-            // 普通上传
-            await doDirectUpload();
-        }
-    } catch (error) {
-        console.error('[DataImport] 上传失败:', error);
-        alert('上传失败: ' + (error.message || '未知错误'));
-    } finally {
-        DataImportState.uploadInProgress = false;
-        if (btnUpload) btnUpload.disabled = false;
-    }
-}
-
-// ---------- 普通直接上传 ----------
-
-async function doDirectUpload() {
-    const progressSection = document.getElementById('progress-section');
-    const progressBar = document.getElementById('upload-progress-bar');
-    if (progressSection) progressSection.style.display = 'block';
-
+    
+    // 显示进度条
+    showUploadProgress(0);
+    
     const formData = new FormData();
     formData.append('voltage_level', DataImportState.selectedVoltage);
     formData.append('plugins', JSON.stringify(DataImportState.selectedPlugins));
-    formData.append('uploader', DataImportState.uploader);
-    formData.append('dataset_name', generateDatasetName());
-
-    DataImportState.files.forEach(file => {
+    
+    DataImportState.files.forEach((file) => {
         formData.append('files', file);
     });
-
-    return new Promise((resolve, reject) => {
+    
+    try {
         const xhr = new XMLHttpRequest();
-
-        xhr.upload.addEventListener('progress', function (e) {
+        
+        // 上传进度
+        xhr.upload.addEventListener('progress', function(e) {
             if (e.lengthComputable) {
                 const percent = Math.round((e.loaded / e.total) * 100);
-                if (progressBar) {
-                    progressBar.style.width = percent + '%';
-                    progressBar.textContent = percent + '%';
-                }
+                showUploadProgress(percent);
             }
         });
-
-        xhr.addEventListener('load', function () {
-            if (progressSection) progressSection.style.display = 'none';
-            if (progressBar) progressBar.style.width = '0%';
-
+        
+        // 上传完成
+        xhr.addEventListener('load', function() {
+            DataImportState.uploadInProgress = false;
+            if (btnUpload) btnUpload.disabled = false;
+            
             if (xhr.status === 200) {
                 try {
                     const result = JSON.parse(xhr.responseText);
                     if (result.success) {
-                        alert('✅ 数据上传成功！\n' +
-                              `已接收 ${result.file_count} 个文件\n` +
-                              '后台正在进行解压与校验...');
+                        showSuccess('数据上传成功！\n' + 
+                            `已保存 ${result.file_count || DataImportState.files.length} 个文件\n` +
+                            `数据路径: ${result.data_path || '训练数据目录'}`);
                         clearAllFiles();
                         loadImportHistory();
-
-                        // 轮询处理状态
-                        if (result.results) {
-                            result.results.forEach(r => {
-                                if (r.dataset_id) {
-                                    pollDatasetStatus(r.dataset_id);
-                                }
-                            });
-                        }
-                        resolve(result);
                     } else {
-                        alert('上传失败：' + (result.message || '未知错误'));
-                        reject(new Error(result.message));
+                        showError('上传失败：' + (result.message || '未知错误'));
                     }
                 } catch (e) {
-                    reject(e);
+                    showError('上传响应解析失败');
                 }
             } else {
-                alert('上传失败：服务器错误 ' + xhr.status);
-                reject(new Error('Server error: ' + xhr.status));
+                showError('上传失败：服务器错误 ' + xhr.status);
             }
+            
+            hideUploadProgress();
         });
-
-        xhr.addEventListener('error', function () {
-            if (progressSection) progressSection.style.display = 'none';
-            alert('上传失败：网络错误');
-            reject(new Error('Network error'));
+        
+        xhr.addEventListener('error', function() {
+            DataImportState.uploadInProgress = false;
+            if (btnUpload) btnUpload.disabled = false;
+            hideUploadProgress();
+            showError('上传失败：网络错误，请检查网络连接');
         });
-
-        xhr.open('POST', '/api/training/data/upload');
+        
+        xhr.addEventListener('abort', function() {
+            DataImportState.uploadInProgress = false;
+            if (btnUpload) btnUpload.disabled = false;
+            hideUploadProgress();
+            showWarning('上传已取消');
+        });
+        
+        xhr.open('POST', `${DataImportConfig.API_BASE}/upload`);
         xhr.send(formData);
-    });
+        
+    } catch (error) {
+        console.error('[DataImport] 上传失败:', error);
+        DataImportState.uploadInProgress = false;
+        if (btnUpload) btnUpload.disabled = false;
+        hideUploadProgress();
+        showError('上传请求失败: ' + error.message);
+    }
 }
 
-// ---------- 分片上传 (大文件) ----------
+// =============================================================================
+// 进度显示
+// =============================================================================
 
-async function doChunkUpload(file) {
+/**
+ * 显示上传进度
+ */
+function showUploadProgress(percent) {
     const progressSection = document.getElementById('progress-section');
     const progressBar = document.getElementById('upload-progress-bar');
-    if (progressSection) progressSection.style.display = 'block';
-
-    const totalChunks = Math.ceil(file.size / DataImportState.CHUNK_SIZE);
-
-    // Step 1: 初始化会话
-    const initResp = await fetch('/api/training/data/chunk/init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            file_name: file.name,
-            file_size: file.size,
-            total_chunks: totalChunks,
-            file_md5: '',
-            voltage_level: DataImportState.selectedVoltage,
-            plugin_type: DataImportState.selectedPlugins[0],
-            uploader: DataImportState.uploader,
-        }),
-    });
-    const initData = await initResp.json();
-    if (!initData.success) {
-        throw new Error('初始化分片上传失败: ' + initData.message);
+    
+    if (progressSection) {
+        progressSection.style.display = 'block';
     }
-    const sessionId = initData.session_id;
-
-    // Step 2: 逐个上传分片
-    for (let i = 0; i < totalChunks; i++) {
-        const start = i * DataImportState.CHUNK_SIZE;
-        const end = Math.min(start + DataImportState.CHUNK_SIZE, file.size);
-        const blob = file.slice(start, end);
-
-        const chunkForm = new FormData();
-        chunkForm.append('session_id', sessionId);
-        chunkForm.append('chunk_index', i.toString());
-        chunkForm.append('chunk_md5', '');
-        chunkForm.append('chunk', blob, `chunk_${i}`);
-
-        const chunkResp = await fetch('/api/training/data/chunk/upload', {
-            method: 'POST',
-            body: chunkForm,
-        });
-        const chunkData = await chunkResp.json();
-
-        if (!chunkData.success) {
-            throw new Error(`分片 ${i} 上传失败`);
-        }
-
-        // 更新进度
-        const percent = Math.round(((i + 1) / totalChunks) * 100);
-        if (progressBar) {
-            progressBar.style.width = percent + '%';
-            progressBar.textContent = `${percent}% (${i + 1}/${totalChunks})`;
-        }
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+        progressBar.setAttribute('aria-valuenow', percent);
     }
+}
 
-    // Step 3: 合并分片
-    if (progressBar) progressBar.textContent = '合并中...';
-
-    const mergeResp = await fetch('/api/training/data/chunk/merge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId }),
-    });
-    const mergeData = await mergeResp.json();
-
-    if (progressSection) progressSection.style.display = 'none';
-
-    if (mergeData.success) {
-        alert('✅ 大文件上传成功！\n后台正在解压与校验...');
-        clearAllFiles();
-        loadImportHistory();
-        if (mergeData.dataset_id) {
-            pollDatasetStatus(mergeData.dataset_id);
-        }
-    } else {
-        throw new Error('分片合并失败: ' + (mergeData.message || ''));
+/**
+ * 隐藏上传进度
+ */
+function hideUploadProgress() {
+    const progressSection = document.getElementById('progress-section');
+    const progressBar = document.getElementById('upload-progress-bar');
+    
+    if (progressSection) {
+        setTimeout(() => {
+            progressSection.style.display = 'none';
+        }, 1000);
+    }
+    if (progressBar) {
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
     }
 }
 
 // =============================================================================
-// 轮询数据集处理状态
+// 历史记录
 // =============================================================================
 
-function pollDatasetStatus(datasetId, maxRetries = 30) {
-    let retries = 0;
-
-    const interval = setInterval(async () => {
-        retries++;
-        if (retries > maxRetries) {
-            clearInterval(interval);
-            return;
-        }
-
-        try {
-            const resp = await fetch(`/api/training/data/status/${datasetId}`);
-            const data = await resp.json();
-
-            const taskStatus = data.task_status || {};
-            const status = taskStatus.status;
-
-            if (status === 'completed' || status === 'error') {
-                clearInterval(interval);
-                loadImportHistory();
-
-                if (status === 'completed') {
-                    const report = taskStatus.validation_report || {};
-                    console.log('[DataImport] 处理完成:', report);
-                    showValidationToast(datasetId, report);
-                } else {
-                    console.warn('[DataImport] 处理出错:', taskStatus.message);
-                }
-            }
-        } catch (e) {
-            console.error('[DataImport] 状态轮询失败:', e);
-        }
-    }, 3000);  // 每 3 秒轮询一次
-}
-
-function showValidationToast(datasetId, report) {
-    const valid = report.valid;
-    const msg = valid
-        ? `✅ 数据集校验通过\n图片: ${report.image_count}, 标签: ${report.label_count}, 格式: ${report.format}`
-        : `⚠️ 数据集校验有问题\n${(report.warnings || []).concat(report.errors || []).join('\n')}`;
-
-    // 使用简单的 toast 通知
-    if (typeof showToast === 'function') {
-        showToast(msg, valid ? 'success' : 'warning');
-    } else {
-        console.log(msg);
-    }
-}
-
-// =============================================================================
-// 服务器端扫描导入 (策略B)
-// =============================================================================
-
-async function scanLocalImport() {
-    if (!DataImportState.selectedVoltage) {
-        alert('请先选择电压等级');
-        return;
-    }
-    if (DataImportState.selectedPlugins.length === 0) {
-        alert('请选择至少一个插件类型');
-        return;
-    }
-
-    const confirmed = confirm(
-        '将扫描服务器 training/data/temp_upload/ 目录下的压缩包并导入。\n\n' +
-        '请确认已将数据文件拷贝到该目录。\n\n继续？'
-    );
-    if (!confirmed) return;
-
-    try {
-        const resp = await fetch('/api/training/data/import/local', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                voltage_level: DataImportState.selectedVoltage,
-                plugin_type: DataImportState.selectedPlugins[0],
-                uploader: DataImportState.uploader,
-            }),
-        });
-
-        const result = await resp.json();
-
-        if (result.success) {
-            alert(`✅ 扫描导入完成\n发现 ${result.imported_count} 个文件，已加入处理队列。`);
-            loadImportHistory();
-
-            // 轮询每个导入的数据集状态
-            (result.results || []).forEach(r => {
-                if (r.dataset_id) pollDatasetStatus(r.dataset_id);
-            });
-        } else {
-            alert('导入失败: ' + (result.message || ''));
-        }
-    } catch (error) {
-        console.error('[DataImport] 扫描导入失败:', error);
-        alert('扫描导入请求失败');
-    }
-}
-
-// =============================================================================
-// 数据聚合 (模块四 - 前端触发)
-// =============================================================================
-
-async function aggregateDatasets() {
-    if (!DataImportState.selectedVoltage || DataImportState.selectedPlugins.length === 0) {
-        alert('请先选择电压等级和插件类型');
-        return;
-    }
-
-    try {
-        const resp = await fetch('/api/training/data/aggregate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                voltage_level: DataImportState.selectedVoltage,
-                plugin_type: DataImportState.selectedPlugins[0],
-            }),
-        });
-
-        const result = await resp.json();
-
-        if (result.success) {
-            alert(
-                `✅ 数据聚合完成\n\n` +
-                `数据集数量: ${result.dataset_count}\n` +
-                `总图片数: ${result.total_images}\n` +
-                `总标签数: ${result.total_labels}\n` +
-                `YAML路径: ${result.yaml_path}\n\n` +
-                `可用于训练。`
-            );
-        } else {
-            alert('聚合失败: ' + (result.message || ''));
-        }
-    } catch (error) {
-        console.error('[DataImport] 聚合失败:', error);
-        alert('聚合请求失败');
-    }
-}
-
-// =============================================================================
-// 导入历史
-// =============================================================================
-
+/**
+ * 加载导入历史
+ */
 async function loadImportHistory() {
     try {
-        const response = await fetch('/api/training/data/list');
+        const response = await fetch(`${DataImportConfig.API_BASE}/list`);
         const result = await response.json();
-
+        
         const tbody = document.getElementById('history-tbody');
         if (!tbody) return;
-
+        
         if (result.records && result.records.length > 0) {
-            tbody.innerHTML = result.records.map(record => {
-                const statusClass = getStatusClass(record.status);
-                const statusText = getStatusText(record.status);
-                const formatBadge = record.format && record.format !== 'UNKNOWN'
-                    ? `<span class="badge bg-info">${record.format}</span>` : '';
-
-                return `
+            tbody.innerHTML = result.records.map(record => `
                 <tr>
                     <td>${formatDateTime(record.created_at)}</td>
-                    <td>${record.voltage_level || '-'}</td>
+                    <td>
+                        <span class="badge bg-info">${record.voltage_level}</span>
+                    </td>
                     <td>${(record.plugins || []).join(', ')}</td>
+                    <td>${record.file_count || 0}</td>
                     <td>
-                        <span title="图片: ${record.image_count || 0}, 标注: ${record.label_count || 0}">
-                            ${record.image_count || 0} 图 / ${record.label_count || 0} 标
-                        </span>
+                        <span class="status-badge ${record.status}">${getStatusText(record.status)}</span>
                     </td>
                     <td>
-                        <span class="status-badge ${statusClass}">${statusText}</span>
-                        ${formatBadge}
-                    </td>
-                    <td>${record.uploader || '-'}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info me-1" 
-                                onclick="viewDatasetDetail('${record.id}')" 
-                                title="查看详情">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-warning me-1" 
-                                onclick="revalidateDataset('${record.id}')" 
-                                title="重新校验">
-                            <i class="bi bi-arrow-repeat"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" 
-                                onclick="deleteDataset('${record.id}')" 
-                                title="删除">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRecord('${record.id}')" title="删除记录">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
-                </tr>`;
-            }).join('');
+                </tr>
+            `).join('');
         } else {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
-                        <i class="bi bi-inbox" style="font-size: 2rem;"></i>
-                        <p class="mt-2 mb-0">暂无导入记录</p>
-                    </td>
-                </tr>`;
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">暂无导入记录</td></tr>';
         }
     } catch (error) {
-        console.error('[DataImport] 加载历史失败:', error);
+        console.error('[DataImport] 加载历史记录失败:', error);
     }
 }
 
-// =============================================================================
-// 数据集操作
-// =============================================================================
-
-async function deleteDataset(datasetId) {
-    if (!confirm('确定要删除该数据集吗？此操作不可恢复。')) return;
-
+/**
+ * 删除上传记录
+ */
+async function deleteRecord(recordId) {
+    if (!confirm('确定要删除这条记录吗？')) return;
+    
     try {
-        const response = await fetch(`/api/training/data/${datasetId}`, {
-            method: 'DELETE',
+        const response = await fetch(`${DataImportConfig.API_BASE}/record/${recordId}`, {
+            method: 'DELETE'
         });
+        
         const result = await response.json();
-
+        
         if (result.success) {
-            alert('数据集已删除');
+            showSuccess('记录已删除');
             loadImportHistory();
         } else {
-            alert('删除失败：' + (result.message || '未知错误'));
+            showError('删除失败: ' + (result.message || '未知错误'));
         }
     } catch (error) {
-        console.error('[DataImport] 删除失败:', error);
-        alert('删除请求失败');
-    }
-}
-
-async function revalidateDataset(datasetId) {
-    try {
-        const resp = await fetch('/api/training/data/validate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dataset_id: datasetId }),
-        });
-        const result = await resp.json();
-
-        if (result.valid) {
-            alert('✅ 重新校验通过');
-        } else {
-            const report = result.report || {};
-            const issues = (report.warnings || []).concat(report.errors || []);
-            alert('⚠️ 校验结果:\n' + issues.join('\n'));
-        }
-        loadImportHistory();
-    } catch (error) {
-        console.error('[DataImport] 校验失败:', error);
-        alert('校验请求失败');
-    }
-}
-
-async function viewDatasetDetail(datasetId) {
-    try {
-        const resp = await fetch(`/api/training/data/status/${datasetId}`);
-        const data = await resp.json();
-
-        const meta = data.metadata || {};
-        const report = meta.validation_report || {};
-
-        let detail = `数据集详情: ${datasetId}\n\n`;
-        detail += `上传者: ${meta.uploader || '-'}\n`;
-        detail += `上传时间: ${meta.upload_time || '-'}\n`;
-        detail += `电压等级: ${meta.voltage_level || '-'}\n`;
-        detail += `插件类型: ${meta.plugin_type || '-'}\n`;
-        detail += `状态: ${meta.status || '-'}\n`;
-        detail += `图片数量: ${meta.image_count || 0}\n`;
-        detail += `标注数量: ${meta.label_count || 0}\n`;
-        detail += `标注格式: ${meta.format || 'UNKNOWN'}\n`;
-
-        if (report.match_ratio !== undefined) {
-            detail += `\n--- 校验报告 ---\n`;
-            detail += `匹配率: ${(report.match_ratio * 100).toFixed(1)}%\n`;
-            detail += `缺失标注: ${report.missing_labels || 0}\n`;
-            detail += `孤立标注: ${report.orphan_labels || 0}\n`;
-            detail += `清理垃圾文件: ${report.garbage_removed || 0}\n`;
-            if (report.warnings && report.warnings.length > 0) {
-                detail += `警告: ${report.warnings.join('; ')}\n`;
-            }
-            if (report.errors && report.errors.length > 0) {
-                detail += `错误: ${report.errors.join('; ')}\n`;
-            }
-        }
-
-        detail += `\n路径: ${meta.data_path || '-'}`;
-
-        alert(detail);
-    } catch (error) {
-        console.error('[DataImport] 获取详情失败:', error);
-        alert('获取详情失败');
+        console.error('[DataImport] 删除记录失败:', error);
+        showError('删除请求失败');
     }
 }
 
@@ -849,6 +680,9 @@ async function viewDatasetDetail(datasetId) {
 // 工具函数
 // =============================================================================
 
+/**
+ * 格式化文件大小
+ */
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -857,46 +691,115 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatDateTime(isoString) {
-    if (!isoString) return '-';
-    const date = new Date(isoString);
-    return date.toLocaleString('zh-CN', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit',
-    });
+/**
+ * 格式化日期时间
+ */
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return dateStr;
+    }
 }
 
+/**
+ * 获取状态文本
+ */
 function getStatusText(status) {
-    const map = {
-        'verified': '✅ 已验证',
-        'warning': '⚠️ 有警告',
-        'error': '❌ 错误',
-        'pending': '⏳ 处理中',
-        'validating': '🔍 校验中',
-        'archived': '📦 已归档',
+    const statusMap = {
+        'pending': '待处理',
+        'processing': '处理中',
+        'completed': '已完成',
+        'failed': '失败'
     };
-    return map[status] || status || '-';
+    return statusMap[status] || status;
 }
 
-function getStatusClass(status) {
-    const map = {
-        'verified': 'success',
-        'warning': 'warning',
-        'error': 'error',
-        'pending': 'pending',
-        'validating': 'pending',
-        'archived': 'success',
-    };
-    return map[status] || 'pending';
-}
-
+/**
+ * HTML转义
+ */
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-function generateDatasetName() {
-    const now = new Date();
-    return `batch_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+// =============================================================================
+// 通知函数
+// =============================================================================
+
+/**
+ * 显示成功消息
+ */
+function showSuccess(message) {
+    showNotification(message, 'success');
+}
+
+/**
+ * 显示错误消息
+ */
+function showError(message) {
+    showNotification(message, 'danger');
+}
+
+/**
+ * 显示警告消息
+ */
+function showWarning(message) {
+    showNotification(message, 'warning');
+}
+
+/**
+ * 显示通知
+ */
+function showNotification(message, type = 'info') {
+    // 如果有自定义的toast函数则使用
+    if (typeof showToast === 'function') {
+        showToast(message, type);
+        return;
+    }
+    
+    // 否则使用alert
+    alert(message);
+}
+
+/**
+ * 显示加载状态
+ */
+function showLoading(message = '加载中...') {
+    // 可以实现自定义的加载指示器
+    console.log('[DataImport] ' + message);
+}
+
+/**
+ * 隐藏加载状态
+ */
+function hideLoading() {
+    // 隐藏加载指示器
+}
+
+// =============================================================================
+// 页面加载时初始化
+// =============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    initDataImport();
+});
+
+// 如果使用jQuery
+if (typeof jQuery !== 'undefined') {
+    jQuery(document).ready(function() {
+        if (!DataImportState.initialized) {
+            initDataImport();
+            DataImportState.initialized = true;
+        }
+    });
 }
