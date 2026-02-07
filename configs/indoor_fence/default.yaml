@@ -1,0 +1,214 @@
+# 室内电子围栏插件配置 V3.0
+# ================================
+# 
+# 硬约束: simulation_mode 生产环境必须为 false
+#
+
+# 基础配置
+plugin:
+  id: indoor_fence
+  version: "3.0.0"
+  enabled: true
+
+# 仿真模式 (生产环境必须关闭)
+simulation:
+  enabled: false                    # 【硬约束】生产环境必须为 false
+  require_explicit_enable: true     # 需要显式开启才能启用仿真
+  fallback_on_hardware_failure: false  # 硬件故障时是否回退到仿真
+
+# 相机配置
+camera:
+  enabled: true
+  source: "rtsp://192.168.1.100:554/stream"  # RTSP地址或设备索引
+  resolution: [1920, 1080]
+  fps: 30
+  
+  # 检测模型
+  model:
+    path: "models/indoor/person_yolov8n.onnx"
+    device: "cuda"                  # cuda / cpu
+    confidence_threshold: 0.5
+    nms_threshold: 0.45
+  
+  # 相机安装参数 (用于坐标转换)
+  installation:
+    height_m: 3.0                   # 安装高度
+    tilt_deg: 40.0                  # 俯仰角度
+  
+  # 重连配置
+  reconnect:
+    max_attempts: 5
+    delay_seconds: 2.0
+
+# 雷达配置
+lidar:
+  enabled: true
+  device_ip: "192.168.1.101"
+  device_port: 2368
+  scan_rate_hz: 10
+  
+  # 安装参数
+  installation:
+    height_m: 2.5
+    tilt_deg: 20.0
+    angle_offset_deg: 0.0
+  
+  # 数据过滤
+  filter:
+    min_distance_m: 0.1
+    max_distance_m: 15.0
+    noise_threshold: 0.05
+
+# 融合配置
+fusion:
+  enabled: true
+  max_time_diff_ms: 100             # 视觉和雷达时间戳最大差
+  angle_match_threshold_deg: 10.0   # 角度匹配阈值
+  distance_match_threshold_m: 0.5   # 距离匹配阈值
+  
+  # 融合策略
+  strategy:
+    trust_visual_x: true            # 横向信任视觉
+    trust_lidar_y: true             # 纵向信任雷达
+  
+  # 传感器降级
+  degradation:
+    camera_health_threshold: 0.3    # 相机健康度阈值
+    lidar_health_threshold: 0.3     # 雷达健康度阈值
+    auto_switch_to_single_sensor: true  # 自动切换到单传感器模式
+
+# 跟踪配置
+tracking:
+  enabled: true
+  use_deep_features: true           # 使用DeepSORT特征
+  
+  # 基础参数
+  max_age: 30                       # 最大未匹配帧数
+  min_hits: 3                       # 确认所需最小匹配数
+  iou_threshold: 0.3
+  distance_threshold: 1.0           # 米
+  
+  # 重识别
+  reidentification:
+    enabled: true
+    feature_threshold: 0.5
+    max_feature_distance: 0.7
+    cache_deleted_features: true
+    cache_duration_seconds: 30
+
+# 安全区配置
+safety_zone:
+  # 黄线配置
+  yellow_line:
+    y_position_m: 0.5               # 黄线Y坐标
+    warning_distance_m: 0.3         # 预警距离
+    danger_distance_m: 0.0          # 越线判定距离
+  
+  # 越线检测
+  crossing_detection:
+    confirm_duration_ms: 500        # 越线确认时间
+    use_hysteresis: true            # 使用迟滞判定
+    enter_threshold_m: 0.3
+    exit_threshold_m: 0.5
+
+# 机柜授权配置
+cabinet_authorization:
+  enabled: true
+  default_allow_list: []            # 默认授权机柜列表
+  check_multi_person: true          # 检查同一机柜多人
+  max_persons_per_cabinet: 1
+
+# 灯光控制配置
+light_control:
+  enabled: true
+  controller_ip: "192.168.1.102"
+  controller_port: 8080
+  
+  # 颜色映射
+  colors:
+    safe: "green"
+    warning: "yellow"
+    alarm: "red"
+    critical: "red_blink"
+
+# API配置
+api:
+  version: "v3"
+  prefix: "/api/v3/indoor/fence"
+  
+  # WebSocket配置
+  websocket:
+    heartbeat_interval_seconds: 25
+    message_buffer_size: 1000
+    max_reconnect_attempts: 10
+  
+  # 历史事件配置
+  events:
+    history_size: 10000
+    dedup_window_ms: 1000
+
+# 审计日志配置
+audit:
+  enabled: true
+  log_level: "INFO"
+  
+  # 存储配置
+  storage:
+    type: "sqlite"                  # sqlite / postgresql / timescaledb
+    path: "data/indoor_fence_audit.db"
+    retention_days: 90
+  
+  # 记录内容
+  record:
+    frame_data: true
+    state_changes: true
+    alerts: true
+    violations: true
+
+# 性能配置
+performance:
+  # 处理频率
+  process_fps: 30
+  
+  # 线程配置
+  use_multiprocessing: false
+  worker_threads: 2
+  
+  # 内存限制
+  max_track_history: 50
+  max_event_history: 10000
+
+# 监控配置
+monitoring:
+  enabled: true
+  
+  # 健康检查
+  health_check:
+    interval_seconds: 10
+  
+  # 指标导出
+  metrics:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+
+# 告警配置
+alerting:
+  # 告警级别
+  levels:
+    info:
+      sound: false
+      light: false
+    warning:
+      sound: true
+      light: true
+      light_color: "yellow"
+    alarm:
+      sound: true
+      light: true
+      light_color: "red"
+    critical:
+      sound: true
+      light: true
+      light_color: "red_blink"
+      emergency_broadcast: true

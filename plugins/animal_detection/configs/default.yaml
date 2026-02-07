@@ -1,65 +1,42 @@
-# =============================================================================
-# 动物入侵检测插件配置 - animal_detection
-# 输变电激光星芒破夜绘明监测平台
-# =============================================================================
+# 室内动物入侵检测插件默认配置
+# 对齐工程要求: 默认非仿真、真实推理优先
 
 model:
   path: "models/animal/animal_yolov8n.onnx"
   device: "cpu"
   input_size: [640, 640]
-  half_precision: false
 
-detection:
-  confidence_threshold: 0.40
-  nms_threshold: 0.45
-  multi_scale: true                 # 多尺度检测（提高小目标感知）
-  tracking_enabled: true
-  max_track_age: 50                 # 较大值（动物可能短暂消失）
-  min_confirm_frames: 2
-  dwell_alarm_seconds: 30           # 停留超时告警
+# 依据《性能指标参数汇总》入侵检测约束
+inference:
+  confidence_threshold: 0.55
+  nms_threshold: 0.4
+  max_detections: 100
+  multi_scale: true
 
-species:
-  classes:
-    - rat                           # 鼠
-    - mouse                         # 小鼠
-    - cat                           # 猫
-    - snake                         # 蛇
-    - bird                          # 鸟
-    - insect                        # 昆虫
-    - weasel                        # 黄鼠狼
-    - unknown_animal                # 未知动物
-  risk_levels:
-    rat: "high"
-    mouse: "medium"
-    cat: "low"
-    snake: "critical"
-    bird: "low"
-    insect: "low"
-    weasel: "high"
-    unknown_animal: "medium"
+thermal:
+  enabled: false
+  heat_diff_threshold_c: 2.0
+  background_update_rate: 0.01
 
-thermal_fusion:
+tracking:
   enabled: true
-  alive_temp_diff: 3.0              # 活体温差阈值 (°C)
-  fusion_weight: 0.3                # 热成像融合权重
-  background_temp: 25.0             # 背景温度 (°C)
+  max_age: 30
+  min_hits: 3
+  iou_threshold: 0.3
 
 deterrent:
-  enabled: true
-  ultrasonic_enabled: true
-  strobe_enabled: true
-  audio_alarm_enabled: false
-  auto_trigger: true
-  trigger_confidence: 0.6
-  cooldown_seconds: 60              # 驱离冷却时间
-  max_continuous_seconds: 30        # 最大持续驱离时间
-  feedback_learning: true           # 驱离效果反馈学习
+  enabled: false
+  stay_time_threshold_s: 2.0
+  cooldown_s: 60.0
+  audio_enabled: true
+  light_enabled: true
 
-risk_assessment:
-  high_risk_species: ["snake", "rat", "weasel"]
-  equipment_proximity_m: 0.5
-  cable_zone_weight: 2.0
-  equipment_zone_weight: 1.5
+statistics:
+  report_interval_hours: 24
+  history_retention_days: 90
+
+simulation:
+  enabled: false
 
 zones:
   - zone_id: "zone_cable_trench"
@@ -75,13 +52,6 @@ zones:
     polygon: [[0.5, 0.0], [1.0, 0.0], [1.0, 0.7], [0.5, 0.7]]
     sensitivity: "medium"
 
-statistics:
-  daily_report: true
-  weekly_report: true
-  export_format: "json"
-  trend_window_days: 30
-
-performance:
-  max_fps: 15
-  batch_size: 1
-  async_processing: true
+site_id: ""
+log_dir: "plugins/animal_detection/logs"
+evidence_dir: "plugins/animal_detection/evidence"

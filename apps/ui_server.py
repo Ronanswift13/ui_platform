@@ -126,6 +126,14 @@ def create_app() -> FastAPI:
     except ImportError as e:
         print(f"✗ 室内监测中心API导入失败: {e}")
 
+    # ============== 集成室内电子围栏API (V3.0) ==============
+    try:
+        from apps.indoor_fence_api_v3 import integrate_indoor_fence_api_v3
+        integrate_indoor_fence_api_v3(app)
+        print("✓ 室内电子围栏API已集成 (V3.0)")
+    except ImportError as e:
+        print(f"✗ 室内电子围栏API导入失败: {e}")
+
     # ============== 集成室外监测中心API (V4.0) ==============
     try:
         from apps.outdoor_api import integrate_outdoor_api

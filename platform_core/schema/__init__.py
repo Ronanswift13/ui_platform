@@ -25,6 +25,14 @@ from platform_core.schema.models import (
     PluginOutput,
 )
 from platform_core.schema.validator import SchemaValidator, validate_plugin_output
+from platform_core.schema.indoor_fence_events import (
+    UnifiedEvent,
+    EventType,
+    AlertLevel,
+    PersonState,
+    IndoorFenceEventBuilder,
+    EventValidator,
+)
 
 __all__ = [
     "Site",
@@ -40,4 +48,10 @@ __all__ = [
     "PluginOutput",
     "SchemaValidator",
     "validate_plugin_output",
+    "UnifiedEvent",
+    "EventType",
+    "AlertLevel",
+    "PersonState",
+    "IndoorFenceEventBuilder",
+    "EventValidator",
 ]

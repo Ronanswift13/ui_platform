@@ -1,0 +1,43 @@
+{
+  "model": {
+    "path": "models/animal/animal_yolov8n.onnx",
+    "device": "cpu",
+    "input_size": [640, 640]
+  },
+  "inference": {
+    "confidence_threshold": 0.55,
+    "nms_threshold": 0.4,
+    "max_detections": 100,
+    "multi_scale": true
+  },
+  "thermal": {
+    "enabled": false,
+    "heat_diff_threshold_c": 2.0,
+    "background_update_rate": 0.01
+  },
+  "tracking": {
+    "enabled": true,
+    "max_age": 30,
+    "min_hits": 3,
+    "iou_threshold": 0.3
+  },
+  "deterrent": {
+    "enabled": false,
+    "stay_time_threshold_s": 2.0,
+    "cooldown_s": 60.0,
+    "max_retries": 3,
+    "audio_enabled": true,
+    "light_enabled": true
+  },
+  "statistics": {
+    "report_interval_hours": 24,
+    "history_retention_days": 90
+  },
+  "simulation": {
+    "enabled": false,
+    "_comment": "默认关闭仿真，真实推理优先"
+  },
+  "site_id": "",
+  "log_dir": "plugins/animal_detection/logs",
+  "evidence_dir": "plugins/animal_detection/evidence"
+}

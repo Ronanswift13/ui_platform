@@ -106,7 +106,7 @@ const IndoorMonitorState = {
     autoRefresh: true,
     
     // 模拟数据模式（当API不可用时）
-    simulationMode: true
+    simulationMode: false
 };
 
 // =============================================================================

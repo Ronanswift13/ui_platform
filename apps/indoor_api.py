@@ -185,12 +185,19 @@ async def get_animal_data():
 
         if plugin and hasattr(plugin, 'get_detections'):
             detections = plugin.get_detections()
+            det_list = detections.get("detections") or detections.get("animals") or []
             return {
-                "timestamp": int(time.time() * 1000),
+                "timestamp": detections.get("timestamp", int(time.time() * 1000)),
                 "status": detections.get("status", "online"),
-                "animals": detections.get("animals", []),
-                "totalCount": len(detections.get("animals", [])),
-                "alarmCount": detections.get("alarmCount", 0)
+                "detections": det_list,
+                "animals": det_list,
+                "totalCount": detections.get("totalCount", len(det_list)),
+                "alarmCount": detections.get("alarmCount", 0),
+                "todayCount": detections.get("todayCount", 0),
+                "deterrentActive": detections.get("deterrentActive", False),
+                "trace_id": detections.get("trace_id"),
+                "risk_level": detections.get("risk_level"),
+                "suggestion": detections.get("suggestion"),
             }
     except Exception as e:
         logger.error(f"获取动物检测数据失败: {e}")
@@ -198,9 +205,12 @@ async def get_animal_data():
     return {
         "timestamp": int(time.time() * 1000),
         "status": "offline",
+        "detections": [],
         "animals": [],
         "totalCount": 0,
-        "alarmCount": 0
+        "alarmCount": 0,
+        "todayCount": 0,
+        "deterrentActive": False,
     }
 
 
@@ -634,4 +644,3 @@ if __name__ == "__main__":
                 print(f"✗ {plugin_id}: 未加载")
         except Exception as e:
             print(f"✗ {plugin_id}: 错误 - {e}")
-
