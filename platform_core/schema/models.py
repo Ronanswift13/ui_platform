@@ -1,36 +1,52 @@
 """
-统一数据模型定义
+统一数据模型定义 - 兼容层
 
-所有数据模型使用Pydantic v2定义
-确保类型安全和自动验证
+核心数据模型已迁移到 darkbreaker_sdk.schemas
+本模块保留向后兼容的 re-export，并包含平台特有模型（Site, Device, Task 等）。
+
+插件开发者应使用:
+    from darkbreaker_sdk.schemas import BoundingBox, RecognitionResult, Alarm, ...
 """
-
 
 from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
-from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
+
+# ===== Re-exports from darkbreaker_sdk (backward compatibility) =====
+
+from darkbreaker_sdk.schemas.common import (  # noqa: F401
+    generate_id,
+    BaseEntity,
+    ROIType,
+    EvidenceType,
+    Evidence,
+)
+
+from darkbreaker_sdk.schemas.detection import (  # noqa: F401
+    BoundingBox,
+    RecognitionResult,
+)
+
+from darkbreaker_sdk.schemas.alarm import (  # noqa: F401
+    Alarm,
+    AlarmLevel,
+    AlarmRule,
+    AlarmStatus,
+)
+
+from darkbreaker_sdk.schemas.plugin_io import (  # noqa: F401
+    PluginOutput,
+)
+
+from darkbreaker_sdk.schemas.common import (  # noqa: F401
+    ROI,
+)
 
 
-def generate_id() -> str:
-    """生成唯一ID"""
-    return str(uuid4())
-
-
-class BaseEntity(BaseModel):
-    """基础实体模型"""
-    id: str = Field(default_factory=generate_id)
-    name: str
-    description: str = ""
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-# ============== 站点/设备层级模型 ==============
+# ===== 平台特有模型 (不在 SDK 中) =====
 
 class Site(BaseEntity):
     """站点模型 - 变电站"""
@@ -73,51 +89,6 @@ class Component(BaseEntity):
     rois: list["ROI"] = Field(default_factory=list)
 
 
-# ============== ROI模型 ==============
-
-class ROIType(str, Enum):
-    """ROI识别类型"""
-    DEFECT = "defect"  # 缺陷检测
-    STATE = "state"  # 状态识别
-    METER = "meter"  # 表计读数
-    THERMAL = "thermal"  # 热成像
-    INTRUSION = "intrusion"  # 入侵检测
-
-
-class BoundingBox(BaseModel):
-    """边界框"""
-    x: float  # 左上角x (0-1归一化)
-    y: float  # 左上角y
-    width: float
-    height: float
-
-    @field_validator("x", "y", "width", "height")
-    @classmethod
-    def validate_normalized(cls, v: float) -> float:
-        if not 0 <= v <= 1:
-            raise ValueError("坐标值必须在0-1之间")
-        return v
-
-
-class ROI(BaseEntity):
-    """识别区域模型"""
-    component_id: str
-    roi_type: ROIType
-    bbox: BoundingBox
-    recognition_types: list[str] = Field(default_factory=list)  # 绑定的识别类型
-    rules: list["AlarmRule"] = Field(default_factory=list)
-
-
-class AlarmRule(BaseModel):
-    """告警规则"""
-    id: str = Field(default_factory=generate_id)
-    name: str
-    condition: str  # 条件表达式
-    level: str = "warning"  # info, warning, error, critical
-    message_template: str = ""
-    enabled: bool = True
-
-
 # ============== 任务模型 ==============
 
 class TaskStatus(str, Enum):
@@ -153,111 +124,8 @@ class Task(BaseEntity):
     result_id: Optional[str] = None
 
 
-# ============== 识别结果模型 ==============
-
-class RecognitionResult(BaseModel):
-    """单个识别结果 - 插件输出的最小单位"""
-    task_id: str
-    site_id: str
-    device_id: str
-    component_id: str
-    roi_id: str
-    bbox: BoundingBox
-    label: str  # 识别标签
-    value: Optional[Any] = None  # 识别值 (表计读数/温度/状态等)
-    confidence: float = Field(ge=0, le=1)
-    evidence_path: str = ""  # 证据截图路径
-    model_version: str = ""
-    code_version: str = ""  # code hash
-    timestamp: datetime = Field(default_factory=datetime.now)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    failure_reason: Optional[str] = None  # 失败原因码
-
-
-class PluginOutput(BaseModel):
-    """插件标准输出格式"""
-    task_id: str
-    plugin_id: str
-    plugin_version: str
-    code_hash: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-    success: bool = True
-    results: list[RecognitionResult] = Field(default_factory=list)
-    alarms: list["Alarm"] = Field(default_factory=list)
-    error_message: str = ""
-    error_code: Optional[str] = None
-    processing_time_ms: float = 0
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-# ============== 告警模型 ==============
-
-class AlarmLevel(str, Enum):
-    """告警级别"""
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
-class AlarmStatus(str, Enum):
-    """告警状态"""
-    ACTIVE = "active"
-    ACKNOWLEDGED = "acknowledged"
-    RESOLVED = "resolved"
-    FALSE_POSITIVE = "false_positive"
-
-
-class Alarm(BaseModel):
-    """告警模型"""
-    id: str = Field(default_factory=generate_id)
-    task_id: str
-    result_id: Optional[str] = None
-    rule_id: Optional[str] = None
-    level: AlarmLevel = AlarmLevel.WARNING
-    status: AlarmStatus = AlarmStatus.ACTIVE
-    title: str
-    message: str
-    site_id: str
-    device_id: str
-    component_id: str = ""
-    evidence_path: str = ""
-    created_at: datetime = Field(default_factory=datetime.now)
-    acknowledged_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
-    acknowledged_by: str = ""
-    resolved_by: str = ""
-    notes: str = ""
-
-
-# ============== 证据模型 ==============
-
-class EvidenceType(str, Enum):
-    """证据类型"""
-    RAW_IMAGE = "raw_image"
-    ANNOTATED_IMAGE = "annotated_image"
-    VIDEO_CLIP = "video_clip"
-    THERMAL_IMAGE = "thermal_image"
-    LOG = "log"
-    RESULT_JSON = "result_json"
-
-
-class Evidence(BaseModel):
-    """证据记录"""
-    id: str = Field(default_factory=generate_id)
-    run_id: str  # 任务运行ID
-    task_id: str
-    evidence_type: EvidenceType
-    file_path: str
-    file_size: int = 0
-    checksum: str = ""  # MD5/SHA256
-    created_at: datetime = Field(default_factory=datetime.now)
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
 # 更新forward references
 Site.model_rebuild()
 Position.model_rebuild()
 Device.model_rebuild()
 Component.model_rebuild()
-ROI.model_rebuild()
