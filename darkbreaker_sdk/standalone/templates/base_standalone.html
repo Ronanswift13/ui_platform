@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title | default("DarkBreaker Plugin") }}{% endblock %}</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+    <!-- SDK Stylesheet -->
+    <link href="/static/css/standalone.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --panel-bg: #1e293b;
+            --bg: #0f172a;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Top Navbar -->
+    <nav class="navbar navbar-dark" style="background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color);">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-lightning-charge-fill text-warning me-2"></i>
+                {% block navbar_title %}{{ title | default("DarkBreaker Plugin") }}{% endblock %}
+            </span>
+            <div class="d-flex align-items-center gap-3">
+                <span id="connection-status" class="badge bg-secondary">
+                    <i class="bi bi-circle-fill me-1"></i>Disconnected
+                </span>
+                <span class="text-secondary small">
+                    v{{ plugin_version | default("1.0.0") }}
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid p-0">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Bottom Status Bar -->
+    {% block status_bar %}
+    <div class="status-bar" style="background-color: var(--panel-bg); border-top: 1px solid var(--border-color);">
+        <div class="container-fluid d-flex justify-content-between align-items-center py-1 px-3">
+            <div class="d-flex gap-4 small">
+                <span><i class="bi bi-speedometer2 me-1"></i>FPS: <span id="stat-fps">0</span></span>
+                <span><i class="bi bi-image me-1"></i>Frames: <span id="stat-frames">0</span></span>
+                <span><i class="bi bi-bullseye me-1"></i>Detections: <span id="stat-detections">0</span></span>
+                <span><i class="bi bi-exclamation-triangle me-1"></i>Alarms: <span id="stat-alarms">0</span></span>
+                <span><i class="bi bi-clock me-1"></i>Avg: <span id="stat-avg-time">0</span>ms</span>
+            </div>
+            <div class="small text-secondary">
+                Plugin: {{ plugin_id | default("unknown") }}
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- SDK JavaScript -->
+    <script src="/static/js/standalone.js"></script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

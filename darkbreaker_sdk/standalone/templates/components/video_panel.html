@@ -1,0 +1,37 @@
+<!-- Video/Image Input Panel -->
+<div class="card bg-dark border-secondary mb-3">
+    <div class="card-header border-secondary d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-camera-video me-2"></i>Input Source</span>
+        <span id="input-status" class="badge bg-secondary">Idle</span>
+    </div>
+    <div class="card-body">
+        <!-- Upload Image -->
+        <div class="mb-3">
+            <label class="form-label small text-secondary">Upload Image</label>
+            <input type="file" class="form-control form-control-sm bg-dark border-secondary text-light"
+                   id="image-upload" accept="image/*">
+        </div>
+
+        <!-- Camera Source -->
+        <div class="mb-3">
+            <label class="form-label small text-secondary">Camera URL (RTSP/HTTP)</label>
+            <div class="input-group input-group-sm">
+                <input type="text" class="form-control bg-dark border-secondary text-light"
+                       id="camera-url" placeholder="rtsp://...">
+                <button class="btn btn-outline-secondary" type="button" id="btn-connect-camera">
+                    <i class="bi bi-link-45deg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary btn-sm" id="btn-detect" disabled>
+                <i class="bi bi-play-fill me-1"></i>Run Detection
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="btn-auto-refresh" data-active="false">
+                <i class="bi bi-arrow-repeat me-1"></i>Auto-Refresh: Off
+            </button>
+        </div>
+    </div>
+</div>

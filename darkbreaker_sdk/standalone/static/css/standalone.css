@@ -1,0 +1,221 @@
+/* DarkBreaker SDK - Standalone Plugin Stylesheet */
+
+:root {
+    --panel-bg: #1e293b;
+    --bg: #0f172a;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+}
+
+/* Global */
+body {
+    background-color: var(--bg);
+    color: var(--text-primary);
+    overflow-x: hidden;
+}
+
+/* Status Bar */
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+    font-size: 0.8rem;
+}
+
+/* Cards */
+.card.bg-dark {
+    background-color: var(--panel-bg) !important;
+}
+
+.card-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Form Controls */
+.form-control.bg-dark,
+.form-select.bg-dark {
+    background-color: var(--bg) !important;
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+.form-control.bg-dark:focus,
+.form-select.bg-dark:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
+}
+
+.form-control.bg-dark::placeholder {
+    color: var(--text-secondary);
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn-outline-secondary {
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Detection List Items */
+.detection-item {
+    background-color: var(--panel-bg);
+    border-color: var(--border-color) !important;
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    transition: background-color 0.2s;
+}
+
+.detection-item:hover {
+    background-color: var(--border-color);
+}
+
+.detection-item .label {
+    font-weight: 600;
+}
+
+.detection-item .confidence {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Alarm Items */
+.alarm-item {
+    background-color: var(--panel-bg);
+    border-color: var(--border-color) !important;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.alarm-item.alarm-critical {
+    border-left: 3px solid var(--danger) !important;
+}
+
+.alarm-item.alarm-error {
+    border-left: 3px solid var(--danger) !important;
+}
+
+.alarm-item.alarm-warning {
+    border-left: 3px solid var(--warning) !important;
+}
+
+.alarm-item.alarm-info {
+    border-left: 3px solid var(--accent) !important;
+}
+
+/* Visualization Container */
+#visualization-container {
+    background-color: var(--bg);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* Badge Styling */
+.badge.bg-success { background-color: var(--success) !important; }
+.badge.bg-warning { background-color: var(--warning) !important; }
+.badge.bg-danger { background-color: var(--danger) !important; }
+
+/* Connection Status */
+#connection-status.connected {
+    background-color: var(--success) !important;
+}
+
+#connection-status.disconnected {
+    background-color: var(--text-secondary) !important;
+}
+
+#connection-status.error {
+    background-color: var(--danger) !important;
+}
+
+/* Stats Cards */
+.stats-card {
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    text-align: center;
+}
+
+.stats-card .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stats-card .label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+/* Config Form */
+.config-field {
+    margin-bottom: 0.75rem;
+}
+
+.config-field label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+/* Responsive adjustments */
+@media (max-height: 700px) {
+    .status-bar {
+        position: relative;
+    }
+}
+
+@media (max-width: 768px) {
+    .row.g-0 {
+        height: auto !important;
+    }
+    .col-md-3, .col-md-6 {
+        border: none !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+}

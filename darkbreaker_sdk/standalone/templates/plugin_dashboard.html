@@ -1,0 +1,72 @@
+{% extends "base_standalone.html" %}
+
+{% block content %}
+<div class="row g-0" style="height: calc(100vh - 90px);">
+
+    <!-- Left Column: Controls -->
+    <div class="col-md-3 p-3" style="background-color: var(--panel-bg); border-right: 1px solid var(--border-color); overflow-y: auto;">
+        <h6 class="text-uppercase text-secondary mb-3">
+            <i class="bi bi-sliders me-2"></i>Controls
+        </h6>
+
+        <!-- Video/Image Input Panel -->
+        {% include "components/video_panel.html" %}
+
+        <hr class="border-secondary my-3">
+
+        <!-- Configuration Editor -->
+        {% include "components/config_editor.html" %}
+    </div>
+
+    <!-- Center Column: Visualization -->
+    <div class="col-md-6 p-3 d-flex flex-column" style="overflow-y: auto;">
+        <h6 class="text-uppercase text-secondary mb-3">
+            <i class="bi bi-eye me-2"></i>Visualization
+        </h6>
+
+        <!-- Main canvas / image display area -->
+        <div id="visualization-container" class="flex-grow-1 d-flex align-items-center justify-content-center"
+             style="background-color: var(--bg); border: 1px solid var(--border-color); border-radius: 8px; min-height: 400px; position: relative;">
+            <div id="canvas-placeholder" class="text-center text-secondary">
+                <i class="bi bi-image" style="font-size: 3rem;"></i>
+                <p class="mt-2">Upload an image or connect a camera to begin</p>
+            </div>
+            <canvas id="detection-canvas" style="display: none; max-width: 100%; max-height: 100%;"></canvas>
+            <img id="detection-image" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;">
+        </div>
+
+        <!-- Stats Panel -->
+        {% include "components/stats_panel.html" %}
+    </div>
+
+    <!-- Right Column: Results -->
+    <div class="col-md-3 p-3" style="background-color: var(--panel-bg); border-left: 1px solid var(--border-color); overflow-y: auto;">
+        <h6 class="text-uppercase text-secondary mb-3">
+            <i class="bi bi-list-check me-2"></i>Results
+        </h6>
+
+        <!-- Detection Results List -->
+        {% include "components/detection_list.html" %}
+
+        <hr class="border-secondary my-3">
+
+        <!-- Alarm Panel -->
+        {% include "components/alarm_panel.html" %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Initialize the standalone dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        DarkBreakerSDK.init({
+            pluginId: '{{ plugin_id }}',
+            pluginName: '{{ plugin_name }}',
+            wsUrl: 'ws://' + window.location.host + '/ws/stream',
+            apiBase: window.location.origin
+        });
+    });
+</script>
+{% endblock %}
