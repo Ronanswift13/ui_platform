@@ -1,0 +1,20 @@
+{
+  "onnx_path": "plugins/animal_detection/models/animal_yolov8n.onnx",
+  "verified_at": "2026-02-16T02:36:55.802737+00:00",
+  "input_shape": [
+    1,
+    3,
+    640,
+    640
+  ],
+  "output_shapes": [
+    [
+      1,
+      84,
+      8400
+    ]
+  ],
+  "avg_inference_ms": 55.8,
+  "test_image_used": false,
+  "status": "pass"
+}

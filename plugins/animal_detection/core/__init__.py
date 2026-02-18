@@ -10,6 +10,7 @@ from .event_schema import (
     AnimalDetectionResult, AnimalEvent, build_intrusion_event,
 )
 from .detector import YOLOv8Detector, DEFAULT_CLASS_MAP, CLASS_NAMES_CN
+from .onnx_inference import AnimalONNXEngine, InferenceResult, Detection
 from .thermal_validator import ThermalValidator
 from .tracker import AnimalTracker, AnimalTrack
 from .deterrent import DeterrentController, DeterrentAction, DeterrentResult, DETERRENT_STRATEGY
@@ -22,6 +23,7 @@ __all__ = [
     "AnimalDetectionResult", "AnimalEvent", "build_intrusion_event",
     # Detector
     "YOLOv8Detector", "DEFAULT_CLASS_MAP", "CLASS_NAMES_CN",
+    "AnimalONNXEngine", "InferenceResult", "Detection",
     # Thermal
     "ThermalValidator",
     # Tracker

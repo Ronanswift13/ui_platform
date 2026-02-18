@@ -1,0 +1,29 @@
+{
+  "model_name": "animal_yolov8n",
+  "format": "onnx",
+  "mode": "coco_pretrained_baseline",
+  "opset": 12,
+  "input_size": [
+    1,
+    3,
+    640,
+    640
+  ],
+  "source_classes": 80,
+  "target_classes": 7,
+  "class_names": [
+    "rat",
+    "cat",
+    "snake",
+    "bird",
+    "dog",
+    "poultry",
+    "other_wildlife"
+  ],
+  "class_mapping": "plugins/animal_detection/models/class_mapping.json",
+  "exported_at": "2026-02-16T02:35:47.730631+00:00",
+  "file_hash": "c5f0649e63ba4700d30b04c70944299a42a61573a06990a0f133cddb95e02699",
+  "confidence_threshold": 0.55,
+  "nms_threshold": 0.4,
+  "coverage_warning": "仅覆盖 bird/cat/dog, 其他类别需自有数据训练"
+}

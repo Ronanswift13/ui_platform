@@ -1,0 +1,32 @@
+{
+  "mode": "coco_pretrained",
+  "description": "COCO 预训练模型, 使用类别映射提取动物检测",
+  "coco_to_animal": {
+    "14": {
+      "target_class": "bird",
+      "target_id": 3
+    },
+    "15": {
+      "target_class": "cat",
+      "target_id": 1
+    },
+    "16": {
+      "target_class": "dog",
+      "target_id": 4
+    }
+  },
+  "unmapped_as": "other_wildlife",
+  "unmapped_id": 6,
+  "total_coco_classes": 80,
+  "total_animal_classes": 7,
+  "class_names": [
+    "rat",
+    "cat",
+    "snake",
+    "bird",
+    "dog",
+    "poultry",
+    "other_wildlife"
+  ],
+  "note": "此为初始基线模型, 仅覆盖 COCO 中的 bird/cat/dog 三类. rat/snake/poultry/other_wildlife 需要自有数据微调后才能检测. 请尽快准备标注数据并执行 --mode train 进行完整训练."
+}

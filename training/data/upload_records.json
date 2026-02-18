@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-02-04T14:05:22.792345",
+  "updated_at": "2026-02-16T10:45:29.982122",
   "records": [
     {
       "id": "upload_20260204_140522_68729d4e",
@@ -17,6 +17,27 @@
       "status": "completed",
       "data_path": "/test/path",
       "message": "",
+      "image_count": 0,
+      "video_count": 0,
+      "audio_count": 0,
+      "label_count": 0
+    },
+    {
+      "id": "upload_20260216_104528_7c96ac61",
+      "created_at": "2026-02-16T10:45:29.260248",
+      "voltage_level": "HV_220kV",
+      "voltage_level_raw": "220kv",
+      "plugins": [
+        "transformer"
+      ],
+      "plugins_raw": [
+        "transformer"
+      ],
+      "file_count": 2,
+      "total_size": 818088536,
+      "status": "completed",
+      "data_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/data/raw/HV_220kV/upload_20260216_104528_7c96ac61",
+      "message": "处理完成: train=593, val=170, test=85",
       "image_count": 0,
       "video_count": 0,
       "audio_count": 0,

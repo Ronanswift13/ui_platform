@@ -37,7 +37,7 @@
     "models_required": [
         {
             "model_id": "animal_yolov8",
-            "model_path": "models/animal/animal_yolov8n.onnx",
+            "model_path": "models/animal_yolov8n.onnx",
             "description": "YOLOv8小动物检测模型",
             "required": true,
             "classes": ["rat", "mouse", "cat", "snake", "bird", "insect", "weasel", "unknown_animal"],
@@ -119,7 +119,7 @@
             "model": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "default": "models/animal/animal_yolov8n.onnx"},
+                    "path": {"type": "string", "default": "models/animal_yolov8n.onnx"},
                     "device": {"type": "string", "enum": ["cpu", "cuda"], "default": "cpu"},
                     "input_size": {"type": "array", "default": [640, 640]}
                 }

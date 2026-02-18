@@ -1,0 +1,38 @@
+# bird_monitoring 独立运行示例配置
+
+plugin:
+  model:
+    # 可选: 覆盖插件模型路径
+    # path: "plugins/bird_monitoring/models/bird_yolov8n.onnx"
+    device: "cpu"
+
+train:
+  # 必填: YOLO data.yaml 路径 (可相对当前配置文件目录)
+  data: "data/bird_data.yaml"
+  model: "yolov8n.pt"
+  epochs: 10
+  imgsz: 640
+  batch: 8
+  device: "cpu"
+  output: "runs"
+  name: "bird_train"
+  # 没装 ultralytics 时建议先 true，先做数据校验
+  dry_run: true
+
+infer:
+  # 支持单数字符串
+  input: "data/samples/test.jpg"
+  # 也支持列表
+  # inputs:
+  #   - "data/samples/test_01.jpg"
+  #   - "data/samples/test_02.jpg"
+  roi: "0,0,1,1"
+  output: "output/inference_summary.json"
+
+context:
+  task_id: "bird-standalone-task"
+  site_id: "site-local"
+  device_id: "camera-local"
+  component_id: "power-line-1"
+  metadata:
+    phase_spacing_m: 3.0

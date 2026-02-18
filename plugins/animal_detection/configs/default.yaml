@@ -2,9 +2,11 @@
 # 对齐工程要求: 默认非仿真、真实推理优先
 
 model:
-  path: "models/animal/animal_yolov8n.onnx"
+  path: "models/animal_yolov8n.onnx"
   device: "cpu"
   input_size: [640, 640]
+
+inference_device: "cpu"
 
 # 依据《性能指标参数汇总》入侵检测约束
 inference:

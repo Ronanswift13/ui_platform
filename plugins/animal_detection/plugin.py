@@ -50,6 +50,7 @@ except ImportError:
 # === 核心模块导入 ===
 from plugins.animal_detection.core import (
     YOLOv8Detector,
+    AnimalONNXEngine,
     ThermalValidator,
     AnimalTracker,
     DeterrentController,
@@ -60,6 +61,7 @@ from plugins.animal_detection.core import (
     build_intrusion_event,
     EvidenceItem,
     AnimalClass,
+    BoundingBox,
     CLASS_NAMES_CN,
 )
 
@@ -222,12 +224,17 @@ class AnimalDetectionPlugin:
 
         # 核心组件
         self._detector: Optional[YOLOv8Detector] = None
+        self._onnx_engine: Optional[AnimalONNXEngine] = None
         self._thermal_validator: Optional[ThermalValidator] = None
         self._tracker: Optional[AnimalTracker] = None
         self._deterrent: Optional[DeterrentController] = None
         self._statistics: Optional[StatisticsCollector] = None
         self._audit_logger: Optional[AnimalAuditLogger] = None
         self._evidence_manager: Optional[EvidenceManager] = None
+        self._model_backend: str = "none"
+        self._model_mode: str = "unknown"
+        self._model_path: str = ""
+        self._last_inference_backend_status: Dict[str, Any] = {}
 
         # 运行时状态
         self._frame_count: int = 0
@@ -279,32 +286,28 @@ class AnimalDetectionPlugin:
             if self._simulation_mode:
                 logger.warning("⚠️ 动物检测插件运行在仿真模式（非真实推理）")
 
-            # 1. 初始化检测器
+            # 1. 初始化模型推理后端 (ONNX 引擎优先, 兼容旧检测器)
             model_config = self._config.get("model", {})
-            model_path = model_config.get(
-                "path",
-                str(plugin_dir / "models" / "animal_yolov8n.onnx"),
+            default_model_path = plugin_dir / "models" / "animal_yolov8n.onnx"
+            model_path = self._resolve_model_path(
+                model_config.get("path", str(default_model_path))
             )
+            self._model_path = model_path
             inference_config = self._config.get("inference", {})
 
-            self._detector = YOLOv8Detector(
-                model_path=model_path,
-                device=model_config.get("device", "cpu"),
-                input_size=tuple(model_config.get("input_size", [640, 640])),
-                confidence_threshold=inference_config.get("confidence_threshold", 0.5),
-                nms_threshold=inference_config.get("nms_threshold", 0.45),
-                max_detections=inference_config.get("max_detections", 50),
-                multi_scale=inference_config.get("multi_scale", False),
-            )
-
             if not self._simulation_mode:
-                self._model_ready = self._detector.load()
+                self._initialize_model_backend(
+                    model_path=model_path,
+                    model_config=model_config,
+                    inference_config=inference_config,
+                )
                 if not self._model_ready:
                     # 非演示要求：无模型时不输出假数据，进入降级空跑模式
                     self._last_error = f"model_load_failed:{model_path}"
                     logger.error("模型加载失败，进入降级模式（不生成模拟检测数据）")
             else:
                 self._model_ready = False
+                self._model_backend = "simulation"
                 logger.info("仿真模式: 跳过模型加载")
 
             # 2. 初始化热成像校验器
@@ -354,6 +357,8 @@ class AnimalDetectionPlugin:
                 f"动物检测插件初始化完成 | "
                 f"模型: {model_path} | "
                 f"模型可用: {'是' if self._model_ready else '否'} | "
+                f"后端: {self._model_backend} | "
+                f"模式: {self._model_mode} | "
                 f"热成像: {'启用' if thermal_config.get('enabled') else '关闭'} | "
                 f"跟踪: {'启用' if tracking_config.get('enabled', True) else '关闭'} | "
                 f"驱离: {'启用' if deterrent_config.get('enabled') else '关闭'} | "
@@ -404,14 +409,8 @@ class AnimalDetectionPlugin:
 
         with self._lock:
             try:
-                # === Step 1: YOLOv8 检测 ===
-                if self._simulation_mode:
-                    detections = []  # 仿真模式不产生假数据
-                elif self._model_ready and self._detector:
-                    detections = self._detector.detect(frame)
-                else:
-                    # 非演示约束: 模型不可用时不输出伪造结果
-                    detections = []
+                # === Step 1: 检测推理 (ONNX/兼容后端) ===
+                detections = self._run_detection(frame)
 
                 # === Step 2: 热成像校验 ===
                 if detections and self._thermal_validator:
@@ -436,6 +435,9 @@ class AnimalDetectionPlugin:
                     site_id=self._config.get("site_id", ""),
                     evidence=[],
                 )
+                backend_trace_id = self._last_inference_backend_status.get("trace_id")
+                if backend_trace_id:
+                    event.trace_id = backend_trace_id
 
                 if detections and self._evidence_manager:
                     event.evidence = self._evidence_manager.save_detection_frame(
@@ -566,6 +568,8 @@ class AnimalDetectionPlugin:
             if status != "error":
                 status = "degraded"
             issues.append("模型未就绪（真实推理不可用）")
+            if self._last_error:
+                issues.append(self._last_error)
 
         if self._error_count > 10:
             if status != "error":
@@ -579,11 +583,15 @@ class AnimalDetectionPlugin:
             "version": self.version,
             "simulation_mode": self._simulation_mode,
             "model_ready": self._model_ready,
+            "model_backend": self._model_backend,
+            "model_mode": self._model_mode,
+            "model_path": self._model_path,
             "frame_count": self._frame_count,
             "inference_count": self._inference_count,
             "error_count": self._error_count,
             "last_process_time_ms": round(self._last_process_time * 1000, 2),
             "detector": self._detector.get_stats() if self._detector else None,
+            "onnx_engine": self._onnx_engine.get_health_info() if self._onnx_engine else None,
             "thermal": self._thermal_validator.get_stats() if self._thermal_validator else None,
             "tracker": self._tracker.get_stats() if self._tracker else None,
             "deterrent": self._deterrent.get_stats() if self._deterrent else None,
@@ -599,6 +607,10 @@ class AnimalDetectionPlugin:
         if self._tracker:
             self._tracker.reset()
 
+        self._onnx_engine = None
+        self._model_backend = "none"
+        self._model_mode = "unknown"
+        self._last_inference_backend_status = {}
         self._initialized = False
         self.status = PluginStatus.UNLOADED
         logger.info(f"[{self.id}] 插件已清理")
@@ -709,6 +721,7 @@ class AnimalDetectionPlugin:
                 "todayCount": self._statistics.get_today_count() if self._statistics else 0,
                 "deterrentActive": False,
                 "simulation_mode": self._simulation_mode,
+                "model_info": self._build_model_info(),
             }
 
         detections: List[Dict[str, Any]] = []
@@ -757,6 +770,7 @@ class AnimalDetectionPlugin:
             "risk_level": self._last_event.risk_level,
             "suggestion": self._last_event.suggestion,
             "simulation_mode": self._simulation_mode,
+            "model_info": self._build_model_info(),
         }
 
     def get_capabilities(self) -> Dict[str, Any]:
@@ -801,11 +815,193 @@ class AnimalDetectionPlugin:
             self._config.setdefault("inference", {})["confidence_threshold"] = max(0.0, min(1.0, val))
             if self._detector:
                 self._detector.confidence_threshold = self._config["inference"]["confidence_threshold"]
+            if self._onnx_engine:
+                self._onnx_engine.conf_threshold = self._config["inference"]["confidence_threshold"]
             return {"success": True, "confidence_threshold": self._config["inference"]["confidence_threshold"]}
 
         return {"success": False, "message": f"不支持的操作: {operation}"}
 
     # ==================== 内部方法 ====================
+
+    def _initialize_model_backend(
+        self,
+        model_path: str,
+        model_config: Dict[str, Any],
+        inference_config: Dict[str, Any],
+    ) -> None:
+        """
+        初始化模型推理后端:
+        1) 优先使用 AnimalONNXEngine (新引擎)
+        2) 失败时回退到 YOLOv8Detector (兼容旧逻辑)
+        """
+        self._model_ready = False
+        self._model_backend = "none"
+        self._model_mode = "unknown"
+        self._detector = None
+        self._onnx_engine = None
+
+        conf_threshold = float(inference_config.get("confidence_threshold", 0.55))
+        nms_threshold = float(inference_config.get("nms_threshold", 0.4))
+        inference_device = self._config.get("inference_device", model_config.get("device", "cpu"))
+
+        class_mapping_path = Path(model_path).with_name("class_mapping.json")
+        mapping_arg = str(class_mapping_path) if class_mapping_path.is_file() else None
+
+        self._onnx_engine = AnimalONNXEngine(
+            model_path=model_path,
+            conf_threshold=conf_threshold,
+            nms_threshold=nms_threshold,
+            class_mapping_path=mapping_arg,
+            device=inference_device,
+        )
+        if self._onnx_engine.load():
+            self._model_ready = True
+            self._model_backend = "onnx_engine"
+            self._model_mode = self._onnx_engine.model_mode or "unknown"
+            logger.info(
+                "ONNX 推理引擎加载成功 | model=%s | mode=%s",
+                model_path,
+                self._model_mode,
+            )
+            return
+
+        logger.warning("ONNX 推理引擎加载失败, 尝试兼容后端 YOLOv8Detector")
+        self._detector = YOLOv8Detector(
+            model_path=model_path,
+            device=inference_device,
+            input_size=tuple(model_config.get("input_size", [640, 640])),
+            confidence_threshold=conf_threshold,
+            nms_threshold=nms_threshold,
+            max_detections=inference_config.get("max_detections", 50),
+            multi_scale=inference_config.get("multi_scale", False),
+        )
+        if self._detector.load():
+            self._model_ready = True
+            self._model_backend = "legacy_detector"
+            self._model_mode = "legacy"
+            logger.warning("兼容后端加载成功: YOLOv8Detector")
+            return
+
+        self._model_backend = "none"
+        self._model_mode = "unavailable"
+
+    def _run_detection(self, frame: np.ndarray) -> List[AnimalDetectionResult]:
+        """
+        执行检测并统一为 AnimalDetectionResult 列表.
+        """
+        self._last_inference_backend_status = {}
+        if self._simulation_mode:
+            return []
+        if frame is None or not isinstance(frame, np.ndarray) or frame.size == 0:
+            return []
+        if not self._model_ready:
+            return []
+
+        if self._model_backend == "onnx_engine" and self._onnx_engine:
+            result = self._onnx_engine.infer(frame)
+            self._last_inference_backend_status = {
+                "backend": "onnx_engine",
+                "status": result.status,
+                "trace_id": result.trace_id,
+                "model_name": result.model_name,
+                "model_mode": result.model_mode,
+                "inference_ms": round(result.inference_ms, 2),
+                "error_message": result.error_message,
+            }
+            if result.status != "ok":
+                return []
+            detections: List[AnimalDetectionResult] = []
+            for det in result.detections:
+                converted = self._convert_onnx_detection(det)
+                if converted is not None:
+                    detections.append(converted)
+            return detections
+
+        if self._detector:
+            detections = self._detector.detect(frame)
+            self._last_inference_backend_status = {
+                "backend": "legacy_detector",
+                "status": "ok",
+                "trace_id": "",
+                "model_name": os.path.basename(self._model_path),
+                "model_mode": "legacy",
+                "inference_ms": 0.0,
+                "error_message": "",
+            }
+            return detections
+
+        return []
+
+    def _convert_onnx_detection(self, detection: Any) -> Optional[AnimalDetectionResult]:
+        """将 ONNX 引擎 Detection 转为平台事件检测结构."""
+        if not hasattr(detection, "bbox_normalized"):
+            return None
+        x1, y1, x2, y2 = detection.bbox_normalized
+        x1 = max(0.0, min(1.0, float(x1)))
+        y1 = max(0.0, min(1.0, float(y1)))
+        x2 = max(0.0, min(1.0, float(x2)))
+        y2 = max(0.0, min(1.0, float(y2)))
+        width = max(0.0, x2 - x1)
+        height = max(0.0, y2 - y1)
+
+        return AnimalDetectionResult(
+            animal_class=self._map_external_class(getattr(detection, "class_name", "")),
+            confidence=float(getattr(detection, "confidence", 0.0)),
+            bbox=BoundingBox(x=x1, y=y1, width=width, height=height),
+        )
+
+    @staticmethod
+    def _map_external_class(class_name: str) -> str:
+        """
+        统一类别命名:
+        - 新引擎 7 类: rat/cat/snake/bird/dog/poultry/other_wildlife
+        - 平台事件枚举: mouse/cat/snake/bird/dog/poultry/insect/other
+        """
+        name = (class_name or "").strip().lower()
+        mapping = {
+            "rat": AnimalClass.MOUSE.value,
+            "mouse": AnimalClass.MOUSE.value,
+            "cat": AnimalClass.CAT.value,
+            "snake": AnimalClass.SNAKE.value,
+            "bird": AnimalClass.BIRD.value,
+            "dog": AnimalClass.DOG.value,
+            "poultry": AnimalClass.POULTRY.value,
+            "insect": AnimalClass.INSECT.value,
+            "other_wildlife": AnimalClass.OTHER.value,
+            "other": AnimalClass.OTHER.value,
+        }
+        return mapping.get(name, AnimalClass.OTHER.value)
+
+    def _resolve_model_path(self, model_path: str) -> str:
+        """
+        将模型路径标准化为绝对路径.
+        相对路径默认按插件目录解析.
+        """
+        path = Path(model_path).expanduser()
+        if not path.is_absolute():
+            project_path = (_project_root / path)
+            plugin_path = (self.plugin_dir / path)
+            if project_path.exists() and not plugin_path.exists():
+                path = project_path
+            else:
+                path = plugin_path
+        return str(path)
+
+    def _build_model_info(self) -> Dict[str, Any]:
+        """构建前端可消费的模型状态描述."""
+        info: Dict[str, Any] = {
+            "loaded": self._model_ready,
+            "backend": self._model_backend,
+            "model_mode": self._model_mode,
+            "model_path": self._model_path,
+        }
+        if self._onnx_engine:
+            info["onnx"] = self._onnx_engine.get_health_info()
+        if self._last_inference_backend_status:
+            info["last_inference"] = self._last_inference_backend_status
+        if not self._model_ready and self._last_error:
+            info["reason"] = self._last_error
+        return info
 
     def _load_default_config(self) -> Dict[str, Any]:
         """优先加载 default.yaml，其次 default.json。"""
@@ -872,6 +1068,7 @@ class AnimalDetectionPlugin:
         out["tracking"] = tracking
         out["deterrent"] = deterrent
         out["simulation"] = simulation
+        out.setdefault("inference_device", out.get("model", {}).get("device", "cpu"))
         out.setdefault("statistics", {"history_retention_days": 90, "report_interval_hours": 24})
         return out
 

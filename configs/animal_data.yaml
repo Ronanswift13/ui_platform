@@ -1,0 +1,54 @@
+# ============================================================
+# 动物入侵检测数据集配置 — animal_data.yaml
+# 用于 Ultralytics YOLOv8 训练
+# ============================================================
+# 使用方法:
+#   yolo detect train data=configs/animal_data.yaml model=yolov8n.pt
+#   或通过 train_animal_model.py --data configs/animal_data.yaml
+#
+# 目录结构要求:
+#   datasets/
+#   └── animal_intrusion/
+#       ├── images/
+#       │   ├── train/    # 训练集图片 (.jpg/.png)
+#       │   └── val/      # 验证集图片
+#       ├── labels/
+#       │   ├── train/    # 训练集标注 (YOLO格式 .txt)
+#       │   └── val/      # 验证集标注
+#       └── test/         # (可选) 测试集
+#           ├── images/
+#           └── labels/
+#
+# 标注格式 (每行):
+#   <class_id> <x_center> <y_center> <width> <height>
+#   所有坐标归一化到 [0, 1]
+# ============================================================
+
+# --- 路径配置 ---
+# 相对路径基于本文件所在目录, 或使用绝对路径
+path: ../datasets/animal_intrusion   # 数据集根目录
+train: images/train                   # 训练集图片目录 (相对于 path)
+val: images/val                       # 验证集图片目录
+test: images/test                     # 测试集 (可选)
+
+# --- 类别定义 ---
+nc: 7  # 类别总数
+
+names:
+  0: rat              # 鼠类 (含老鼠、田鼠等)
+  1: cat              # 猫 (含野猫、家猫)
+  2: snake            # 蛇类
+  3: bird             # 鸟类 (含麻雀、燕子、乌鸦等)
+  4: dog              # 犬类
+  5: poultry          # 家禽 (鸡、鸭、鹅)
+  6: other_wildlife   # 其他小型野生动物 (黄鼠狼、刺猬等)
+
+# --- 数据来源说明 ---
+# 初始阶段可使用以下开源数据集补充:
+#   1. MS COCO (bird=14, cat=15, dog=16) → 映射到 class 3,1,4
+#   2. Open Images v7 (Mouse, Snake, Bird, Cat, Dog 等)
+#   3. iNaturalist 2021 (精细动物分类)
+#   4. Roboflow Universe 上的变电站/工业场景动物检测数据集
+#
+# 数据导入工具: scripts/prepare_dataset.py
+# ============================================================
