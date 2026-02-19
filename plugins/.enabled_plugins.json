@@ -1,0 +1,21 @@
+{
+  "enabled": [
+    "acoustic_monitoring",
+    "animal_detection",
+    "bird_monitoring",
+    "busbar_inspection",
+    "capacitor_inspection",
+    "device_monitoring",
+    "fire_detection",
+    "gas_detection",
+    "hyperspectral_detection",
+    "indoor_fence",
+    "meter_reading",
+    "multimodal_fusion",
+    "slam_mapping",
+    "switch_inspection",
+    "temperature_monitoring",
+    "transformer_inspection"
+  ],
+  "version": "1.0.0"
+}

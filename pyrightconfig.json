@@ -4,13 +4,15 @@
     "pythonVersion": "3.9",
     "extraPaths": [
         ".",
-        "platform_core"
+        "platform_core",
+        "darkbreaker_sdk"
     ],
     "include": [
         "platform_core",
         "plugins",
         "apps",
-        "tests"
+        "tests",
+        "darkbreaker_sdk"
     ],
     "exclude": [
         "venv",

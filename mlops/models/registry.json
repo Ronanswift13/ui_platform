@@ -19,8 +19,8 @@
           "precision": 0.9
         },
         "validation_metrics": {},
-        "created_at": "2026-01-20T16:41:51.399378",
-        "updated_at": "2026-01-20T16:41:51.399378",
+        "created_at": "2026-02-19T18:09:05.476475",
+        "updated_at": "2026-02-19T18:09:05.476475",
         "trained_at": null,
         "deployed_at": null,
         "tags": [],

@@ -1,4 +1,4 @@
-current_category: 超高压
-current_voltage_level: 500kV_AC
-current_voltage_level_display: EHV_500kV
+current_category: 低压
+current_voltage_level: 10kV
+current_voltage_level_display: LV_10kV
 last_updated: /Users/ronan/Desktop/DarkBreaker
