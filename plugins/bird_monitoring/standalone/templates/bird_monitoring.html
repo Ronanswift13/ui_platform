@@ -1,0 +1,113 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Bird Monitoring - DarkBreaker{% endblock %}
+{% block navbar_title %}Bird Monitoring Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm, .status-critical { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Detection Status</div>
+            <div class="metric-value status-normal" id="detection-status">Ready</div>
+            <div class="metric-label">Bird monitoring active</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Active Tracks</div>
+            <div class="metric-value" id="active-tracks">0</div>
+            <div class="metric-label">Tracked birds</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Bird Database</div>
+            <div class="metric-value" id="db-size">0</div>
+            <div class="metric-label">Known species</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Inference Count</div>
+            <div class="metric-value" id="inference-count">0</div>
+            <div class="metric-label">Total processed</div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-binoculars me-1"></i>Bird Detections</div>
+            <div class="event-list" id="detection-events">
+                <div class="event-item text-secondary">No detections yet</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle-fill me-1"></i>Risk Alerts</div>
+            <div class="event-list" id="risk-alerts">
+                <div class="event-item text-secondary">No alerts</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data) return;
+        if (data.active_tracks !== undefined) {
+            document.getElementById('active-tracks').textContent = data.active_tracks;
+        }
+        if (data.bird_database_size !== undefined) {
+            document.getElementById('db-size').textContent = data.bird_database_size;
+        }
+        if (data.inference_count !== undefined) {
+            document.getElementById('inference-count').textContent = data.inference_count;
+        }
+    }
+</script>
+{% endblock %}

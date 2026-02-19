@@ -1,0 +1,113 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Hyperspectral Detection - DarkBreaker{% endblock %}
+{% block navbar_title %}Hyperspectral Detection Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm, .status-critical { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Analysis Status</div>
+            <div class="metric-value status-normal" id="analysis-status">Ready</div>
+            <div class="metric-label">Spectral engine</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Spectral Bands</div>
+            <div class="metric-value" id="num-bands">224</div>
+            <div class="metric-label">Active channels</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Defects Found</div>
+            <div class="metric-value" id="defect-count">0</div>
+            <div class="metric-label">Current scan</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Primary Material</div>
+            <div class="metric-value" id="primary-material">--</div>
+            <div class="metric-label">Identified material</div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-rainbow me-1"></i>Spectral Analysis</div>
+            <div class="event-list" id="spectral-events">
+                <div class="event-item text-secondary">No analysis data</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-search me-1"></i>Defect Detection</div>
+            <div class="event-list" id="defect-events">
+                <div class="event-item text-secondary">No defects detected</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+        if (data.num_bands !== undefined) {
+            document.getElementById('num-bands').textContent = data.num_bands;
+        }
+        if (data.defect_detection) {
+            document.getElementById('defect-count').textContent = data.defect_detection.defect_count || 0;
+        }
+        if (data.material_analysis) {
+            document.getElementById('primary-material').textContent = data.material_analysis.primary_material || '--';
+        }
+    }
+</script>
+{% endblock %}

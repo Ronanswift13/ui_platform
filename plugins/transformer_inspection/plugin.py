@@ -21,14 +21,14 @@ import importlib.util
 import sys
 import numpy as np
 
-from platform_core.plugin_manager.base import (
+from darkbreaker_sdk.interfaces import (
     BasePlugin,
     HealthStatus,
     PluginContext,
     PluginManifest,
     PluginStatus,
 )
-from platform_core.schema.models import (
+from darkbreaker_sdk.schemas import (
     Alarm,
     AlarmLevel,
     AlarmRule,
@@ -123,6 +123,18 @@ class TransformerInspectionPlugin(BasePlugin):
         self.nms_threshold = 0.4
         self.max_detections = 100
     
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        instance.init(config)
+        return instance
+
     def init(self, config: dict[str, Any]) -> bool:
         """
         初始化插件
@@ -437,3 +449,6 @@ class TransformerInspectionPlugin(BasePlugin):
     def _get_label_name(self, label: str) -> str:
         """获取标签的中文名称"""
         return self.LABEL_NAMES.get(label, label)
+
+
+Plugin = TransformerInspectionPlugin

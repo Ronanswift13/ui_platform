@@ -1,0 +1,125 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Fire Detection - DarkBreaker{% endblock %}
+{% block navbar_title %}Fire Detection Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm, .status-critical { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Fire Level</div>
+            <div class="metric-value status-normal" id="fire-level">None</div>
+            <div class="metric-label">Current assessment</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Fusion Confidence</div>
+            <div class="metric-value" id="fusion-conf">0.00</div>
+            <div class="metric-label">Multi-sensor fusion</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Detections</div>
+            <div class="metric-value" id="det-count">0</div>
+            <div class="metric-label">Fire/smoke objects</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Evacuation</div>
+            <div class="metric-value status-normal" id="evac-status">Not needed</div>
+            <div class="metric-label">Evacuation status</div>
+        </div>
+    </div>
+
+    <!-- Detection View -->
+    <div class="col-md-8">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-fire me-1"></i>Detection View</div>
+            <canvas id="detectionCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
+        </div>
+    </div>
+
+    <!-- Sensor Status -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-diagram-3 me-1"></i>Sensor Status</div>
+            <div class="event-list" id="sensor-status">
+                <div class="event-item">Smoke: <span id="smoke-val">--</span></div>
+                <div class="event-item">Temperature: <span id="temp-val">--</span></div>
+                <div class="event-item">CO: <span id="co-val">--</span></div>
+                <div class="event-item">Humidity: <span id="humidity-val">--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alarms -->
+    <div class="col-md-12">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Alarm History</div>
+            <div class="event-list" id="alarm-list">
+                <div class="event-item text-secondary">No alarms</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data) return;
+        document.getElementById('fire-level').textContent = data.fire_level || 'none';
+        document.getElementById('fusion-conf').textContent = (data.fusion_confidence || 0).toFixed(2);
+        document.getElementById('det-count').textContent = (data.detections || []).length;
+        const evac = data.evacuation_needed;
+        const evacEl = document.getElementById('evac-status');
+        evacEl.textContent = evac ? 'EVACUATE' : 'Not needed';
+        evacEl.className = 'metric-value ' + (evac ? 'status-alarm' : 'status-normal');
+    }
+</script>
+{% endblock %}

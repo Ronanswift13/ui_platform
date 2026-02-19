@@ -284,14 +284,59 @@ function drawDetections(data) {
     });
 }
 
-// 插件列表
-function renderPluginList() {
+// Map outdoor module IDs to plugin IDs in the installer
+const OUTDOOR_MODULE_TO_PLUGIN = {
+    busbar: 'busbar_inspection',
+    switch: 'switch_inspection',
+    transformer: 'transformer_inspection',
+    capacitor: 'capacitor_inspection',
+    meter: 'meter_reading',
+    bird: 'bird_monitoring',
+    acoustic: 'acoustic_monitoring',
+    gas: 'gas_detection',
+    hyperspectral: 'hyperspectral_detection',
+    slam: 'slam_mapping',
+    fusion: 'multimodal_fusion',
+};
+
+// Enabled plugins cache
+let _enabledOutdoorPlugins = null;
+
+/**
+ * Load enabled plugins from the API and filter the plugin list
+ */
+async function fetchEnabledPlugins() {
+    try {
+        const resp = await fetch('/api/plugins/enabled');
+        if (resp.ok) {
+            const data = await resp.json();
+            _enabledOutdoorPlugins = new Set(data.enabled || []);
+        }
+    } catch (e) {
+        console.warn('[OutdoorCenter] Could not load enabled plugins, showing all:', e.message);
+    }
+}
+
+function isPluginEnabled(moduleId) {
+    if (!_enabledOutdoorPlugins) return true; // show all if API unavailable
+    const pluginId = OUTDOOR_MODULE_TO_PLUGIN[moduleId];
+    return !pluginId || _enabledOutdoorPlugins.has(pluginId);
+}
+
+// 插件列表 (dynamic loading - only show enabled plugins)
+async function renderPluginList() {
     const container = document.getElementById('plugin-list');
     if (!container) return;
-    
-    const plugins = ['busbar', 'switch', 'transformer', 'capacitor', 'meter', 
-                     'bird', 'acoustic', 'gas', 'hyperspectral', 'slam', 'fusion'];
-    
+
+    // Fetch enabled plugins first
+    await fetchEnabledPlugins();
+
+    const allPlugins = ['busbar', 'switch', 'transformer', 'capacitor', 'meter',
+                        'bird', 'acoustic', 'gas', 'hyperspectral', 'slam', 'fusion'];
+
+    // Filter to only enabled plugins
+    const plugins = allPlugins.filter(id => isPluginEnabled(id));
+
     container.innerHTML = plugins.map(id => `
         <div class="plugin-panel" data-plugin="${id}">
             <div class="plugin-header" onclick="togglePlugin('${id}')">
@@ -310,6 +355,12 @@ function renderPluginList() {
             </div>
         </div>
     `).join('');
+
+    // Log disabled plugins
+    const disabled = allPlugins.filter(id => !isPluginEnabled(id));
+    if (disabled.length > 0) {
+        console.log(`[OutdoorCenter] Disabled plugins hidden: ${disabled.join(', ')}`);
+    }
 }
 
 function togglePlugin(pluginId) {

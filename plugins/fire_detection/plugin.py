@@ -35,6 +35,11 @@ from enum import Enum
 
 import numpy as np
 
+from darkbreaker_sdk.interfaces import HealthStatus
+from darkbreaker_sdk.schemas import (
+    Alarm, AlarmLevel, RecognitionResult, BoundingBox,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -108,6 +113,20 @@ class FireDetectionPlugin:
         self._training_config: Dict = {}
 
         logger.info(f"[{self.PLUGIN_NAME}] 实例已创建")
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        instance = cls()
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        if hasattr(instance, 'init'):
+            instance.init(config)
+        elif hasattr(instance, 'initialize'):
+            instance.initialize(config)
+        return instance
 
     # =========================================================================
     # 属性 (兼容 platform_core.plugin_manager)
@@ -299,8 +318,6 @@ class FireDetectionPlugin:
             result = self.detect(frame, context={"task_id": getattr(context, "task_id", "")})
             
             # 转换为 RecognitionResult 格式
-            from platform_core.schema.models import RecognitionResult, BoundingBox
-            
             results = []
             for det in result.get("detections", []):
                 bbox = det.get("bbox", {})
@@ -328,37 +345,25 @@ class FireDetectionPlugin:
 
     def postprocess(self, results, rules):
         """BasePlugin.postprocess 兼容"""
-        try:
-            from platform_core.schema.models import Alarm, AlarmLevel as AL
-
-            alarms = []
-            for r in results:
-                if r.label in ("fire", "smoke") and r.confidence > 0.5:
-                    level = AL.ERROR if r.label == "fire" else AL.WARNING
-                    alarms.append(Alarm(
-                        task_id=r.task_id, result_id=None, level=level,
-                        title=f"{'火焰' if r.label == 'fire' else '烟雾'}检测告警",
-                        message=f"在监测区域检测到{r.label}，置信度: {r.confidence:.2%}",
-                        site_id=r.site_id, device_id=r.device_id, component_id=r.component_id,
-                    ))
-            return alarms
-        except ImportError:
-            return []
+        alarms = []
+        for r in results:
+            if r.label in ("fire", "smoke") and r.confidence > 0.5:
+                level = AlarmLevel.ERROR if r.label == "fire" else AlarmLevel.WARNING
+                alarms.append(Alarm(
+                    task_id=r.task_id, result_id=None, level=level,
+                    title=f"{'火焰' if r.label == 'fire' else '烟雾'}检测告警",
+                    message=f"在监测区域检测到{r.label}，置信度: {r.confidence:.2%}",
+                    site_id=r.site_id, device_id=r.device_id, component_id=r.component_id,
+                ))
+        return alarms
 
     def healthcheck(self):
         """BasePlugin.healthcheck 兼容"""
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(
-                healthy=self._is_initialized,
-                message="运行正常" if self._is_initialized else f"未初始化: {self._last_error}",
-                details=self._detector.stats if self._detector else {},
-            )
-        except ImportError:
-            return {
-                "healthy": self._is_initialized,
-                "message": "OK" if self._is_initialized else self._last_error,
-            }
+        return HealthStatus(
+            healthy=self._is_initialized,
+            message="运行正常" if self._is_initialized else f"未初始化: {self._last_error}",
+            details=self._detector.stats if self._detector else {},
+        )
 
     # =========================================================================
     # 训练数据管理 (支持前端上传)
@@ -612,3 +617,6 @@ class FireDetectionPlugin:
             else:
                 result[k] = v
         return result
+
+
+Plugin = FireDetectionPlugin

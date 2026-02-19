@@ -1,0 +1,122 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Device Monitoring - DarkBreaker{% endblock %}
+{% block navbar_title %}Device Monitoring Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Total Devices</div>
+            <div class="metric-value" id="total-devices">0</div>
+            <div class="metric-label">Monitored devices</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Online</div>
+            <div class="metric-value status-normal" id="online-count">0</div>
+            <div class="metric-label">Active devices</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Warnings</div>
+            <div class="metric-value status-warning" id="warning-count">0</div>
+            <div class="metric-label">Devices with issues</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Avg Health</div>
+            <div class="metric-value" id="avg-health">--%</div>
+            <div class="metric-label">Fleet health index</div>
+        </div>
+    </div>
+
+    <!-- Device List -->
+    <div class="col-md-8">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-hdd-rack me-1"></i>Device Status</div>
+            <div class="event-list" id="device-list" style="max-height:400px;">
+                <div class="event-item text-secondary">No devices registered</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintenance Tickets -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-clipboard-check me-1"></i>Maintenance Tickets</div>
+            <div class="event-list" id="ticket-list">
+                <div class="event-item text-secondary">No tickets</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alarms -->
+    <div class="col-md-12">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Device Alarms</div>
+            <div class="event-list" id="alarm-list">
+                <div class="event-item text-secondary">No alarms</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+        const s = data.summary || {};
+        document.getElementById('total-devices').textContent = s.total_devices || 0;
+        document.getElementById('online-count').textContent = s.online_count || 0;
+        document.getElementById('warning-count').textContent = s.warning_count || 0;
+        document.getElementById('avg-health').textContent = (s.avg_health || 0).toFixed(0) + '%';
+    }
+</script>
+{% endblock %}

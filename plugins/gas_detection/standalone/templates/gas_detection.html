@@ -1,0 +1,117 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Gas Detection - DarkBreaker{% endblock %}
+{% block navbar_title %}Gas Detection Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm, .status-critical { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Overall Status</div>
+            <div class="metric-value status-normal" id="overall-status">Normal</div>
+            <div class="metric-label">Gas monitoring</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Health Index</div>
+            <div class="metric-value" id="health-index">100</div>
+            <div class="metric-label">Equipment health</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Leak Detection</div>
+            <div class="metric-value status-normal" id="leak-status">Clear</div>
+            <div class="metric-label">No leaks detected</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Monitored Gases</div>
+            <div class="metric-value" id="gas-count">7</div>
+            <div class="metric-label">Active sensors</div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-cloud-haze me-1"></i>Gas Concentration Levels</div>
+            <div class="event-list" id="gas-levels">
+                <div class="event-item text-secondary">No data available</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle-fill me-1"></i>Alarms</div>
+            <div class="event-list" id="gas-alarms">
+                <div class="event-item text-secondary">No alarms</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+        if (data.overall_status) {
+            const el = document.getElementById('overall-status');
+            el.textContent = data.overall_status;
+            el.className = 'metric-value status-' + (data.overall_status === 'normal' ? 'normal' : 'alarm');
+        }
+        if (data.health_index !== undefined) {
+            document.getElementById('health-index').textContent = data.health_index.toFixed(0);
+        }
+        if (data.leak_detection) {
+            const el = document.getElementById('leak-status');
+            el.textContent = data.leak_detection.detected ? 'Detected' : 'Clear';
+            el.className = 'metric-value status-' + (data.leak_detection.detected ? 'alarm' : 'normal');
+        }
+    }
+</script>
+{% endblock %}

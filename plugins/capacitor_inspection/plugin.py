@@ -20,10 +20,10 @@ import importlib.util
 import sys
 import numpy as np
 
-from platform_core.plugin_manager.base import (
+from darkbreaker_sdk.interfaces import (
     BasePlugin, HealthStatus, PluginContext, PluginManifest, PluginStatus,
 )
-from platform_core.schema.models import (
+from darkbreaker_sdk.schemas import (
     Alarm, AlarmLevel, AlarmRule, RecognitionResult, ROI, BoundingBox,
 )
 
@@ -58,7 +58,19 @@ def get_detector_class():
 
 class CapacitorInspectionPlugin(BasePlugin):
     """电容器自主巡视插件"""
-    
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        instance.init(config)
+        return instance
+
     LABEL_NAMES = {
         "tilt_warning": "电容器倾斜(警告)", "tilt_error": "电容器倾斜(严重)",
         "collapse": "电容器倒塌", "missing_unit": "电容器单元缺失",
@@ -229,3 +241,6 @@ class CapacitorInspectionPlugin(BasePlugin):
             label=detection["label"], confidence=detection["confidence"],
             model_version=self.version, code_version=self.code_hash, metadata=detection.get("metadata", {})
         )
+
+
+Plugin = CapacitorInspectionPlugin

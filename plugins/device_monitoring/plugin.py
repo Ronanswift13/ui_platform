@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 from enum import Enum
 import numpy as np
 
+from darkbreaker_sdk.interfaces import HealthStatus
+
 logger = logging.getLogger(__name__)
 
 class PluginStatus(str, Enum):
@@ -32,6 +34,20 @@ class DeviceMonitoringPlugin:
         self._detector = None
         self._is_initialized = False
         self._training_buffer: List[Dict] = []
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        instance = cls()
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        if hasattr(instance, 'init'):
+            instance.init(config)
+        elif hasattr(instance, 'initialize'):
+            instance.initialize(config)
+        return instance
 
     @property
     def id(self): return self.manifest.id if self.manifest and hasattr(self.manifest, "id") else self.PLUGIN_ID
@@ -126,12 +142,8 @@ class DeviceMonitoringPlugin:
         return []
 
     def healthcheck(self):
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else self._last_error,
-                                details=self._detector.stats if self._detector else {})
-        except ImportError:
-            return {"healthy": self._is_initialized, "message": "OK" if self._is_initialized else self._last_error}
+        return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else self._last_error,
+                            details=self._detector.stats if self._detector else {})
 
     def scan_devices(self) -> Dict:
         """扫描所有注册设备状态"""
@@ -241,3 +253,6 @@ class DeviceMonitoringPlugin:
             if k in r and isinstance(r[k], dict) and isinstance(v, dict): r[k] = DeviceMonitoringPlugin._merge(r[k], v)
             else: r[k] = v
         return r
+
+
+Plugin = DeviceMonitoringPlugin

@@ -22,14 +22,14 @@ import importlib.util
 import sys
 import numpy as np
 
-from platform_core.plugin_manager.base import (
+from darkbreaker_sdk.interfaces import (
     BasePlugin,
     HealthStatus,
     PluginContext,
     PluginManifest,
     PluginStatus,
 )
-from platform_core.schema.models import (
+from darkbreaker_sdk.schemas import (
     Alarm,
     AlarmLevel,
     AlarmRule,
@@ -107,6 +107,18 @@ class BusbarInspectionPlugin(BasePlugin):
         301: "结果不可信",
     }
     
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        instance.init(config)
+        return instance
+
     def __init__(self, manifest: PluginManifest, plugin_dir: Path):
         super().__init__(manifest, plugin_dir)
         self._detector: Any = None
@@ -115,7 +127,7 @@ class BusbarInspectionPlugin(BasePlugin):
         self._inference_count = 0
         self._error_count = 0
         self._quality_fail_count = 0
-        
+
         # 配置参数
         self.confidence_threshold = 0.5
     
@@ -451,5 +463,8 @@ class BusbarInspectionPlugin(BasePlugin):
         abs_y = roi_bbox.y + rel_y * roi_bbox.height
         abs_w = rel_w * roi_bbox.width
         abs_h = rel_h * roi_bbox.height
-        
+
         return BoundingBox(x=abs_x, y=abs_y, width=abs_w, height=abs_h)
+
+
+Plugin = BusbarInspectionPlugin

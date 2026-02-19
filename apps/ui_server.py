@@ -401,6 +401,68 @@ def create_app() -> FastAPI:
             },
         )
 
+    # ============== 插件管理器 (Plugin Manager) ==============
+    try:
+        from platform_core.plugin_manager.installer import PluginInstaller
+        _installer = PluginInstaller(
+            plugins_dir=PROJECT_ROOT / "plugins",
+        )
+
+        @app.get("/plugins", response_class=HTMLResponse)
+        async def plugin_manager_page(request: Request):
+            """Plugin Manager page - MATLAB-style plugin selector"""
+            plugins_data = [p.to_dict() for p in _installer.list_available()]
+            import json
+            return templates.TemplateResponse(
+                "pages/plugin_manager.html",
+                {
+                    "request": request,
+                    "active_tab": "plugins",
+                    "version": "4.0.0",
+                    "plugins_data": json.dumps(plugins_data, ensure_ascii=False),
+                },
+            )
+
+        @app.get("/api/plugins/list")
+        async def api_plugins_list():
+            """List all available plugins."""
+            return [p.to_dict() for p in _installer.list_available()]
+
+        @app.get("/api/plugins/enabled")
+        async def api_plugins_enabled():
+            """Get enabled plugins."""
+            return {"enabled": _installer.get_enabled()}
+
+        @app.post("/api/plugins/enable/{plugin_id}")
+        async def api_plugin_enable(plugin_id: str):
+            """Enable a plugin."""
+            ok = _installer.enable(plugin_id)
+            return {"success": ok, "plugin_id": plugin_id, "enabled": True}
+
+        @app.post("/api/plugins/disable/{plugin_id}")
+        async def api_plugin_disable(plugin_id: str):
+            """Disable a plugin."""
+            ok = _installer.disable(plugin_id)
+            return {"success": ok, "plugin_id": plugin_id, "enabled": False}
+
+        @app.get("/api/plugins/{plugin_id}/info")
+        async def api_plugin_info(plugin_id: str):
+            """Get plugin details."""
+            info = _installer.get_plugin_info(plugin_id)
+            if info:
+                return info.to_dict()
+            return {"error": "Plugin not found"}
+
+        @app.get("/api/plugins/{plugin_id}/dependencies")
+        async def api_plugin_dependencies(plugin_id: str):
+            """Check plugin dependencies."""
+            missing = _installer.check_dependencies(plugin_id)
+            return {"plugin_id": plugin_id, "missing": missing, "satisfied": len(missing) == 0}
+
+        print("✓ 插件管理器已集成 (Plugin Manager)")
+    except ImportError as e:
+        print(f"✗ 插件管理器导入失败: {e}")
+
     # ============== 集成高级插件 ==============
     if ADVANCED_PLUGINS_AVAILABLE:
         try:

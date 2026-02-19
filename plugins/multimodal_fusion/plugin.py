@@ -42,6 +42,8 @@ except ImportError as e:
     FusionStrategyManager = None
     logging.getLogger(__name__).warning(f"增强融合引擎不可用: {e}")
 
+from darkbreaker_sdk.interfaces import HealthStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +79,20 @@ class MultimodalConfig:
 
 class MultimodalFusionPlugin:
     """多模态融合插件 - 完整修复版"""
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        instance = cls()
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        if hasattr(instance, 'init'):
+            instance.init(config)
+        elif hasattr(instance, 'initialize'):
+            instance.initialize(config)
+        return instance
 
     PLUGIN_ID = "multimodal_fusion"
     PLUGIN_NAME = "多模态融合诊断"
@@ -604,11 +620,7 @@ class MultimodalFusionPlugin:
         return []
 
     def healthcheck(self):
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else "未初始化")
-        except ImportError:
-            return {"healthy": self._is_initialized, "message": "OK" if self._is_initialized else "未初始化"}
+        return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else "未初始化")
 
     @property
     def plugin_info(self) -> Dict:
@@ -715,3 +727,6 @@ class MultimodalFusionPlugin:
     def is_enhanced_engine_active(self) -> bool:
         """检查增强融合引擎是否激活"""
         return self._use_enhanced_engine and self.enhanced_engine is not None
+
+
+Plugin = MultimodalFusionPlugin

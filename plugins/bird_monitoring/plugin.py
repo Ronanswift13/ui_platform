@@ -25,14 +25,14 @@ import sys
 import numpy as np
 import yaml
 
-from platform_core.plugin_manager.base import (
+from darkbreaker_sdk.interfaces import (
     BasePlugin,
     HealthStatus,
     PluginContext,
     PluginManifest,
     PluginStatus,
 )
-from platform_core.schema.models import (
+from darkbreaker_sdk.schemas import (
     Alarm,
     AlarmLevel,
     AlarmRule,
@@ -174,10 +174,22 @@ def get_detector_class():
 class BirdMonitoringPlugin(BasePlugin):
     """
     鸟类监控插件
-    
+
     实现室外输电线路鸟类检测、种类识别和风险评估
     """
-    
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        instance.init(config)
+        return instance
+
     # 风险等级阈值
     RISK_THRESHOLDS = {
         "safe_distance_m": 15.0,
@@ -750,3 +762,6 @@ class BirdMonitoringPlugin(BasePlugin):
             "deterrent_options": ["acoustic", "laser", "combined"],
             "bird_database_size": len(self._bird_database),
         }
+
+
+Plugin = BirdMonitoringPlugin

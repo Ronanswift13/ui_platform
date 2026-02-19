@@ -1,0 +1,256 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Acoustic Monitoring - DarkBreaker{% endblock %}
+{% block navbar_title %}Acoustic Monitoring Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm, .status-critical { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+    canvas { max-height: 250px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Anomaly Score</div>
+            <div class="metric-value" id="anomaly-score">0.00</div>
+            <div class="metric-label">Threshold: 0.50</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Detection Status</div>
+            <div class="metric-value status-normal" id="detection-status">Normal</div>
+            <div class="metric-label" id="anomaly-type">No anomaly</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Dominant Frequency</div>
+            <div class="metric-value" id="dominant-freq">-- Hz</div>
+            <div class="metric-label">Frequency analysis</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Noise Level</div>
+            <div class="metric-value" id="noise-level">-- dB</div>
+            <div class="metric-label">RMS noise floor</div>
+        </div>
+    </div>
+
+    <!-- Waveform Display -->
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-soundwave me-1"></i>Waveform Display</div>
+            <canvas id="waveformChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Spectrogram Visualization -->
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-bar-chart-fill me-1"></i>Spectrogram / Frequency Spectrum</div>
+            <canvas id="spectrumChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Band Energy -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-equalizer me-1"></i>Band Energy Distribution</div>
+            <canvas id="bandEnergyChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Partial Discharge Events -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-lightning-fill me-1"></i>Partial Discharge Events</div>
+            <div class="event-list" id="pd-events">
+                <div class="event-item text-secondary">No events detected</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Anomaly Detection Alerts -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle-fill me-1"></i>Anomaly Alerts</div>
+            <div class="event-list" id="anomaly-alerts">
+                <div class="event-item text-secondary">No alerts</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Waveform chart
+    const waveformCtx = document.getElementById('waveformChart').getContext('2d');
+    const waveformChart = new Chart(waveformCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Amplitude',
+                data: [],
+                borderColor: '#3b82f6',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                tension: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            animation: false,
+            scales: {
+                x: { display: true, title: { display: true, text: 'Time (samples)', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                y: { title: { display: true, text: 'Amplitude', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // Spectrum chart
+    const spectrumCtx = document.getElementById('spectrumChart').getContext('2d');
+    const spectrumChart = new Chart(spectrumCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Magnitude',
+                data: [],
+                borderColor: '#22c55e',
+                backgroundColor: 'rgba(34,197,94,0.15)',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            animation: false,
+            scales: {
+                x: { display: true, title: { display: true, text: 'Frequency (Hz)', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                y: { title: { display: true, text: 'Magnitude', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // Band energy chart
+    const bandCtx = document.getElementById('bandEnergyChart').getContext('2d');
+    const bandEnergyChart = new Chart(bandCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Low', 'Mid-Low', 'Mid', 'Mid-High', 'High'],
+            datasets: [{
+                label: 'Energy %',
+                data: [0, 0, 0, 0, 0],
+                backgroundColor: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444']
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: '%', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+                x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+
+        // Metrics
+        document.getElementById('anomaly-score').textContent = (data.anomaly_score || 0).toFixed(2);
+        const statusEl = document.getElementById('detection-status');
+        if (data.anomaly_detected) {
+            statusEl.textContent = data.severity || 'Anomaly';
+            statusEl.className = 'metric-value status-alarm';
+        } else {
+            statusEl.textContent = 'Normal';
+            statusEl.className = 'metric-value status-normal';
+        }
+        document.getElementById('anomaly-type').textContent = data.anomaly_type || 'No anomaly';
+
+        const freq = data.frequency_analysis || {};
+        document.getElementById('dominant-freq').textContent = (freq.dominant_frequency || 0).toFixed(1) + ' Hz';
+        document.getElementById('noise-level').textContent = (freq.noise_level_db || 0).toFixed(1) + ' dB';
+
+        // Spectrum
+        if (freq.spectrum) {
+            spectrumChart.data.labels = freq.spectrum.frequencies.map(f => f.toFixed(0));
+            spectrumChart.data.datasets[0].data = freq.spectrum.magnitude_normalized;
+            spectrumChart.update();
+        }
+
+        // Band energy
+        if (freq.band_energy) {
+            const be = freq.band_energy;
+            bandEnergyChart.data.datasets[0].data = [
+                be.low || 0, be.mid_low || 0, be.mid || 0, be.mid_high || 0, be.high || 0
+            ];
+            bandEnergyChart.update();
+        }
+
+        // PD events
+        if (data.pd_detected) {
+            const pdEl = document.getElementById('pd-events');
+            const now = new Date().toLocaleTimeString();
+            pdEl.innerHTML = `<div class="event-item text-danger"><i class="bi bi-lightning-fill me-1"></i>${now} - PD Level: ${data.pd_level} (conf: ${(data.pd_confidence || 0).toFixed(2)})</div>` + pdEl.innerHTML;
+        }
+
+        // Alarms
+        if (data.alarms && data.alarms.length > 0) {
+            const alertEl = document.getElementById('anomaly-alerts');
+            data.alarms.forEach(a => {
+                const now = new Date().toLocaleTimeString();
+                alertEl.innerHTML = `<div class="event-item text-warning"><i class="bi bi-exclamation-triangle me-1"></i>${now} - ${a.message}</div>` + alertEl.innerHTML;
+            });
+        }
+    }
+</script>
+{% endblock %}

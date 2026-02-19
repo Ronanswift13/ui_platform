@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}插件管理 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --panel-bg: #1e293b;
+        --card-bg: #0f172a;
+        --border-color: #334155;
+        --text-primary: #e2e8f0;
+        --text-secondary: #94a3b8;
+        --accent-blue: #3b82f6;
+        --accent-green: #22c55e;
+        --accent-red: #ef4444;
+        --accent-amber: #f59e0b;
+    }
+
+    body { background: var(--card-bg); color: var(--text-primary); }
+
+    .plugin-manager-header {
+        background: linear-gradient(135deg, #1e3a5f, #0f172a);
+        border-bottom: 1px solid var(--border-color);
+        padding: 1.5rem 2rem;
+    }
+
+    .plugin-manager-header h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .plugin-manager-header .subtitle {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    .category-tabs {
+        background: var(--panel-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.5rem 2rem;
+    }
+
+    .category-tabs .btn {
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        margin-right: 0.5rem;
+        border-radius: 20px;
+        padding: 0.35rem 1rem;
+        font-size: 0.85rem;
+    }
+
+    .category-tabs .btn.active {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+        color: #fff;
+    }
+
+    .category-tabs .btn:hover:not(.active) {
+        border-color: var(--accent-blue);
+        color: var(--text-primary);
+    }
+
+    .plugins-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.25rem;
+        padding: 1.5rem 2rem;
+    }
+
+    .plugin-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+
+    .plugin-card:hover {
+        border-color: var(--accent-blue);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+    }
+
+    .plugin-card.disabled {
+        opacity: 0.6;
+    }
+
+    .plugin-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem 0.5rem;
+    }
+
+    .plugin-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .plugin-icon.indoor { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+    .plugin-icon.outdoor { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); }
+    .plugin-icon.monitoring { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+
+    .plugin-card-body {
+        padding: 0.5rem 1.25rem;
+    }
+
+    .plugin-card-body h5 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .plugin-card-body .description {
+        color: var(--text-secondary);
+        font-size: 0.8rem;
+        line-height: 1.4;
+        margin-bottom: 0.75rem;
+        min-height: 2.2rem;
+    }
+
+    .plugin-card-body .version {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+    }
+
+    .plugin-badges {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.75rem;
+    }
+
+    .plugin-badges .badge {
+        font-size: 0.7rem;
+        font-weight: 500;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .plugin-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid var(--border-color);
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    .plugin-toggle .form-check-input {
+        width: 2.5rem;
+        height: 1.25rem;
+        cursor: pointer;
+    }
+
+    .plugin-toggle .form-check-input:checked {
+        background-color: var(--accent-green);
+        border-color: var(--accent-green);
+    }
+
+    .plugin-actions .btn-sm {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.75rem;
+        border-radius: 6px;
+    }
+
+    .stats-bar {
+        background: var(--panel-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.75rem 2rem;
+        display: flex;
+        gap: 2rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .stat-item .number {
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    .stat-item .label { color: var(--text-secondary); }
+
+    .search-box {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+        width: 280px;
+    }
+
+    .search-box:focus {
+        border-color: var(--accent-blue);
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+    }
+
+    .search-box::placeholder { color: var(--text-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="plugin-manager-header">
+    <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <h2><i class="bi bi-puzzle"></i> Plugin Manager</h2>
+            <div class="subtitle">Manage monitoring plugins - enable, disable, and configure individual modules</div>
+        </div>
+        <div class="d-flex gap-2">
+            <input type="text" class="search-box" id="pluginSearch" placeholder="Search plugins...">
+            <button class="btn btn-outline-info btn-sm" onclick="refreshPlugins()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+    <div class="stat-item">
+        <span class="number text-info" id="totalCount">0</span>
+        <span class="label">Total</span>
+    </div>
+    <div class="stat-item">
+        <span class="number text-success" id="enabledCount">0</span>
+        <span class="label">Enabled</span>
+    </div>
+    <div class="stat-item">
+        <span class="number text-secondary" id="disabledCount">0</span>
+        <span class="label">Disabled</span>
+    </div>
+    <div class="stat-item">
+        <span class="number text-primary" id="indoorCount">0</span>
+        <span class="label">Indoor</span>
+    </div>
+    <div class="stat-item">
+        <span class="number text-success" id="outdoorCount">0</span>
+        <span class="label">Outdoor</span>
+    </div>
+    <div class="stat-item">
+        <span class="number text-warning" id="monitoringCount">0</span>
+        <span class="label">Monitoring</span>
+    </div>
+</div>
+
+<!-- Category Tabs -->
+<div class="category-tabs">
+    <button class="btn active" data-category="all" onclick="filterCategory('all', this)">
+        <i class="bi bi-grid-3x3-gap"></i> All Plugins
+    </button>
+    <button class="btn" data-category="indoor" onclick="filterCategory('indoor', this)">
+        <i class="bi bi-building"></i> Indoor
+    </button>
+    <button class="btn" data-category="outdoor" onclick="filterCategory('outdoor', this)">
+        <i class="bi bi-sun"></i> Outdoor
+    </button>
+    <button class="btn" data-category="monitoring" onclick="filterCategory('monitoring', this)">
+        <i class="bi bi-activity"></i> Monitoring
+    </button>
+</div>
+
+<!-- Plugin Grid -->
+<div class="plugins-grid" id="pluginsGrid">
+    <!-- Populated by JavaScript -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Plugin icon mapping
+const PLUGIN_ICONS = {
+    indoor_fence: 'bi-shield-lock',
+    animal_detection: 'bi-bug',
+    fire_detection: 'bi-fire',
+    slam_mapping: 'bi-map',
+    temperature_monitoring: 'bi-thermometer-half',
+    device_monitoring: 'bi-hdd-rack',
+    transformer_inspection: 'bi-lightning-charge',
+    switch_inspection: 'bi-toggles',
+    busbar_inspection: 'bi-bezier2',
+    capacitor_inspection: 'bi-battery-charging',
+    meter_reading: 'bi-speedometer2',
+    bird_monitoring: 'bi-twitter',
+    acoustic_monitoring: 'bi-soundwave',
+    gas_detection: 'bi-cloud-haze2',
+    hyperspectral_detection: 'bi-rainbow',
+    multimodal_fusion: 'bi-layers',
+};
+
+let allPlugins = [];
+
+async function loadPlugins() {
+    try {
+        const resp = await fetch('/api/plugins/list');
+        if (resp.ok) {
+            allPlugins = await resp.json();
+        } else {
+            allPlugins = {{ plugins_data | default('[]') | safe }};
+        }
+    } catch (e) {
+        allPlugins = {{ plugins_data | default('[]') | safe }};
+    }
+    renderPlugins(allPlugins);
+    updateStats(allPlugins);
+}
+
+function renderPlugins(plugins) {
+    const grid = document.getElementById('pluginsGrid');
+    grid.innerHTML = plugins.map(p => `
+        <div class="plugin-card ${p.enabled ? '' : 'disabled'}" data-category="${p.category}" data-id="${p.id}">
+            <div class="plugin-card-header">
+                <div class="plugin-icon ${p.category}">
+                    <i class="bi ${PLUGIN_ICONS[p.id] || 'bi-puzzle'}"></i>
+                </div>
+                <span class="version">v${p.version}</span>
+            </div>
+            <div class="plugin-card-body">
+                <h5>${p.name}</h5>
+                <div class="description">${p.description || 'No description'}</div>
+                <div class="plugin-badges">
+                    <span class="badge bg-${p.category === 'indoor' ? 'primary' : p.category === 'outdoor' ? 'success' : 'warning'}">${p.category}</span>
+                    ${p.has_standalone ? '<span class="badge bg-info">Standalone</span>' : ''}
+                    ${p.has_demo ? '<span class="badge bg-secondary">Demo</span>' : ''}
+                    ${p.has_tests ? '<span class="badge bg-dark">Tests</span>' : ''}
+                </div>
+            </div>
+            <div class="plugin-card-footer">
+                <div class="plugin-toggle">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               ${p.enabled ? 'checked' : ''}
+                               onchange="togglePlugin('${p.id}', this.checked)">
+                    </div>
+                </div>
+                <div class="plugin-actions">
+                    ${p.has_standalone && p.standalone_port ? `<a href="http://localhost:${p.standalone_port}" target="_blank" class="btn btn-outline-info btn-sm" title="Open Standalone"><i class="bi bi-box-arrow-up-right"></i></a>` : ''}
+                    <button class="btn btn-outline-secondary btn-sm" onclick="showPluginDetails('${p.id}')" title="Details">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateStats(plugins) {
+    document.getElementById('totalCount').textContent = plugins.length;
+    document.getElementById('enabledCount').textContent = plugins.filter(p => p.enabled).length;
+    document.getElementById('disabledCount').textContent = plugins.filter(p => !p.enabled).length;
+    document.getElementById('indoorCount').textContent = plugins.filter(p => p.category === 'indoor').length;
+    document.getElementById('outdoorCount').textContent = plugins.filter(p => p.category === 'outdoor').length;
+    document.getElementById('monitoringCount').textContent = plugins.filter(p => p.category === 'monitoring').length;
+}
+
+function filterCategory(category, btn) {
+    document.querySelectorAll('.category-tabs .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const cards = document.querySelectorAll('.plugin-card');
+    cards.forEach(card => {
+        if (category === 'all' || card.dataset.category === category) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+async function togglePlugin(pluginId, enabled) {
+    try {
+        const action = enabled ? 'enable' : 'disable';
+        const resp = await fetch(`/api/plugins/${action}/${pluginId}`, { method: 'POST' });
+        if (resp.ok) {
+            const card = document.querySelector(`.plugin-card[data-id="${pluginId}"]`);
+            if (card) card.classList.toggle('disabled', !enabled);
+            // Update local data
+            const plugin = allPlugins.find(p => p.id === pluginId);
+            if (plugin) plugin.enabled = enabled;
+            updateStats(allPlugins);
+        }
+    } catch (e) {
+        console.error('Toggle failed:', e);
+    }
+}
+
+async function showPluginDetails(pluginId) {
+    const plugin = allPlugins.find(p => p.id === pluginId);
+    if (!plugin) return;
+
+    alert(`${plugin.name} v${plugin.version}\n\nCapabilities: ${(plugin.capabilities || []).join(', ')}\nDependencies: ${(plugin.dependencies || []).join(', ')}\nStandalone Port: ${plugin.standalone_port || 'N/A'}`);
+}
+
+function refreshPlugins() { loadPlugins(); }
+
+// Search
+document.getElementById('pluginSearch').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase();
+    const filtered = allPlugins.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.id.toLowerCase().includes(query) ||
+        (p.description || '').toLowerCase().includes(query)
+    );
+    renderPlugins(filtered);
+});
+
+// Init
+loadPlugins();
+</script>
+{% endblock %}

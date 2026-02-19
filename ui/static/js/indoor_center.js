@@ -140,21 +140,24 @@ const Indoor3DState = {
 // =============================================================================
 // 初始化
 // =============================================================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log(`[IndoorMonitor] 初始化 V${IndoorMonitorState.version}`);
-    
+
+    // Dynamic plugin loading: hide disabled plugins
+    await loadEnabledPlugins();
+
     // 初始化所有模块画布
     initModuleCanvases();
-    
+
     // 加载初始数据
     loadAllModulesData();
-    
+
     // 启动自动刷新
     startAutoRefresh();
-    
+
     // 尝试连接WebSocket
     connectWebSocket();
-    
+
     // 绑定事件
     bindEvents();
 
@@ -169,6 +172,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     console.log('[IndoorMonitor] 初始化完成');
 });
+
+/**
+ * Dynamic plugin loading - queries enabled plugins and hides disabled ones
+ */
+async function loadEnabledPlugins() {
+    // Map indoor module IDs to plugin IDs in the installer
+    const moduleToPluginId = {
+        fence: 'indoor_fence',
+        animal: 'animal_detection',
+        temperature: 'temperature_monitoring',
+        device: 'device_monitoring',
+        fire: 'fire_detection',
+        environment: 'gas_detection',
+    };
+
+    try {
+        const resp = await fetch('/api/plugins/enabled');
+        if (!resp.ok) return; // If API unavailable, show all
+        const data = await resp.json();
+        const enabledPlugins = new Set(data.enabled || []);
+
+        Object.entries(moduleToPluginId).forEach(([moduleId, pluginId]) => {
+            if (!enabledPlugins.has(pluginId)) {
+                // Hide module card
+                const card = document.querySelector(`[data-module="${moduleId}"]`);
+                if (card) card.style.display = 'none';
+                // Disable module in state
+                if (IndoorMonitorState.modules[moduleId]) {
+                    IndoorMonitorState.modules[moduleId].status = 'disabled';
+                }
+                console.log(`[IndoorMonitor] Plugin disabled: ${pluginId}`);
+            }
+        });
+    } catch (e) {
+        console.warn('[IndoorMonitor] Could not load enabled plugins, showing all:', e.message);
+    }
+}
 
 /**
  * 初始化所有模块的画布

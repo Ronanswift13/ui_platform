@@ -101,65 +101,80 @@ except Exception as e:
     print(f"  ✗ 读取失败: {e}")
     sys.exit(1)
 
-# 5. 检查 platform_core
+# 5. 检查 darkbreaker_sdk / platform_core
 print("\n[步骤 5] 检查平台核心...")
-platform_core = current_dir / "platform_core"
-if not platform_core.exists():
-    print(f"✗ platform_core 目录不存在")
-    print("  这可能导致插件无法加载")
-else:
-    print(f"✓ platform_core 存在")
-    
-    # 检查插件管理器
-    plugin_manager = platform_core / "plugin_manager"
-    if plugin_manager.exists():
-        print(f"  ✓ plugin_manager 模块存在")
+try:
+    import darkbreaker_sdk
+    print(f"✓ darkbreaker_sdk 已安装")
+except ImportError:
+    print("✗ darkbreaker_sdk 未安装")
+    # Fallback: check platform_core directory
+    platform_core = current_dir / "platform_core"
+    if not platform_core.exists():
+        print(f"✗ platform_core 目录也不存在")
+        print("  这可能导致插件无法加载")
     else:
-        print(f"  ✗ plugin_manager 模块不存在")
+        print(f"✓ platform_core 存在 (旧版)")
+        plugin_manager = platform_core / "plugin_manager"
+        if plugin_manager.exists():
+            print(f"  ✓ plugin_manager 模块存在")
+        else:
+            print(f"  ✗ plugin_manager 模块不存在")
 
 # 6. 测试插件加载
 print("\n[步骤 6] 测试插件加载...")
 sys.path.insert(0, str(current_dir))
 
 try:
-    # 尝试导入平台模块
-    from platform_core.plugin_manager import PluginManager
-    
-    pm = PluginManager()
-    plugins = pm.discover_plugins()
-    
-    print(f"✓ 发现 {len(plugins)} 个插件:")
-    for p in plugins:
-        status = "✓" if p.id == "transformer_inspection" else " "
-        print(f"  {status} {p.id} v{p.version}")
-    
-    # 检查是否找到我们的插件
-    transformer_found = any(p.id == "transformer_inspection" for p in plugins)
-    if transformer_found:
-        print("\n✓ 主变巡视插件已被发现!")
-        
-        # 尝试加载
-        try:
-            plugin = pm.load_plugin("transformer_inspection")
-            print(f"✓ 插件加载成功，状态: {plugin.status}")
-        except Exception as e:
-            print(f"✗ 插件加载失败: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print("\n✗ 主变巡视插件未被发现")
-        print("  可能的原因:")
-        print("  1. manifest.json 格式错误")
-        print("  2. 插件管理器配置问题")
-        
+    # 尝试导入平台模块 (优先使用 darkbreaker_sdk)
+    try:
+        from darkbreaker_sdk.standalone import StandalonePluginRunner
+        print("✓ 使用 darkbreaker_sdk 进行插件测试")
+
+        runner = StandalonePluginRunner(
+            plugin_dir=str(transformer_dir),
+        )
+        print(f"✓ StandalonePluginRunner 创建成功")
+        print("  (使用 standalone runner 进行插件诊断)")
+
+    except ImportError:
+        from platform_core.plugin_manager import PluginManager
+
+        pm = PluginManager()
+        plugins = pm.discover_plugins()
+
+        print(f"✓ 发现 {len(plugins)} 个插件:")
+        for p in plugins:
+            status = "✓" if p.id == "transformer_inspection" else " "
+            print(f"  {status} {p.id} v{p.version}")
+
+        # 检查是否找到我们的插件
+        transformer_found = any(p.id == "transformer_inspection" for p in plugins)
+        if transformer_found:
+            print("\n✓ 主变巡视插件已被发现!")
+
+            # 尝试加载
+            try:
+                plugin = pm.load_plugin("transformer_inspection")
+                print(f"✓ 插件加载成功，状态: {plugin.status}")
+            except Exception as e:
+                print(f"✗ 插件加载失败: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("\n✗ 主变巡视插件未被发现")
+            print("  可能的原因:")
+            print("  1. manifest.json 格式错误")
+            print("  2. 插件管理器配置问题")
+
 except ImportError as e:
     print(f"✗ 无法导入平台模块: {e}")
     print("\n可能的原因:")
     print("  1. 不在项目根目录")
-    print("  2. platform_core 未正确安装")
+    print("  2. darkbreaker_sdk 或 platform_core 未正确安装")
     print("\n解决方案:")
-    print("  cd /path/to/your/project")
-    print("  python -m pip install -e .")
+    print("  pip install darkbreaker_sdk")
+    print("  # 或: cd /path/to/your/project && python -m pip install -e .")
 except Exception as e:
     print(f"✗ 测试失败: {e}")
     import traceback

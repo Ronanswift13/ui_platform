@@ -23,14 +23,14 @@ import importlib.util
 import sys
 import numpy as np
 
-from platform_core.plugin_manager.base import (
+from darkbreaker_sdk.interfaces import (
     BasePlugin,
     HealthStatus,
     PluginContext,
     PluginManifest,
     PluginStatus,
 )
-from platform_core.schema.models import (
+from darkbreaker_sdk.schemas import (
     Alarm,
     AlarmLevel,
     AlarmRule,
@@ -115,6 +115,18 @@ class SwitchInspectionPlugin(BasePlugin):
         9000: "未知错误",
     }
     
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        instance.init(config)
+        return instance
+
     def __init__(self, manifest: PluginManifest, plugin_dir: Path):
         super().__init__(manifest, plugin_dir)
         self._detector: Any = None
@@ -122,10 +134,10 @@ class SwitchInspectionPlugin(BasePlugin):
         self._last_inference_time: Optional[datetime] = None
         self._inference_count = 0
         self._error_count = 0
-        
+
         # 间隔状态缓存(用于逻辑校验)
         self._bay_states: Dict[str, BayState] = {}
-        
+
         # 性能指标参数
         self.confidence_threshold = 0.6
         self.min_clarity_score = 0.70
@@ -582,3 +594,6 @@ class SwitchInspectionPlugin(BasePlugin):
         if state == "intermediate":
             return f"{prefix}_intermediate"
         return "unknown"
+
+
+Plugin = SwitchInspectionPlugin

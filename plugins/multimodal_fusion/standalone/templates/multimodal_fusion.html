@@ -1,0 +1,112 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Multimodal Fusion - DarkBreaker{% endblock %}
+{% block navbar_title %}Multimodal Fusion Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm, .status-critical { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Fusion Status</div>
+            <div class="metric-value status-normal" id="fusion-status">Ready</div>
+            <div class="metric-label">Multi-modal engine</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Confidence</div>
+            <div class="metric-value" id="fusion-confidence">0.00</div>
+            <div class="metric-label">Fusion confidence</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Strategy</div>
+            <div class="metric-value" id="fusion-strategy">hybrid</div>
+            <div class="metric-label">Fusion method</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Modalities</div>
+            <div class="metric-value" id="modality-count">0</div>
+            <div class="metric-label">Registered sources</div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-diagram-3 me-1"></i>Modality Contributions</div>
+            <div class="event-list" id="modality-events">
+                <div class="event-item text-secondary">No fusion data</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-clipboard-data me-1"></i>Diagnostic Report</div>
+            <div class="event-list" id="diagnostic-events">
+                <div class="event-item text-secondary">No diagnostics</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+        if (data.overall_status) {
+            const el = document.getElementById('fusion-status');
+            el.textContent = data.overall_status;
+            el.className = 'metric-value status-' + (data.overall_status === 'normal' ? 'normal' : 'alarm');
+        }
+        if (data.confidence !== undefined) {
+            document.getElementById('fusion-confidence').textContent = data.confidence.toFixed(2);
+        }
+    }
+</script>
+{% endblock %}

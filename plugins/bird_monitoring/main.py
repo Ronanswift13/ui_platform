@@ -36,8 +36,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from platform_core.plugin_manager.base import PluginContext, PluginManifest
-from platform_core.schema.models import BoundingBox, ROI, ROIType
+from darkbreaker_sdk.interfaces import PluginContext, PluginManifest
+from darkbreaker_sdk.schemas import BoundingBox, ROI, ROIType
 from plugins.bird_monitoring.plugin import BirdMonitoringPlugin
 
 

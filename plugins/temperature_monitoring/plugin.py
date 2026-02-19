@@ -11,6 +11,11 @@ from typing import Any, Dict, List, Optional
 from enum import Enum
 import numpy as np
 
+from darkbreaker_sdk.interfaces import HealthStatus
+from darkbreaker_sdk.schemas import (
+    Alarm, AlarmLevel, RecognitionResult, BoundingBox,
+)
+
 logger = logging.getLogger(__name__)
 
 class PluginStatus(str, Enum):
@@ -32,6 +37,20 @@ class TemperatureMonitoringPlugin:
         self._detector = None
         self._is_initialized = False
         self._training_buffer: List[Dict] = []
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        instance = cls()
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        if hasattr(instance, 'init'):
+            instance.init(config)
+        elif hasattr(instance, 'initialize'):
+            instance.initialize(config)
+        return instance
 
     @property
     def id(self): return self.manifest.id if self.manifest and hasattr(self.manifest, "id") else self.PLUGIN_ID
@@ -106,34 +125,24 @@ class TemperatureMonitoringPlugin:
 
     def infer(self, frame, rois, context):
         r = self.detect(thermal_frame=frame, context={"task_id": getattr(context, "task_id", "")})
-        try:
-            from platform_core.schema.models import RecognitionResult, BoundingBox
-            return [RecognitionResult(
-                task_id=getattr(context, "task_id", ""), site_id=getattr(context, "site_id", ""),
-                device_id=getattr(context, "device_id", ""), component_id="",
-                roi_id="", bbox=BoundingBox(x=h["center"][0], y=h["center"][1], width=0.05, height=0.05),
-                label=f"hotspot_{h['severity']}", confidence=min(1.0, h["temperature"]/100),
-                model_version=self.version, code_version=self.code_hash,
-            ) for h in r.get("hotspots", [])]
-        except ImportError: return []
+        return [RecognitionResult(
+            task_id=getattr(context, "task_id", ""), site_id=getattr(context, "site_id", ""),
+            device_id=getattr(context, "device_id", ""), component_id="",
+            roi_id="", bbox=BoundingBox(x=h["center"][0], y=h["center"][1], width=0.05, height=0.05),
+            label=f"hotspot_{h['severity']}", confidence=min(1.0, h["temperature"]/100),
+            model_version=self.version, code_version=self.code_hash,
+        ) for h in r.get("hotspots", [])]
 
     def postprocess(self, results, rules):
-        try:
-            from platform_core.schema.models import Alarm, AlarmLevel as AL
-            return [Alarm(task_id=r.task_id, result_id=None,
-                          level=AL.ERROR if "alarm" in r.label else AL.WARNING,
-                          title=f"温度异常: {r.label}", message=f"温度异常 置信度{r.confidence:.0%}",
-                          site_id=r.site_id, device_id=r.device_id, component_id="")
-                    for r in results if r.confidence > 0.5]
-        except ImportError: return []
+        return [Alarm(task_id=r.task_id, result_id=None,
+                      level=AlarmLevel.ERROR if "alarm" in r.label else AlarmLevel.WARNING,
+                      title=f"温度异常: {r.label}", message=f"温度异常 置信度{r.confidence:.0%}",
+                      site_id=r.site_id, device_id=r.device_id, component_id="")
+                for r in results if r.confidence > 0.5]
 
     def healthcheck(self):
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else self._last_error,
-                                details=self._detector.stats if self._detector else {})
-        except ImportError:
-            return {"healthy": self._is_initialized, "message": "OK" if self._is_initialized else self._last_error}
+        return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else self._last_error,
+                            details=self._detector.stats if self._detector else {})
 
     def upload_training_data(self, data, labels) -> Dict:
         self._training_buffer.append({"timestamp": datetime.now().isoformat(), "labels": labels})
@@ -197,3 +206,6 @@ class TemperatureMonitoringPlugin:
             if k in r and isinstance(r[k], dict) and isinstance(v, dict): r[k] = TemperatureMonitoringPlugin._merge(r[k], v)
             else: r[k] = v
         return r
+
+
+Plugin = TemperatureMonitoringPlugin

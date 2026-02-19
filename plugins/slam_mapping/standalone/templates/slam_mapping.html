@@ -1,0 +1,325 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}SLAM Mapping - DarkBreaker{% endblock %}
+{% block navbar_title %}SLAM Mapping Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm { color: var(--danger); }
+    .pointcloud-canvas {
+        width: 100%;
+        height: 360px;
+        background-color: #0a0e17;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    .pointcloud-canvas canvas {
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+    }
+    .pointcloud-placeholder {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        text-align: center;
+    }
+    .occupancy-grid {
+        width: 100%;
+        height: 280px;
+        background-color: #0a0e17;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .occupancy-grid canvas {
+        width: 100%;
+        height: 100%;
+        border-radius: 6px;
+    }
+    .pose-info {
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+    }
+    .pose-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.3rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .pose-row:last-child { border-bottom: none; }
+    .pose-label { color: var(--text-secondary); }
+    .pose-value { font-weight: 600; }
+    .device-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .device-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .device-item:last-child { border-bottom: none; }
+    .device-type-badge {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+    }
+    .subsidence-list {
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .subsidence-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .subsidence-item:last-child { border-bottom: none; }
+    .subsidence-value {
+        font-weight: 600;
+        font-family: 'Courier New', monospace;
+    }
+    .subsidence-ok { color: var(--success); }
+    .subsidence-warn { color: var(--warning); }
+    .subsidence-alert { color: var(--danger); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics Row -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Frames Processed</div>
+            <div class="metric-value" id="frame-count">0</div>
+            <div class="metric-label">Point cloud frames</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Registered Devices</div>
+            <div class="metric-value status-normal" id="device-count">0</div>
+            <div class="metric-label">Located in map</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Subsidence Points</div>
+            <div class="metric-value status-warning" id="subsidence-count">0</div>
+            <div class="metric-label">Monitoring stations</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Map Resolution</div>
+            <div class="metric-value" id="map-resolution">--</div>
+            <div class="metric-label">Meters per cell</div>
+        </div>
+    </div>
+
+    <!-- 3D Point Cloud Visualization -->
+    <div class="col-md-8">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-box me-1"></i>3D Point Cloud</div>
+            <div class="pointcloud-canvas" id="pointcloud-container">
+                <canvas id="pointcloud-canvas"></canvas>
+                <div class="pointcloud-placeholder" id="pointcloud-placeholder">
+                    <i class="bi bi-box" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
+                    Awaiting point cloud data...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current Pose Info -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-compass me-1"></i>Current Pose</div>
+            <div class="pose-info">
+                <div class="pose-row">
+                    <span class="pose-label">X</span>
+                    <span class="pose-value" id="pose-x">0.000</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">Y</span>
+                    <span class="pose-value" id="pose-y">0.000</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">Z</span>
+                    <span class="pose-value" id="pose-z">0.000</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">Roll</span>
+                    <span class="pose-value" id="pose-roll">0.000&deg;</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">Pitch</span>
+                    <span class="pose-value" id="pose-pitch">0.000&deg;</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">Yaw</span>
+                    <span class="pose-value" id="pose-yaw">0.000&deg;</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Panel -->
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-bar-chart me-1"></i>Processing Stats</div>
+            <div class="pose-info">
+                <div class="pose-row">
+                    <span class="pose-label">Pose History</span>
+                    <span class="pose-value" id="pose-history-len">0</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">Map Size</span>
+                    <span class="pose-value" id="map-size">--</span>
+                </div>
+                <div class="pose-row">
+                    <span class="pose-label">DL Enabled</span>
+                    <span class="pose-value" id="dl-enabled">No</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Occupancy Grid Display -->
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-grid-3x3 me-1"></i>Occupancy Grid (2D Projection)</div>
+            <div class="occupancy-grid" id="occupancy-container">
+                <canvas id="occupancy-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Locations Panel -->
+    <div class="col-md-6">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-geo-alt me-1"></i>Device Locations</div>
+            <div class="device-list" id="device-list">
+                <div class="device-item text-secondary">No devices registered</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Subsidence Monitoring Panel -->
+    <div class="col-md-12">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-arrow-down-circle me-1"></i>Subsidence Monitoring</div>
+            <div class="subsidence-list" id="subsidence-list">
+                <div class="subsidence-item text-secondary">No monitoring points configured</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+        const s = data.status || {};
+
+        // Top metrics
+        document.getElementById('frame-count').textContent = s.frame_count || 0;
+        document.getElementById('device-count').textContent = s.registered_devices || 0;
+        document.getElementById('subsidence-count').textContent = s.subsidence_points || 0;
+        document.getElementById('map-resolution').textContent = s.map_resolution ? s.map_resolution + 'm' : '--';
+
+        // Current pose
+        const pose = s.current_pose || {};
+        document.getElementById('pose-x').textContent = (pose.x || 0).toFixed(3);
+        document.getElementById('pose-y').textContent = (pose.y || 0).toFixed(3);
+        document.getElementById('pose-z').textContent = (pose.z || 0).toFixed(3);
+        document.getElementById('pose-roll').innerHTML = ((pose.roll || 0) * 180 / Math.PI).toFixed(3) + '&deg;';
+        document.getElementById('pose-pitch').innerHTML = ((pose.pitch || 0) * 180 / Math.PI).toFixed(3) + '&deg;';
+        document.getElementById('pose-yaw').innerHTML = ((pose.yaw || 0) * 180 / Math.PI).toFixed(3) + '&deg;';
+
+        // Stats
+        document.getElementById('pose-history-len').textContent = s.pose_history_length || 0;
+        const mapSize = s.map_size || [];
+        document.getElementById('map-size').textContent = mapSize.length ? mapSize.join(' x ') : '--';
+        document.getElementById('dl-enabled').textContent = s.dl_enabled ? 'Yes' : 'No';
+
+        // Device list
+        const devices = data.devices || {};
+        const deviceList = document.getElementById('device-list');
+        const deviceIds = Object.keys(devices);
+        if (deviceIds.length > 0) {
+            deviceList.innerHTML = '';
+            deviceIds.forEach(function(id) {
+                const dev = devices[id];
+                const loc = dev.location || {};
+                const item = document.createElement('div');
+                item.className = 'device-item';
+                item.innerHTML = '<div><strong>' + id + '</strong> ' +
+                    '<span class="device-type-badge">' + (dev.type || 'unknown') + '</span>' +
+                    '<br><small class="text-secondary">(' +
+                    (loc.x || 0).toFixed(1) + ', ' +
+                    (loc.y || 0).toFixed(1) + ', ' +
+                    (loc.z || 0).toFixed(1) + ')</small></div>';
+                deviceList.appendChild(item);
+            });
+        }
+
+        // Subsidence monitoring
+        const subsidencePoints = data.subsidence || {};
+        const subList = document.getElementById('subsidence-list');
+        const subIds = Object.keys(subsidencePoints);
+        if (subIds.length > 0) {
+            subList.innerHTML = '';
+            subIds.forEach(function(id) {
+                const pt = subsidencePoints[id];
+                const sub = pt.subsidence_mm || 0;
+                let cls = 'subsidence-ok';
+                if (Math.abs(sub) >= 10) cls = 'subsidence-alert';
+                else if (Math.abs(sub) >= 5) cls = 'subsidence-warn';
+                const item = document.createElement('div');
+                item.className = 'subsidence-item';
+                item.innerHTML = '<strong>' + id + '</strong> &mdash; ' +
+                    '<span class="subsidence-value ' + cls + '">' + sub.toFixed(2) + ' mm</span>' +
+                    ' <small class="text-secondary">(' +
+                    'initial: ' + (pt.initial_height || 0).toFixed(3) + 'm, ' +
+                    'current: ' + (pt.current_height || 0).toFixed(3) + 'm)</small>';
+                subList.appendChild(item);
+            });
+        }
+    }
+</script>
+{% endblock %}

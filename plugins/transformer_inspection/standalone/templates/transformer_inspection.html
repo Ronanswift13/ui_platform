@@ -1,0 +1,219 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Transformer Inspection Dashboard{% endblock %}
+{% block navbar_title %}Transformer Inspection - Defect Detection & Thermal Analysis{% endblock %}
+
+{% block extra_head %}
+<style>
+    .detection-panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+    .overlay-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+    .image-container {
+        position: relative;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .image-container img {
+        max-width: 100%;
+        max-height: 500px;
+        object-fit: contain;
+    }
+    .indicator-card {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        text-align: center;
+    }
+    .indicator-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .indicator-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+    .thermal-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
+    }
+    .defect-tag {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .defect-tag.error { background: rgba(239,68,68,0.2); color: #ef4444; }
+    .defect-tag.warning { background: rgba(245,158,11,0.2); color: #f59e0b; }
+    .defect-tag.info { background: rgba(59,130,246,0.2); color: #3b82f6; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Left: Image with detection overlay -->
+    <div class="col-lg-8">
+        <div class="detection-panel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0"><i class="bi bi-eye me-1"></i>Defect Detection Overlay</h6>
+                <div>
+                    <button class="btn btn-sm btn-outline-light" id="btn-upload">
+                        <i class="bi bi-upload me-1"></i>Upload Image
+                    </button>
+                    <input type="file" id="file-input" accept="image/*" class="d-none">
+                </div>
+            </div>
+            <div class="image-container" id="image-container">
+                <canvas id="detection-canvas" class="overlay-canvas"></canvas>
+                <span class="text-secondary">Upload an image to begin detection</span>
+            </div>
+        </div>
+
+        <!-- Thermal Analysis Panel -->
+        <div class="detection-panel mt-3">
+            <h6 class="mb-3"><i class="bi bi-thermometer-half me-1"></i>Thermal Analysis Panel</h6>
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <div class="indicator-card">
+                        <div class="indicator-value text-success" id="temp-current">--</div>
+                        <div class="indicator-label">Current Temp</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="indicator-card">
+                        <div class="indicator-value text-warning" id="temp-max">--</div>
+                        <div class="indicator-label">Max Temp</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="indicator-card">
+                        <div class="indicator-value text-danger" id="temp-threshold">80&#8451;</div>
+                        <div class="indicator-label">Threshold</div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span>Temperature Distribution</span>
+                    <span id="thermal-status" class="text-success">Normal</span>
+                </div>
+                <div class="thermal-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Status indicators and results -->
+    <div class="col-lg-4">
+        <!-- Oil Level / Corrosion Indicators -->
+        <div class="detection-panel mb-3">
+            <h6 class="mb-3"><i class="bi bi-droplet me-1"></i>Status Indicators</h6>
+            <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Oil Level</span>
+                    <span class="badge bg-success" id="oil-status">Normal</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" id="oil-bar" style="width: 75%"></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span>Corrosion Index</span>
+                    <span class="badge bg-success" id="corrosion-status">Low</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" id="corrosion-bar" style="width: 15%"></div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span>Silica Gel</span>
+                    <span class="badge bg-success" id="silica-status">Normal</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span>Valve State</span>
+                    <span class="badge bg-info" id="valve-status">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detection Results -->
+        <div class="detection-panel">
+            <h6 class="mb-3"><i class="bi bi-list-check me-1"></i>Detection Results</h6>
+            <div id="results-list" style="max-height: 300px; overflow-y: auto;">
+                <div class="text-secondary small">No results yet</div>
+            </div>
+        </div>
+
+        <!-- Inference Stats -->
+        <div class="detection-panel mt-3">
+            <h6 class="mb-2"><i class="bi bi-graph-up me-1"></i>Performance</h6>
+            <canvas id="perf-chart" height="150"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('btn-upload').addEventListener('click', () => {
+    document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const container = document.getElementById('image-container');
+    container.innerHTML = '<div class="spinner-border text-light" role="status"></div>';
+
+    try {
+        const resp = await fetch('/api/detect', { method: 'POST', body: formData });
+        const data = await resp.json();
+
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            container.innerHTML = '';
+            container.appendChild(img);
+            updateResults(data);
+        };
+    } catch (err) {
+        container.innerHTML = '<span class="text-danger">Detection failed</span>';
+    }
+});
+
+function updateResults(data) {
+    const list = document.getElementById('results-list');
+    if (!data.results || data.results.length === 0) {
+        list.innerHTML = '<div class="text-success small">No defects detected</div>';
+        return;
+    }
+    list.innerHTML = data.results.map(r => {
+        const levelClass = r.label.includes('leak') || r.label.includes('damage') ? 'error' :
+                          r.label.includes('rust') ? 'warning' : 'info';
+        return `<div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="defect-tag ${levelClass}">${r.label}</span>
+            <span class="small text-secondary">${(r.confidence * 100).toFixed(1)}%</span>
+        </div>`;
+    }).join('');
+}
+</script>
+{% endblock %}

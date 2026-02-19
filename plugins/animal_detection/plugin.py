@@ -32,20 +32,14 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 # === 平台基础设施导入 ===
-try:
-    from platform_core.plugin_manager.base import (
-        BasePlugin, HealthStatus, PluginContext, PluginManifest, PluginStatus,
-    )
-    from platform_core.schema.models import (
-        Alarm, AlarmLevel, AlarmRule, RecognitionResult, ROI, BoundingBox as PlatformBBox, PluginOutput,
-    )
-    PLATFORM_AVAILABLE = True
-except ImportError:
-    PLATFORM_AVAILABLE = False
-    # 降级兼容: 定义最小占位
-    class PluginStatus:
-        UNLOADED = "unloaded"; LOADING = "loading"; READY = "ready"
-        RUNNING = "running"; ERROR = "error"
+from darkbreaker_sdk.interfaces import (
+    BasePlugin, HealthStatus, PluginContext, PluginManifest, PluginStatus,
+)
+from darkbreaker_sdk.schemas import (
+    Alarm, AlarmLevel, AlarmRule, RecognitionResult, ROI,
+    BoundingBox as PlatformBBox, PluginOutput,
+)
+PLATFORM_AVAILABLE = True
 
 # === 核心模块导入 ===
 from plugins.animal_detection.core import (
@@ -246,6 +240,18 @@ class AnimalDetectionPlugin:
 
         # 仿真模式
         self._simulation_mode: bool = False
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        instance.init(config)
+        return instance
 
     def set_status(self, status: Any, message: str = ""):
         """兼容 PluginManager 的状态设置接口。"""
@@ -1088,3 +1094,6 @@ class AnimalDetectionPlugin:
             return hashlib.md5(code_file.read_bytes()).hexdigest()[:12]
         except Exception:
             return "unknown"
+
+
+Plugin = AnimalDetectionPlugin

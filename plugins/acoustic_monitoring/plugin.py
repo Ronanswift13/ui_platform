@@ -22,24 +22,13 @@ import importlib
 import sys
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 import numpy as np
 
+from darkbreaker_sdk.interfaces import HealthStatus, PluginStatus, PluginManifest
+from darkbreaker_sdk.schemas import BoundingBox, RecognitionResult, Alarm, AlarmLevel
+
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# 插件状态枚举 (兼容 platform_core)
-# =============================================================================
-class PluginStatus(str, Enum):
-    """插件状态枚举"""
-    UNLOADED = "unloaded"
-    LOADING = "loading"
-    READY = "ready"
-    RUNNING = "running"
-    ERROR = "error"
-    DISABLED = "disabled"
 
 
 # =============================================================================
@@ -563,11 +552,27 @@ class AcousticMonitoringPlugin:
 
     def healthcheck(self):
         """健康检查"""
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else "未初始化")
-        except ImportError:
-            return {"healthy": self._is_initialized, "message": "OK" if self._is_initialized else "未初始化"}
+        return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else "未初始化")
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest = PluginManifest.from_file(plugin_dir / "manifest.json")
+        instance = cls(manifest, plugin_dir)
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config_path = plugin_dir / "configs" / "default.yaml"
+            if config_path.exists():
+                config = load_plugin_config(config_path)
+            else:
+                config = {}
+        instance.init(config)
+        return instance
+
+    def get_standalone_routes(self) -> list:
+        """Return additional standalone routes for this plugin."""
+        return []
 
     @property
     def plugin_info(self) -> Dict:
@@ -579,3 +584,7 @@ class AcousticMonitoringPlugin:
             "description": "基于深度学习的声学异常检测",
             "capabilities": ["partial_discharge_detection", "acoustic_monitoring", "frequency_analysis"]
         }
+
+
+# Alias for standalone runner compatibility
+Plugin = AcousticMonitoringPlugin

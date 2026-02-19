@@ -33,10 +33,12 @@ def detector():
 @pytest.fixture
 def plugin():
     """创建并初始化插件实例"""
-    from platform_core.plugin_manager import PluginManager
+    from darkbreaker_sdk.standalone import StandalonePluginRunner
 
-    pm = PluginManager()
-    plugin_instance = pm.load_plugin("transformer_inspection")
+    runner = StandalonePluginRunner(
+        plugin_dir=str(PLUGIN_DIR),
+    )
+    plugin_instance = runner.load_plugin()
     return plugin_instance
 
 
@@ -70,7 +72,7 @@ def test_detector(detector, test_image):
 
 def test_plugin_init(plugin):
     """测试插件初始化"""
-    from platform_core.plugin_manager.base import PluginStatus
+    from darkbreaker_sdk.interfaces import PluginStatus
 
     assert plugin is not None, "插件实例不应为空"
     assert plugin.status == PluginStatus.READY, f"插件状态应为 READY，实际为 {plugin.status.value}"
@@ -94,8 +96,8 @@ def test_healthcheck(plugin):
 
 def test_inference(plugin, test_image):
     """测试推理"""
-    from platform_core.plugin_manager.base import PluginContext
-    from platform_core.schema.models import ROI, ROIType, BoundingBox
+    from darkbreaker_sdk.interfaces import PluginContext
+    from darkbreaker_sdk.schemas import ROI, ROIType, BoundingBox
 
     # 创建ROI
     rois = [

@@ -22,6 +22,8 @@ from enum import Enum
 from pathlib import Path
 import numpy as np
 
+from darkbreaker_sdk.interfaces import HealthStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,6 +52,20 @@ class HyperspectralConfig:
 
 class HyperspectralDetectionPlugin:
     """高光谱检测插件 - 完整修复版"""
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        instance = cls()
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        if hasattr(instance, 'init'):
+            instance.init(config)
+        elif hasattr(instance, 'initialize'):
+            instance.initialize(config)
+        return instance
 
     PLUGIN_ID = "hyperspectral_detection"
     PLUGIN_NAME = "高光谱检测"
@@ -275,11 +291,7 @@ class HyperspectralDetectionPlugin:
         return []
 
     def healthcheck(self):
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else "未初始化")
-        except ImportError:
-            return {"healthy": self._is_initialized, "message": "OK" if self._is_initialized else "未初始化"}
+        return HealthStatus(healthy=self._is_initialized, message="OK" if self._is_initialized else "未初始化")
 
     @property
     def plugin_info(self) -> Dict:
@@ -290,3 +302,6 @@ class HyperspectralDetectionPlugin:
             "description": "高光谱图像分析与缺陷检测",
             "capabilities": ["hyperspectral_analysis", "defect_detection", "material_identification"]
         }
+
+
+Plugin = HyperspectralDetectionPlugin

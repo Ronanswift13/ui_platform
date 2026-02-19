@@ -1,0 +1,119 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Animal Detection - DarkBreaker{% endblock %}
+{% block navbar_title %}Animal Detection Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Detection Status</div>
+            <div class="metric-value status-normal" id="det-status">Online</div>
+            <div class="metric-label">Current state</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Active Detections</div>
+            <div class="metric-value" id="det-count">0</div>
+            <div class="metric-label">Animals detected</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Today Count</div>
+            <div class="metric-value" id="today-count">0</div>
+            <div class="metric-label">Total intrusions today</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Deterrent</div>
+            <div class="metric-value" id="deterrent-status">Off</div>
+            <div class="metric-label">Active deterrent status</div>
+        </div>
+    </div>
+
+    <!-- Detection Feed -->
+    <div class="col-md-8">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-camera-video me-1"></i>Detection Feed</div>
+            <canvas id="detectionCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
+        </div>
+    </div>
+
+    <!-- Active Tracks -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-list-check me-1"></i>Active Tracks</div>
+            <div class="event-list" id="active-tracks">
+                <div class="event-item text-secondary">No active tracks</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Events -->
+    <div class="col-md-12">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-clock-history me-1"></i>Recent Events</div>
+            <div class="event-list" id="recent-events">
+                <div class="event-item text-secondary">No events recorded</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data) return;
+        document.getElementById('det-status').textContent = data.status || 'Online';
+        document.getElementById('det-count').textContent = (data.detections || []).length;
+        document.getElementById('today-count').textContent = data.todayCount || 0;
+        document.getElementById('deterrent-status').textContent = data.deterrentActive ? 'Active' : 'Off';
+    }
+</script>
+{% endblock %}

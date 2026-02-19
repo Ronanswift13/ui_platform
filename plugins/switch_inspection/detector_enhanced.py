@@ -544,7 +544,7 @@ class SwitchDetectorEnhanced:
     
     def _fuse_with_engine(self, evidences: List[StateEvidence]) -> Dict:
         """使用融合引擎"""
-        from platform_core.fusion_engine import Evidence, EvidenceType
+        from darkbreaker_sdk.schemas import Evidence, EvidenceType
         
         assert self._fusion_engine is not None
         fusion_evidences = []

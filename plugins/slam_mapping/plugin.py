@@ -16,55 +16,48 @@ import logging
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from collections import deque
 import json
 
-# 导入插件状态混入类
-try:
-    from platform_core.plugin_mixin import PluginStatusMixin, PluginStatus
-except ImportError:
-    from enum import Enum
+from darkbreaker_sdk.interfaces import PluginStatus, HealthStatus, PluginManifest
+from darkbreaker_sdk.schemas import BoundingBox, RecognitionResult, Alarm, AlarmLevel
 
-    class PluginStatus(str, Enum):
-        UNLOADED = "unloaded"
-        LOADING = "loading"
-        READY = "ready"
-        RUNNING = "running"
-        ERROR = "error"
-        DISABLED = "disabled"
 
-    class PluginStatusMixin:
-        def __init_status__(self):
-            self._status = PluginStatus.UNLOADED
-            self._last_error = ""
+class PluginStatusMixin:
+    """Mixin providing plugin status management via SDK PluginStatus."""
 
-        @property
-        def status(self):
-            return getattr(self, '_status', PluginStatus.UNLOADED)
+    def __init_status__(self):
+        self._status = PluginStatus.UNLOADED
+        self._last_error = ""
 
-        @status.setter
-        def status(self, value):
-            self._status = value
+    @property
+    def status(self):
+        return getattr(self, '_status', PluginStatus.UNLOADED)
 
-        def set_status(self, status, error: str = ""):
-            if isinstance(status, str):
-                try:
-                    status = PluginStatus(status)
-                except ValueError:
-                    status = PluginStatus.ERROR
-            self._status = status
-            if error:
-                self._last_error = error
+    @status.setter
+    def status(self, value):
+        self._status = value
 
-        def get_plugin_status(self) -> dict:
-            return {
-                'plugin_id': getattr(self, 'PLUGIN_ID', 'unknown'),
-                'name': getattr(self, 'PLUGIN_NAME', 'Unknown'),
-                'version': getattr(self, 'PLUGIN_VERSION', '0.0.0'),
-                'status': self._status.value if hasattr(self, '_status') else 'unknown',
-                'initialized': getattr(self, '_is_initialized', False),
-                'last_error': getattr(self, '_last_error', '')
-            }
+    def set_status(self, status, error: str = ""):
+        if isinstance(status, str):
+            try:
+                status = PluginStatus(status)
+            except ValueError:
+                status = PluginStatus.ERROR
+        self._status = status
+        if error:
+            self._last_error = error
+
+    def get_plugin_status(self) -> dict:
+        return {
+            'plugin_id': getattr(self, 'PLUGIN_ID', 'unknown'),
+            'name': getattr(self, 'PLUGIN_NAME', 'Unknown'),
+            'version': getattr(self, 'PLUGIN_VERSION', '0.0.0'),
+            'status': self._status.value if hasattr(self, '_status') else 'unknown',
+            'initialized': getattr(self, '_is_initialized', False),
+            'last_error': getattr(self, '_last_error', '')
+        }
 
 logger = logging.getLogger(__name__)
 
@@ -797,7 +790,25 @@ class SLAMMappingPlugin(PluginStatusMixin):
         self.dl_enabled = False
         
         logger.info(f"SLAM建图插件初始化完成: {self.name} v{self.version}")
-        
+
+    @classmethod
+    def create_standalone(cls, config=None):
+        """Create plugin instance for standalone operation."""
+        plugin_dir = Path(__file__).resolve().parent
+        manifest_path = plugin_dir / "manifest.json"
+        if manifest_path.exists():
+            manifest = PluginManifest.from_file(manifest_path)
+            instance = cls(manifest, plugin_dir)
+        else:
+            instance = cls.__new__(cls)
+            instance.__init__()  # fallback for non-BasePlugin classes
+        if config is None:
+            from darkbreaker_sdk.utils import load_plugin_config
+            config = load_plugin_config(plugin_dir / "configs" / "default.yaml")
+        if hasattr(instance, 'init'):
+            instance.init(config)
+        return instance
+
     def _default_config(self) -> Dict[str, Any]:
         """默认配置"""
         return {
@@ -1237,11 +1248,7 @@ class SLAMMappingPlugin(PluginStatusMixin):
 
     def healthcheck(self):
         """实现BasePlugin抽象方法 - 健康检查"""
-        try:
-            from platform_core.plugin_manager.base import HealthStatus
-            return HealthStatus(healthy=True, message="OK")
-        except ImportError:
-            return {"healthy": True, "message": "OK"}
+        return HealthStatus(healthy=True, message="OK")
 
     def get_status(self) -> Dict[str, Any]:
         """获取插件状态"""
@@ -1309,3 +1316,6 @@ if __name__ == "__main__":
     print(f"\n插件状态: {json.dumps(status, indent=2)}")
     
     plugin.shutdown()
+
+
+Plugin = SLAMMappingPlugin

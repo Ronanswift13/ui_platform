@@ -1,0 +1,120 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Temperature Monitoring - DarkBreaker{% endblock %}
+{% block navbar_title %}Temperature Monitoring Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Max Temperature</div>
+            <div class="metric-value" id="max-temp">-- C</div>
+            <div class="metric-label">Current maximum</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Avg Temperature</div>
+            <div class="metric-value" id="avg-temp">-- C</div>
+            <div class="metric-label">Current average</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Rise Rate</div>
+            <div class="metric-value" id="rise-rate">-- C/min</div>
+            <div class="metric-label">Temperature trend</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Hotspots</div>
+            <div class="metric-value" id="hotspot-count">0</div>
+            <div class="metric-label">Active hotspots</div>
+        </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="col-md-8">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-thermometer-half me-1"></i>Thermal Heatmap</div>
+            <canvas id="heatmapCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
+        </div>
+    </div>
+
+    <!-- Hotspot List -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-geo-alt me-1"></i>Hotspot Details</div>
+            <div class="event-list" id="hotspot-list">
+                <div class="event-item text-secondary">No hotspots detected</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alarms -->
+    <div class="col-md-12">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Temperature Alarms</div>
+            <div class="event-list" id="alarm-list">
+                <div class="event-item text-secondary">No alarms</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data || !data.success) return;
+        document.getElementById('max-temp').textContent = (data.max_temp || 0).toFixed(1) + ' C';
+        document.getElementById('avg-temp').textContent = (data.avg_temp || 0).toFixed(1) + ' C';
+        const trend = data.trend || {};
+        document.getElementById('rise-rate').textContent = (trend.rise_rate || 0).toFixed(2) + ' C/min';
+        document.getElementById('hotspot-count').textContent = (data.hotspots || []).length;
+    }
+</script>
+{% endblock %}
