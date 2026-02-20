@@ -1,5 +1,5 @@
 """
-室内电子围栏插件 V2.0 - 多人安全监测系统
+室内电子围栏插件 V2.1 - 多人安全监测系统
 输变电激光星芒破夜绘明监测平台 (G组)
 
 功能范围:
@@ -25,10 +25,9 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from datetime import datetime
-from dataclasses import dataclass, field
-from enum import Enum
+import copy
 import hashlib
 import time
 import threading
@@ -36,6 +35,7 @@ from collections import deque
 import json
 import sys
 import importlib.util
+import logging
 import numpy as np
 
 # =============================================================================
@@ -109,6 +109,7 @@ from plugins.indoor_fence.core import (
     PersonState, GlobalAlarmLevel, PersonStateResult, GlobalStateResult, StateMachine,
     Detection, Track, MultiTargetTracker,
     VisualDetection, LidarDetection, FusedDetection, SensorFusion, FusedTracker,
+    IndoorFenceConfigManager,
 )
 
 # 导入适配器 (使用绝对导入以支持动态加载)
@@ -118,6 +119,9 @@ from plugins.indoor_fence.adapters import (
     LidarAdapter, LidarConfig, LidarScan, LidarCluster,
     LightAdapter, LightColor, LightConfig, LightState,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -235,7 +239,7 @@ class AuditLogger:
 
 class IndoorFencePlugin(BasePlugin):
     """
-    室内电子围栏插件 V2.0
+    室内电子围栏插件 V2.1
 
     实现基于视觉+2D激光雷达融合的安全监测系统
     使用五层算法架构
@@ -263,11 +267,14 @@ class IndoorFencePlugin(BasePlugin):
     def __init__(self, manifest: PluginManifest, plugin_dir: Path):
         """初始化插件"""
         super().__init__(manifest, plugin_dir)
+        self._config_manager = IndoorFenceConfigManager(plugin_dir, manifest.config_schema)
         self._config: Dict[str, Any] = {}
+        self._config_revision = 0
         self._initialized = False
 
         # V2 核心组件
         self._zone_config: Optional[ZoneConfiguration] = None
+        self._zone_config_path: Optional[Path] = None
         self._state_machine: Optional[StateMachine] = None
         self._fused_tracker: Optional[FusedTracker] = None
 
@@ -282,6 +289,8 @@ class IndoorFencePlugin(BasePlugin):
         # 运行时状态
         self._frame_count = 0
         self._last_process_time = 0.0
+        self._inference_times: deque = deque(maxlen=200)
+        self._exception_count = 0
         self._last_global_state: Optional[GlobalStateResult] = None
         self._person_state_cache: Dict[str, PersonState] = {}
 
@@ -325,74 +334,113 @@ class IndoorFencePlugin(BasePlugin):
         config = config or {}
 
         try:
-            self._config = config
+            normalized = self._config_manager.build(update_config=config)
+            with self._lock:
+                self._apply_runtime_config(normalized)
+                self._initialized = True
+                self.status = PluginStatus.READY
+                self._config_revision += 1
 
-            # 1. 加载区域配置
-            zone_config_path = config.get("zone_config_path")
-            if zone_config_path:
-                loader = ZoneConfigLoader(Path(zone_config_path))
-                self._zone_config = loader.load()
-            else:
-                loader = ZoneConfigLoader()
-                self._zone_config = loader.load()
-
-            print(f"[{self.id}] 区域配置已加载: "
-                  f"{len(self._zone_config.zones)}个区域, "
-                  f"{len(self._zone_config.cabinets)}个机柜")
-
-            # 2. 初始化状态机
-            self._state_machine = StateMachine(self._zone_config)
-
-            # 配置阈值
-            safety_config = config.get("safety_zone", {})
-            self._state_machine.on_line_threshold = safety_config.get("warning_distance_m", 0.3)
-            self._state_machine.cross_line_threshold = safety_config.get("danger_distance_m", 0.0)
-
-            # 3. 初始化融合跟踪器
-            fusion_config = {
-                "max_time_diff_ms": config.get("fusion", {}).get("max_time_diff_ms", 100),
-                "distance_match_threshold_m": config.get("fusion", {}).get("distance_match_threshold_m", 0.5),
-            }
-            tracker_config = {
-                "max_age": config.get("tracking", {}).get("max_age", 30),
-                "min_hits": config.get("tracking", {}).get("min_hits", 3),
-                "distance_threshold": config.get("tracking", {}).get("distance_threshold", 1.0),
-                "use_kalman": config.get("tracking", {}).get("use_kalman", True),
-            }
-            self._fused_tracker = FusedTracker(
-                fusion_config=fusion_config,
-                tracker_config=tracker_config,
+            logger.info(
+                "[%s] 初始化成功: zones=%s cabinets=%s allow_list=%s",
+                self.id,
+                len(self._zone_config.zones) if self._zone_config else 0,
+                len(self._zone_config.cabinets) if self._zone_config else 0,
+                self._allow_list,
             )
-
-            # 4. 初始化适配器
-            self._init_adapters(config)
-
-            # 5. 初始化审计日志
-            audit_config = config.get("audit", {"enabled": True, "log_level": "event"})
-            self._audit_logger = AuditLogger(audit_config)
-
-            # 6. 设置授权列表
-            auth_config = config.get("cabinet_authorization", {})
-            self._allow_list = auth_config.get("allow_list", [])
-
-            self._initialized = True
-            self.status = PluginStatus.READY
-
-            print(f"[{self.id}] 插件初始化成功 (V2.0)")
-            print(f"[{self.id}] 授权机柜: {self._allow_list}")
-
             return True
 
         except Exception as e:
             self.status = PluginStatus.ERROR
             self._last_error = str(e)
-            print(f"[{self.id}] 初始化失败: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("[%s] 初始化失败: %s", self.id, e)
             return False
+
+    def _apply_runtime_config(self, config: Dict[str, Any]) -> None:
+        """将配置应用到插件运行时组件。"""
+        self._config = copy.deepcopy(config)
+
+        # 1. 区域配置
+        self._zone_config_path = self._config_manager.resolve_zone_config_path(self._config)
+        loader = ZoneConfigLoader(self._zone_config_path) if self._zone_config_path else ZoneConfigLoader()
+        self._zone_config = loader.load()
+
+        # 2. 状态机与阈值
+        self._state_machine = StateMachine(self._zone_config)
+        safety_config = self._config.get("safety_zone", {})
+        self._state_machine.on_line_threshold = float(safety_config.get("warning_distance_m", 0.3))
+        self._state_machine.cross_line_threshold = float(safety_config.get("danger_distance_m", 0.1))
+
+        # 3. 授权策略
+        self._apply_authorization_policy()
+
+        # 4. 融合跟踪
+        fusion_config = self._config.get("fusion", {})
+        camera_cfg = self._config.get("camera", {})
+        lidar_cfg = self._config.get("lidar", {})
+        tracker_config = self._config.get("tracking", {})
+        self._fused_tracker = FusedTracker(
+            fusion_config={
+                "max_time_diff_ms": fusion_config.get("max_time_diff_ms", 100),
+                "angle_match_threshold_deg": fusion_config.get("angle_match_threshold_deg", 10.0),
+                "distance_match_threshold_m": fusion_config.get("distance_match_threshold_m", 0.5),
+                "image_size": tuple(camera_cfg.get("resolution", [640, 480])),
+                "camera_height": camera_cfg.get("height_m", 3.0),
+                "camera_tilt_deg": camera_cfg.get("tilt_deg", 40.0),
+                "lidar_height": lidar_cfg.get("install", {}).get("height_m", lidar_cfg.get("height_m", 2.5)),
+                "lidar_tilt_deg": lidar_cfg.get("install", {}).get("tilt_deg", lidar_cfg.get("tilt_deg", 20.0)),
+            },
+            tracker_config={
+                "max_age": tracker_config.get("max_age", 30),
+                "min_hits": tracker_config.get("min_hits", 3),
+                "distance_threshold": tracker_config.get("distance_threshold", 1.0),
+                "use_kalman": tracker_config.get("use_kalman", True),
+            },
+        )
+
+        # 5. 适配器
+        self._init_adapters(self._config)
+
+        # 6. 审计日志
+        self._init_audit_logger(self._config.get("audit", {}))
+
+    def _apply_authorization_policy(self) -> None:
+        """应用授权与机柜人数策略。"""
+        auth_config = self._config.get("cabinet_authorization", {})
+        self._allow_list = list(auth_config.get("allow_list", []))
+
+        if not self._zone_config:
+            return
+
+        require_auth = bool(auth_config.get("enabled", True))
+        max_persons = int(auth_config.get("max_persons_per_cabinet", 1))
+        for cabinet in self._zone_config.cabinets.values():
+            cabinet.zone.require_authorization = require_auth
+            cabinet.zone.max_occupancy = max_persons
+
+    def _init_audit_logger(self, audit_config: Dict[str, Any]) -> None:
+        """初始化审计日志。"""
+        if self._audit_logger:
+            self._audit_logger.close()
+        self._audit_logger = AuditLogger(audit_config)
+
+    def _disconnect_adapters(self) -> None:
+        """断开全部适配器连接。"""
+        if self._camera_adapter:
+            self._camera_adapter.disconnect()
+            self._camera_adapter = None
+        if self._lidar_adapter:
+            self._lidar_adapter.disconnect()
+            self._lidar_adapter = None
+        if self._light_adapter:
+            self._light_adapter.all_off()
+            self._light_adapter.disconnect()
+            self._light_adapter = None
 
     def _init_adapters(self, config: Dict):
         """初始化适配器"""
+        self._disconnect_adapters()
+
         # 相机适配器
         cam_config = config.get("camera", {})
         if cam_config.get("enabled", True):
@@ -402,6 +450,15 @@ class IndoorFencePlugin(BasePlugin):
                 fps=cam_config.get("fps", 30),
                 confidence_threshold=cam_config.get("confidence_threshold", 0.5),
                 model_path=cam_config.get("model_path", ""),
+                nms_threshold=cam_config.get("nms_threshold", 0.45),
+                tracking_enabled=config.get("tracking", {}).get("enabled", True),
+                max_track_age=config.get("tracking", {}).get("max_age", 30),
+                height_m=cam_config.get("height_m", 3.0),
+                tilt_deg=cam_config.get("tilt_deg", 40.0),
+                fx=cam_config.get("fx", 500.0),
+                fy=cam_config.get("fy", 500.0),
+                cx=cam_config.get("cx", 320.0),
+                cy=cam_config.get("cy", 240.0),
             )
             camera_config.device_id = "camera_main"
             self._camera_adapter = CameraAdapter(camera_config)
@@ -416,6 +473,9 @@ class IndoorFencePlugin(BasePlugin):
                 scan_rate_hz=lidar_config.get("scan_rate_hz", 10),
                 angle_min_deg=lidar_config.get("angle_min_deg", -45),
                 angle_max_deg=lidar_config.get("angle_max_deg", 45),
+                angle_offset_deg=lidar_config.get("angle_offset_deg", 0.0),
+                height_m=lidar_config.get("install", {}).get("height_m", lidar_config.get("height_m", 2.5)),
+                tilt_deg=lidar_config.get("install", {}).get("tilt_deg", lidar_config.get("tilt_deg", 20.0)),
             )
             lidar_cfg.device_id = "lidar_main"
             self._lidar_adapter = LidarAdapter(lidar_cfg)
@@ -434,26 +494,24 @@ class IndoorFencePlugin(BasePlugin):
         self,
         frame: np.ndarray,
         rois: list[ROI],
-        context: PluginContext,
+        context: Optional[PluginContext],
     ) -> list[RecognitionResult]:
         """
         执行推理 - 实现五层算法架构
         """
+        context = self._ensure_context(context)
+        rois = rois or []
+        default_bbox = rois[0].bbox if rois else BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0)
+        roi_entries: list[Optional[ROI]] = rois if rois else [None]
+
         if not self._initialized:
-            return [RecognitionResult(
-                task_id=context.task_id,
-                site_id=context.site_id,
-                device_id=context.device_id,
-                component_id=context.component_id,
-                roi_id=roi.id,
-                bbox=roi.bbox,
-                label="error",
-                confidence=0.0,
-                model_version=self.version,
-                code_version=self.code_hash,
+            return self._build_error_results(
+                context=context,
+                roi_entries=roi_entries,
+                default_bbox=default_bbox,
                 failure_reason="9000",
-                metadata={"error": "插件未初始化"}
-            ) for roi in rois]
+                error_message="插件未初始化",
+            )
 
         start_time = time.time()
         self._frame_count += 1
@@ -463,6 +521,9 @@ class IndoorFencePlugin(BasePlugin):
 
         with self._lock:
             try:
+                if not self._state_machine or not self._fused_tracker:
+                    raise RuntimeError("核心组件未就绪，请检查初始化流程")
+
                 # ===== 第1层: 传感器适配 =====
                 visual_detections = self._get_visual_detections(frame)
                 lidar_detections = self._get_lidar_detections()
@@ -510,7 +571,7 @@ class IndoorFencePlugin(BasePlugin):
                     )
 
                 # 记录告警
-                if global_state.alarm_level != GlobalAlarmLevel.GREEN:
+                if self._audit_logger and global_state.alarm_level != GlobalAlarmLevel.GREEN:
                     self._audit_logger.log_alarm(
                         global_state.light_color,
                         global_state.status_message,
@@ -518,23 +579,26 @@ class IndoorFencePlugin(BasePlugin):
                     )
 
                 # 记录违规
-                for violation in violations:
-                    self._audit_logger.log_violation(
-                        violation["type"],
-                        violation
-                    )
+                if self._audit_logger:
+                    for violation in violations:
+                        self._audit_logger.log_violation(
+                            violation["type"],
+                            violation
+                        )
 
                 # 保存状态
                 self._last_global_state = global_state
                 self._last_process_time = time.time() - start_time
+                self._inference_times.append(self._last_process_time)
 
                 # 生成结果
-                default_bbox = rois[0].bbox if rois else BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0)
+                for roi in roi_entries:
+                    roi_id = roi.id if roi else "full_frame"
+                    roi_bbox = roi.bbox if roi else default_bbox
 
-                for roi in rois:
                     # 为每个人员生成结果
                     for ps in global_state.person_states:
-                        result = self._create_result(roi, ps, context)
+                        result = self._create_result(roi, ps, context, default_bbox)
                         results.append(result)
 
                     # 添加多人违规告警
@@ -544,7 +608,7 @@ class IndoorFencePlugin(BasePlugin):
                             site_id=context.site_id,
                             device_id=context.device_id,
                             component_id=context.component_id,
-                            roi_id=f"cab_{violation.get('cabinet_id', 0)}",
+                            roi_id=roi_id if roi else f"cab_{violation.get('cabinet_id', 0)}",
                             bbox=default_bbox,
                             label="multi_person",
                             confidence=1.0,
@@ -561,8 +625,8 @@ class IndoorFencePlugin(BasePlugin):
                             site_id=context.site_id,
                             device_id=context.device_id,
                             component_id=context.component_id,
-                            roi_id=roi.id,
-                            bbox=roi.bbox,
+                            roi_id=roi_id,
+                            bbox=roi_bbox,
                             label="no_person",
                             confidence=1.0,
                             value="区域空闲",
@@ -575,23 +639,56 @@ class IndoorFencePlugin(BasePlugin):
                 return results
 
             except Exception as e:
+                self._exception_count += 1
                 self.status = PluginStatus.ERROR
-                import traceback
-                traceback.print_exc()
-                return [RecognitionResult(
-                    task_id=context.task_id,
-                    site_id=context.site_id,
-                    device_id=context.device_id,
-                    component_id=context.component_id,
-                    roi_id=roi.id,
-                    bbox=roi.bbox,
-                    label="error",
-                    confidence=0.0,
-                    model_version=self.version,
-                    code_version=self.code_hash,
+                logger.exception("[%s] 推理失败: %s", self.id, e)
+                if self._audit_logger:
+                    self._audit_logger.log_event("infer_error", {"error": str(e)})
+                return self._build_error_results(
+                    context=context,
+                    roi_entries=roi_entries,
+                    default_bbox=default_bbox,
                     failure_reason="9001",
-                    metadata={"error": str(e)}
-                ) for roi in rois]
+                    error_message=str(e),
+                )
+
+    def _ensure_context(self, context: Optional[PluginContext]) -> PluginContext:
+        """兜底运行上下文，兼容独立调试调用。"""
+        if context is not None:
+            return context
+        return PluginContext(
+            task_id=f"standalone-{int(time.time() * 1000)}",
+            site_id="standalone",
+            device_id=self.id,
+            component_id="default",
+        )
+
+    def _build_error_results(
+        self,
+        context: PluginContext,
+        roi_entries: List[Optional[ROI]],
+        default_bbox: BoundingBox,
+        failure_reason: str,
+        error_message: str,
+    ) -> list[RecognitionResult]:
+        """构建统一错误返回。"""
+        outputs: list[RecognitionResult] = []
+        for roi in roi_entries:
+            outputs.append(RecognitionResult(
+                task_id=context.task_id,
+                site_id=context.site_id,
+                device_id=context.device_id,
+                component_id=context.component_id,
+                roi_id=roi.id if roi else "full_frame",
+                bbox=roi.bbox if roi else default_bbox,
+                label="error",
+                confidence=0.0,
+                model_version=self.version,
+                code_version=self.code_hash,
+                failure_reason=failure_reason,
+                metadata={"error": error_message},
+            ))
+        return outputs
 
     def _get_visual_detections(self, frame: Optional[np.ndarray]) -> List[VisualDetection]:
         """获取视觉检测结果"""
@@ -638,6 +735,8 @@ class IndoorFencePlugin(BasePlugin):
 
     def _check_state_changes(self, person_states: List[PersonStateResult]):
         """检查并记录状态变化"""
+        if not self._audit_logger:
+            return
         for ps in person_states:
             old_state = self._person_state_cache.get(ps.person_id)
             new_state = ps.state
@@ -658,9 +757,10 @@ class IndoorFencePlugin(BasePlugin):
 
     def _create_result(
         self,
-        roi: ROI,
+        roi: Optional[ROI],
         person_state: PersonStateResult,
         context: PluginContext,
+        default_bbox: Optional[BoundingBox] = None,
     ) -> RecognitionResult:
         """创建识别结果"""
         state = person_state.state
@@ -686,14 +786,14 @@ class IndoorFencePlugin(BasePlugin):
         }
 
         # 计算边界框
-        bbox = roi.bbox
+        bbox = roi.bbox if roi else (default_bbox or BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0))
 
         return RecognitionResult(
             task_id=context.task_id,
             site_id=context.site_id,
             device_id=context.device_id,
             component_id=context.component_id,
-            roi_id=roi.id,
+            roi_id=roi.id if roi else "full_frame",
             label=label_map.get(state, "unknown"),
             confidence=1.0,
             value=f"机柜{person_state.current_cabinet or 0} · {person_state.distance_to_yellow_line:.2f}m",
@@ -771,12 +871,13 @@ class IndoorFencePlugin(BasePlugin):
             elif result.label == "on_line":
                 person_id = result.metadata.get("person_id", "人员")
                 distance = result.metadata.get("distance_to_line_m")
+                distance_text = f"{distance:.2f}m" if isinstance(distance, (int, float)) else "未知距离"
                 alarms.append(Alarm(
                     task_id=result.task_id,
                     result_id=None,
                     level=AlarmLevel.WARNING,
                     title=self.LABEL_NAMES.get("on_line", "压线警告"),
-                    message=f"{person_id}接近黄线，距离{distance:.2f}m",
+                    message=f"{person_id}接近黄线，距离{distance_text}",
                     site_id=result.site_id,
                     device_id=result.device_id,
                     component_id=result.component_id,
@@ -811,77 +912,93 @@ class IndoorFencePlugin(BasePlugin):
 
         # 检查适配器状态
         adapters_ok = True
-        adapter_details = {}
-
-        if self._camera_adapter:
-            adapter_details["camera"] = self._camera_adapter.status.value
-            if not self._camera_adapter.is_connected:
+        adapter_details: Dict[str, Any] = {}
+        for name, adapter in (
+            ("camera", self._camera_adapter),
+            ("lidar", self._lidar_adapter),
+            ("light", self._light_adapter),
+        ):
+            if not adapter:
+                continue
+            adapter_details[name] = {
+                "status": adapter.status.value,
+                "connected": adapter.is_connected,
+                "simulated": adapter.is_simulated,
+                "last_error": adapter.last_error,
+                "stats": adapter.get_stats(),
+            }
+            if not adapter.is_connected and adapter.status not in (AdapterStatus.SIMULATED, AdapterStatus.SIMULATING):
                 adapters_ok = False
 
-        if self._lidar_adapter:
-            adapter_details["lidar"] = self._lidar_adapter.status.value
-            if not self._lidar_adapter.is_connected:
-                adapters_ok = False
-
-        if self._light_adapter:
-            adapter_details["light"] = self._light_adapter.status.value
-
-        # 检查处理时间
-        latency_ok = self._last_process_time < 0.2  # < 200ms
+        # 检查处理时间，目标值来自方案: <100ms
+        latency_ok = self._last_process_time < 0.1
+        inference_ms = [x * 1000.0 for x in self._inference_times]
+        latency_summary = {
+            "current_ms": round(self._last_process_time * 1000.0, 2),
+            "window_size": len(inference_ms),
+            "avg_ms": round(float(np.mean(inference_ms)), 2) if inference_ms else 0.0,
+            "p95_ms": round(float(np.percentile(inference_ms, 95)), 2) if len(inference_ms) >= 5 else 0.0,
+            "max_ms": round(float(np.max(inference_ms)), 2) if inference_ms else 0.0,
+        }
 
         person_count = len(self._last_global_state.person_states) if self._last_global_state else 0
         cabinet_count = len(self._zone_config.cabinets) if self._zone_config else 0
 
         return HealthStatus(
             healthy=adapters_ok and latency_ok,
-            message=f"室内监控就绪 V2.0，{cabinet_count}个机柜，{person_count}人跟踪中",
+            message=f"室内监控就绪 V2.1，{cabinet_count}个机柜，{person_count}人跟踪中",
             details={
                 "status": "ready",
-                "version": "2.0.0",
+                "version": self.version,
+                "config_revision": self._config_revision,
                 "frame_count": self._frame_count,
                 "alert_count": self._alert_count,
+                "exception_count": self._exception_count,
                 "tracked_persons": person_count,
                 "cabinet_count": cabinet_count,
                 "allow_list": self._allow_list,
                 "adapters": adapter_details,
-                "last_process_time_ms": self._last_process_time * 1000,
+                "latency": latency_summary,
+                "last_process_time_ms": self._last_process_time * 1000.0,
+                "queue_lengths": {
+                    "inference_window": len(self._inference_times),
+                    "audit_events": len(self._audit_logger._event_logs) if self._audit_logger else 0,
+                },
                 "last_alarm_level": self._last_global_state.light_color if self._last_global_state else "green",
+                "zone_config_path": str(self._zone_config_path) if self._zone_config_path else "",
             }
         )
 
     def cleanup(self) -> None:
         """清理资源"""
         # 断开适配器
-        if self._camera_adapter:
-            self._camera_adapter.disconnect()
-        if self._lidar_adapter:
-            self._lidar_adapter.disconnect()
-        if self._light_adapter:
-            self._light_adapter.all_off()
-            self._light_adapter.disconnect()
+        self._disconnect_adapters()
 
         # 关闭审计日志
         if self._audit_logger:
             self._audit_logger.close()
+            self._audit_logger = None
 
         # 重置状态
         self._person_state_cache.clear()
 
         self._initialized = False
         self.status = PluginStatus.UNLOADED
-        print(f"[{self.id}] 插件已清理")
+        logger.info("[%s] 插件已清理", self.id)
 
     # ==================== 扩展API接口 ====================
 
     def update_allow_list(self, cabinet_ids: List[int]):
         """更新授权机柜列表"""
-        self._allow_list = cabinet_ids
+        with self._lock:
+            self._allow_list = cabinet_ids
+            self._config.setdefault("cabinet_authorization", {})["allow_list"] = list(cabinet_ids)
         if self._audit_logger:
             self._audit_logger.log_event("config_change", {
                 "key": "allow_list",
                 "value": cabinet_ids,
             })
-        print(f"[{self.id}] 授权列表已更新: {self._allow_list}")
+        logger.info("[%s] 授权列表已更新: %s", self.id, self._allow_list)
 
     def set_authorization(self, person_id: str, cabinet_ids: List[int]):
         """设置人员授权"""
@@ -958,7 +1075,8 @@ class IndoorFencePlugin(BasePlugin):
             "yellow_line_distance_m": self._config.get("safety_zone", {}).get("yellow_line_distance_m", 0.5),
             "lidar_enabled": self._config.get("lidar", {}).get("enabled", False),
             "camera_enabled": self._config.get("camera", {}).get("enabled", False),
-            "version": "2.0.0",
+            "version": self.version,
+            "config_revision": self._config_revision,
         }
 
     def get_zone_config(self) -> Dict:
@@ -969,6 +1087,8 @@ class IndoorFencePlugin(BasePlugin):
         return {
             "id": self._zone_config.config_id,
             "name": self._zone_config.config_name,
+            "version": self._zone_config.version,
+            "path": str(self._zone_config_path) if self._zone_config_path else "",
             "zones": [
                 {
                     "id": z.zone_id,
@@ -987,7 +1107,209 @@ class IndoorFencePlugin(BasePlugin):
                 }
                 for c in self._zone_config.cabinets.values()
             ],
+            "yellow_lines": [
+                {
+                    "id": yl.line_id,
+                    "name": yl.name,
+                    "start": (yl.line.start.x, yl.line.start.y),
+                    "end": (yl.line.end.x, yl.line.end.y),
+                    "cabinets": yl.associated_cabinets,
+                    "warning_distance": yl.warning_distance,
+                    "danger_distance": yl.danger_distance,
+                }
+                for yl in self._zone_config.yellow_lines.values()
+            ],
         }
+
+    def get_runtime_config(self) -> Dict[str, Any]:
+        """获取当前运行配置快照。"""
+        return copy.deepcopy(self._config)
+
+    def update_config(self, new_config: Dict[str, Any], merge: bool = True) -> Dict[str, Any]:
+        """
+        更新插件配置。
+
+        - merge=True: 在当前配置基础上增量更新
+        - merge=False: 以默认配置为基线替换
+        """
+        with self._lock:
+            previous_config = copy.deepcopy(self._config)
+            previous_revision = self._config_revision
+            try:
+                normalized = self._config_manager.build(
+                    update_config=new_config,
+                    base_config=previous_config if merge else None,
+                )
+                self._apply_runtime_config(normalized)
+                self._config_revision = previous_revision + 1
+                self.status = PluginStatus.READY
+                if self._audit_logger:
+                    self._audit_logger.log_event("config_update", {
+                        "merge": merge,
+                        "revision": self._config_revision,
+                    })
+                logger.info("[%s] 配置已更新, revision=%s", self.id, self._config_revision)
+                return self.get_runtime_config()
+            except Exception as e:
+                self._exception_count += 1
+                self.status = PluginStatus.ERROR
+                self._last_error = str(e)
+                logger.exception("[%s] 配置更新失败，执行回滚: %s", self.id, e)
+                if previous_config:
+                    try:
+                        self._apply_runtime_config(previous_config)
+                        self.status = PluginStatus.READY
+                        self._config_revision = previous_revision
+                    except Exception as rollback_error:
+                        logger.exception("[%s] 回滚失败: %s", self.id, rollback_error)
+                raise ValueError(f"配置更新失败: {e}") from e
+
+    def on_config_update(self, new_config: dict[str, Any]) -> None:
+        """SDK 配置更新回调。"""
+        self.update_config(new_config, merge=True)
+
+    def update_zone_config(self, zone_config_data: Dict[str, Any], persist: Optional[bool] = None) -> Dict[str, Any]:
+        """更新区域配置并按需落盘。"""
+        if not isinstance(zone_config_data, dict):
+            raise ValueError("zone_config_data 必须是字典")
+
+        with self._lock:
+            loader = ZoneConfigLoader()
+            try:
+                parsed_config = loader._parse_config(zone_config_data)
+            except Exception as e:
+                raise ValueError(f"区域配置解析失败: {e}") from e
+
+            self._zone_config = parsed_config
+            self._state_machine = StateMachine(self._zone_config)
+            safety_cfg = self._config.get("safety_zone", {})
+            self._state_machine.on_line_threshold = float(safety_cfg.get("warning_distance_m", 0.3))
+            self._state_machine.cross_line_threshold = float(safety_cfg.get("danger_distance_m", 0.1))
+            self._apply_authorization_policy()
+
+            persist_flag = (
+                self._config.get("zone_config", {}).get("persist_on_update", True)
+                if persist is None else bool(persist)
+            )
+            if persist_flag:
+                target_path = self._zone_config_path or self._config_manager.resolve_zone_config_path(self._config)
+                if target_path is None:
+                    target_path = self._config_manager.default_zone_config_path
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                if not loader.save(parsed_config, target_path):
+                    raise ValueError("区域配置持久化失败")
+                self._zone_config_path = target_path
+                try:
+                    rel_path = target_path.relative_to(self.plugin_dir)
+                    self._config.setdefault("zone_config", {})["path"] = str(rel_path)
+                except ValueError:
+                    self._config.setdefault("zone_config", {})["path"] = str(target_path)
+
+            self._config_revision += 1
+            if self._audit_logger:
+                self._audit_logger.log_event("zone_config_update", {
+                    "revision": self._config_revision,
+                    "persist": persist_flag,
+                })
+            return self.get_zone_config()
+
+    def update_config_key(self, key: str, value: Any) -> Dict[str, Any]:
+        """按点路径更新单个配置字段。"""
+        patched = IndoorFenceConfigManager.patch_by_key(self.get_runtime_config(), key, value)
+        return self.update_config(patched, merge=False)
+
+    def get_status(self) -> Dict[str, Any]:
+        """提供给 standalone runner 的额外状态信息。"""
+        return {
+            "tracked_persons": self.get_tracked_persons(),
+            "cabinet_status": self.get_cabinet_status(),
+            "allow_list": self._allow_list,
+            "zone_config": self.get_zone_config(),
+            "config_revision": self._config_revision,
+        }
+
+    def get_standalone_routes(self) -> list:
+        """注册电子围栏专用 standalone API。"""
+
+        async def _get_plugin_config():
+            return {
+                "config": self.get_runtime_config(),
+                "config_schema": self.manifest.config_schema,
+                "revision": self._config_revision,
+            }
+
+        async def _patch_plugin_config(payload: Dict[str, Any]):
+            payload = payload or {}
+            cfg = payload.get("config", payload)
+            merge = bool(payload.get("merge", True))
+            return {
+                "status": "updated",
+                "config": self.update_config(cfg, merge=merge),
+                "revision": self._config_revision,
+            }
+
+        async def _update_config_key(payload: Dict[str, Any]):
+            payload = payload or {}
+            return {
+                "status": "updated",
+                "config": self.update_config_key(payload.get("key", ""), payload.get("value")),
+                "revision": self._config_revision,
+            }
+
+        async def _get_zone():
+            return self.get_zone_config()
+
+        async def _put_zone(payload: Dict[str, Any]):
+            payload = payload or {}
+            zone_data = payload.get("zone_config", payload)
+            persist = payload.get("persist", None)
+            return {
+                "status": "updated",
+                "zone_config": self.update_zone_config(zone_data, persist=persist),
+                "revision": self._config_revision,
+            }
+
+        async def _get_events(limit: int = 100):
+            return self.get_recent_events(limit=limit)
+
+        return [
+            {
+                "path": "/api/indoor-fence/config",
+                "endpoint": _get_plugin_config,
+                "methods": ["GET"],
+                "summary": "获取电子围栏配置",
+            },
+            {
+                "path": "/api/indoor-fence/config",
+                "endpoint": _patch_plugin_config,
+                "methods": ["PATCH", "PUT"],
+                "summary": "更新电子围栏配置",
+            },
+            {
+                "path": "/api/indoor-fence/config/key",
+                "endpoint": _update_config_key,
+                "methods": ["PUT"],
+                "summary": "更新单个配置字段",
+            },
+            {
+                "path": "/api/indoor-fence/zones",
+                "endpoint": _get_zone,
+                "methods": ["GET"],
+                "summary": "获取区域配置",
+            },
+            {
+                "path": "/api/indoor-fence/zones",
+                "endpoint": _put_zone,
+                "methods": ["PUT"],
+                "summary": "更新区域配置",
+            },
+            {
+                "path": "/api/indoor-fence/events",
+                "endpoint": _get_events,
+                "methods": ["GET"],
+                "summary": "获取最近事件",
+            },
+        ]
 
     @classmethod
     def create_standalone(cls, config=None):

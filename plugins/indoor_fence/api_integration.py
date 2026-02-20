@@ -9,8 +9,8 @@
 - WebSocket 实时推送
 - 前端组件配置
 
-基于 V2.0 平台架构设计
-作者: G组 | 版本: 2.0.0
+基于 V2.1 平台架构设计
+作者: G组 | 版本: 2.1.0
 """
 
 from __future__ import annotations
@@ -52,15 +52,20 @@ if FASTAPI_AVAILABLE:
         """授权列表请求"""
         cabinet_ids: List[int]
 
-    class ConfigUpdateRequest(BaseModel):
+    class ConfigRequest(BaseModel):
         """配置更新请求"""
+        config: Dict[str, Any]
+        merge: bool = True
+
+    class ConfigKeyRequest(BaseModel):
+        """单字段更新请求"""
         key: str
         value: Any
 
-    class ProcessRequest(BaseModel):
-        """处理请求"""
-        frame_data: Optional[str] = None  # Base64 编码的帧数据
-        context: Optional[Dict] = None
+    class ZoneConfigRequest(BaseModel):
+        """区域配置更新请求"""
+        zone_config: Dict[str, Any]
+        persist: bool = True
 
 
 # =============================================================================
@@ -198,6 +203,55 @@ def create_indoor_fence_router(
         """获取区域配置"""
         return plugin.get_zone_config()
 
+    @router.put("/zones")
+    async def update_zone_config(request: ZoneConfigRequest):
+        """更新区域配置"""
+        try:
+            zone_config = plugin.update_zone_config(
+                request.zone_config,
+                persist=request.persist,
+            )
+            return {"status": "ok", "zone_config": zone_config}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    # ==================== 配置管理 ====================
+
+    @router.get("/config")
+    async def get_runtime_config():
+        """获取运行配置"""
+        return {
+            "config": plugin.get_runtime_config(),
+            "config_schema": plugin.manifest.config_schema,
+        }
+
+    @router.put("/config")
+    async def replace_runtime_config(request: ConfigRequest):
+        """全量替换配置"""
+        try:
+            config = plugin.update_config(request.config, merge=False)
+            return {"status": "ok", "config": config}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @router.patch("/config")
+    async def patch_runtime_config(request: ConfigRequest):
+        """增量更新配置"""
+        try:
+            config = plugin.update_config(request.config, merge=request.merge)
+            return {"status": "ok", "config": config}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    @router.put("/config/key")
+    async def update_config_key(request: ConfigKeyRequest):
+        """更新单个配置字段"""
+        try:
+            config = plugin.update_config_key(request.key, request.value)
+            return {"status": "ok", "config": config}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
     # ==================== 授权管理 ====================
 
     @router.post("/authorization")
@@ -293,9 +347,12 @@ def create_indoor_fence_router(
         return {
             "frame_count": details.get("frame_count", 0),
             "alert_count": details.get("alert_count", 0),
+            "exception_count": details.get("exception_count", 0),
             "tracked_persons": details.get("tracked_persons", 0),
             "cabinet_count": details.get("cabinet_count", 0),
             "last_process_time_ms": details.get("last_process_time_ms", 0),
+            "latency": details.get("latency", {}),
+            "config_revision": details.get("config_revision", 0),
             "websocket_connections": ws_manager.connection_count,
         }
 

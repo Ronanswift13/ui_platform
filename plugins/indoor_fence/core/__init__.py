@@ -55,6 +55,12 @@ from .fusion import (
     FusedTracker,
 )
 
+from .config_manager import (
+    ConfigValidationError,
+    IndoorFenceConfigManager,
+    deep_merge,
+)
+
 
 __version__ = "2.0.0"
 __author__ = "G组"
@@ -81,4 +87,7 @@ __all__ = [
     # Fusion
     'VisualDetection', 'LidarDetection', 'FusedDetection',
     'SensorFusion', 'FusedTracker',
+
+    # Config
+    'ConfigValidationError', 'IndoorFenceConfigManager', 'deep_merge',
 ]

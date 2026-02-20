@@ -1,8 +1,11 @@
 # =============================================================================
-# 室内电子围栏插件 - 默认配置
-# 输变电激光星芒破夜绘明监测平台 (G组)
-# 基于《变电站多目标操作安全监测系统》方案
+# 室内电子围栏插件 - 默认配置 (2.1)
 # =============================================================================
+
+# 区域配置文件
+zone_config:
+  path: "standalone/configs/zone.yaml"
+  persist_on_update: true
 
 # 模型配置
 model:
@@ -17,120 +20,72 @@ inference:
   tracking_enabled: true
   max_track_age: 30
 
+# 跟踪配置
+tracking:
+  enabled: true
+  max_age: 30
+  min_hits: 3
+  distance_threshold: 1.0
+  use_kalman: true
+
 # 激光雷达配置
 lidar:
   enabled: true
   device_ip: "192.168.1.100"
   device_port: 2368
   scan_rate_hz: 10
-  angle_offset_deg: 0
-  
-  # 安装参数 
+  angle_min_deg: -45
+  angle_max_deg: 45
+  angle_offset_deg: 0.0
   install:
-    height_m: 2.5           # 安装高度
-    tilt_deg: 20            # 向下倾斜角度
-    scan_plane_height_m: 0.5  # 扫描平面与地面交点高度(膝盖/小腿)
+    height_m: 2.5
+    tilt_deg: 20
+    scan_plane_height_m: 0.5
 
-# 安全区域配置
-safety_zone:
-  yellow_line_distance_m: 0.5   # 黄线安全距离
-  warning_distance_m: 0.3       # 警告距离
-  danger_distance_m: 0.1        # 危险距离(越线)
-  
-  # 黄线位置 (相对于雷达)
-  yellow_line_position_m: 2.0
-
-# 机柜配置
-cabinets:
-  count: 6
-  
-  # 机柜定义 (可选，默认均匀分布)
-  # definitions:
-  #   1: {name: "机柜-01", x_start: 0.0, x_end: 0.167}
-  #   2: {name: "机柜-02", x_start: 0.167, x_end: 0.333}
-  #   ...
-
-# 授权配置
-cabinet_authorization:
+# 相机配置
+camera:
   enabled: true
-  allow_list: [3, 4, 5]  # 默认授权机柜列表
-  check_multi_person: true
-  max_persons_per_cabinet: 1
+  source: "0"
+  resolution: [640, 480]
+  fps: 30
+  confidence_threshold: 0.5
+  nms_threshold: 0.45
+  model_path: "models/indoor/person_yolov8n.onnx"
+  cx: 320
+  cy: 240
+  fx: 500
+  fy: 500
+  height_m: 3.0
+  tilt_deg: 40
 
 # 视觉-雷达融合配置
 fusion:
   enabled: true
-  max_time_diff_ms: 50      # 最大时间戳差异
-  angle_match_threshold_deg: 5.0  # 角度匹配阈值
+  max_time_diff_ms: 100
+  angle_match_threshold_deg: 5.0
+  distance_match_threshold_m: 0.5
 
-# 相机配置 (用于透视变换)
-camera:
-  # 相机内参 (需要标定)
-  cx: 320   # 光心X (假设640x480)
-  cy: 240   # 光心Y
-  fx: 500   # 焦距X
-  fy: 500   # 焦距Y
-  
-  # 安装参数
-  height_m: 3.0
-  tilt_deg: 40
+# 安全区域配置
+safety_zone:
+  yellow_line_distance_m: 0.5
+  warning_distance_m: 0.3
+  danger_distance_m: 0.1
+  yellow_line_position_m: 2.0
 
-# 告警配置
-alerting:
-  # 越线告警
-  line_cross:
-    enabled: true
-    sound_enabled: true
-    relay_enabled: true
-    cooldown_s: 5
-  
-  # 未授权告警
-  unauthorized:
-    enabled: true
-    sound_enabled: false
-    cooldown_s: 30
-  
-  # 同柜多人告警
-  multi_person:
-    enabled: true
-    sound_enabled: false
-    cooldown_s: 60
+# 授权与同柜多人策略
+cabinet_authorization:
+  enabled: true
+  allow_list: [3, 4, 5]
+  check_multi_person: true
+  max_persons_per_cabinet: 1
 
-# 继电器输出配置
-relay:
-  enabled: false
-  device_ip: ""
-  device_port: 8080
-  
-  # 继电器映射
-  outputs:
-    alarm_light: 1      # 声光报警器
-    warning_light: 2    # 警示灯
+# 灯光输出
+light:
+  enabled: true
+  output_type: "simulate"
 
-# 日志配置
-logging:
-  level: "INFO"
-  save_detections: true
-  save_tracks: true
-  save_alerts: true
-  retention_days: 90
-
-# 状态机配置 (基于文档方案)
-state_machine:
-  # 状态定义
-  states:
-    SAFE_AUTH:
-      description: "授权且安全"
-      action: "log_normal"
-    SAFE_UNAUTH:
-      description: "未授权但几何安全"
-      action: "alarm_unauthorized"
-    DANGER_LINE:
-      description: "越线危险"
-      action: "alarm_critical"
-    VISION_ONLY:
-      description: "仅视觉模式"
-      action: "log_degraded"
-    LIDAR_ONLY:
-      description: "仅雷达模式"
-      action: "log_degraded"
+# 审计日志
+audit:
+  enabled: true
+  log_level: "event"
+  log_dir: "logs/indoor_fence"

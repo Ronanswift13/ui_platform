@@ -1,0 +1,178 @@
+id: "indoor-default"
+name: "室内电子围栏默认区域"
+version: "1.0.0"
+coordinate_system: "local"
+unit: "meter"
+
+scene_bounds:
+  vertices:
+    - [0.0, 0.0]
+    - [10.0, 0.0]
+    - [10.0, 6.0]
+    - [0.0, 6.0]
+
+zones:
+  - id: "passage_main"
+    name: "主通道"
+    type: "passage"
+    alert_level: "normal"
+    vertices:
+      - [0.0, 0.0]
+      - [10.0, 0.0]
+      - [10.0, 2.0]
+      - [0.0, 2.0]
+
+  - id: "cabinet_1"
+    name: "机柜-01"
+    type: "cabinet"
+    alert_level: "attention"
+    max_occupancy: 1
+    require_authorization: true
+    cabinet_id: 1
+    vertices: [[0.0, 2.0], [1.6667, 2.0], [1.6667, 6.0], [0.0, 6.0]]
+  - id: "cabinet_2"
+    name: "机柜-02"
+    type: "cabinet"
+    alert_level: "attention"
+    max_occupancy: 1
+    require_authorization: true
+    cabinet_id: 2
+    vertices: [[1.6667, 2.0], [3.3333, 2.0], [3.3333, 6.0], [1.6667, 6.0]]
+  - id: "cabinet_3"
+    name: "机柜-03"
+    type: "cabinet"
+    alert_level: "attention"
+    max_occupancy: 1
+    require_authorization: true
+    cabinet_id: 3
+    vertices: [[3.3333, 2.0], [5.0, 2.0], [5.0, 6.0], [3.3333, 6.0]]
+  - id: "cabinet_4"
+    name: "机柜-04"
+    type: "cabinet"
+    alert_level: "attention"
+    max_occupancy: 1
+    require_authorization: true
+    cabinet_id: 4
+    vertices: [[5.0, 2.0], [6.6667, 2.0], [6.6667, 6.0], [5.0, 6.0]]
+  - id: "cabinet_5"
+    name: "机柜-05"
+    type: "cabinet"
+    alert_level: "attention"
+    max_occupancy: 1
+    require_authorization: true
+    cabinet_id: 5
+    vertices: [[6.6667, 2.0], [8.3333, 2.0], [8.3333, 6.0], [6.6667, 6.0]]
+  - id: "cabinet_6"
+    name: "机柜-06"
+    type: "cabinet"
+    alert_level: "attention"
+    max_occupancy: 1
+    require_authorization: true
+    cabinet_id: 6
+    vertices: [[8.3333, 2.0], [10.0, 2.0], [10.0, 6.0], [8.3333, 6.0]]
+
+cabinets:
+  - id: 1
+    name: "机柜-01"
+    zone_id: "cabinet_1"
+    x_start: 0.0000
+    x_end: 0.1667
+    y_position: 4.0
+    yellow_line_distance: 0.5
+    yellow_line:
+      start: [0.0, 2.5]
+      end: [1.6667, 2.5]
+  - id: 2
+    name: "机柜-02"
+    zone_id: "cabinet_2"
+    x_start: 0.1667
+    x_end: 0.3333
+    y_position: 4.0
+    yellow_line_distance: 0.5
+    yellow_line:
+      start: [1.6667, 2.5]
+      end: [3.3333, 2.5]
+  - id: 3
+    name: "机柜-03"
+    zone_id: "cabinet_3"
+    x_start: 0.3333
+    x_end: 0.5000
+    y_position: 4.0
+    yellow_line_distance: 0.5
+    yellow_line:
+      start: [3.3333, 2.5]
+      end: [5.0, 2.5]
+  - id: 4
+    name: "机柜-04"
+    zone_id: "cabinet_4"
+    x_start: 0.5000
+    x_end: 0.6667
+    y_position: 4.0
+    yellow_line_distance: 0.5
+    yellow_line:
+      start: [5.0, 2.5]
+      end: [6.6667, 2.5]
+  - id: 5
+    name: "机柜-05"
+    zone_id: "cabinet_5"
+    x_start: 0.6667
+    x_end: 0.8333
+    y_position: 4.0
+    yellow_line_distance: 0.5
+    yellow_line:
+      start: [6.6667, 2.5]
+      end: [8.3333, 2.5]
+  - id: 6
+    name: "机柜-06"
+    zone_id: "cabinet_6"
+    x_start: 0.8333
+    x_end: 1.0000
+    y_position: 4.0
+    yellow_line_distance: 0.5
+    yellow_line:
+      start: [8.3333, 2.5]
+      end: [10.0, 2.5]
+
+yellow_lines:
+  - id: "yl_1"
+    name: "机柜1黄线"
+    start: [0.0, 2.5]
+    end: [1.6667, 2.5]
+    cabinets: [1]
+    warning_distance: 0.3
+    danger_distance: 0.1
+  - id: "yl_2"
+    name: "机柜2黄线"
+    start: [1.6667, 2.5]
+    end: [3.3333, 2.5]
+    cabinets: [2]
+    warning_distance: 0.3
+    danger_distance: 0.1
+  - id: "yl_3"
+    name: "机柜3黄线"
+    start: [3.3333, 2.5]
+    end: [5.0, 2.5]
+    cabinets: [3]
+    warning_distance: 0.3
+    danger_distance: 0.1
+  - id: "yl_4"
+    name: "机柜4黄线"
+    start: [5.0, 2.5]
+    end: [6.6667, 2.5]
+    cabinets: [4]
+    warning_distance: 0.3
+    danger_distance: 0.1
+  - id: "yl_5"
+    name: "机柜5黄线"
+    start: [6.6667, 2.5]
+    end: [8.3333, 2.5]
+    cabinets: [5]
+    warning_distance: 0.3
+    danger_distance: 0.1
+  - id: "yl_6"
+    name: "机柜6黄线"
+    start: [8.3333, 2.5]
+    end: [10.0, 2.5]
+    cabinets: [6]
+    warning_distance: 0.3
+    danger_distance: 0.1

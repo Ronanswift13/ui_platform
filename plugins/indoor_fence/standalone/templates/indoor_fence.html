@@ -265,24 +265,7 @@
         </div>
 
         <div class="panel-header">Authorization Panel</div>
-        <div class="auth-panel">
-            <div class="auth-item">
-                <span>Cabinet 1</span>
-                <span class="auth-status authorized">Authorized</span>
-            </div>
-            <div class="auth-item">
-                <span>Cabinet 2</span>
-                <span class="auth-status authorized">Authorized</span>
-            </div>
-            <div class="auth-item">
-                <span>Cabinet 3</span>
-                <span class="auth-status unauthorized">Locked</span>
-            </div>
-            <div class="auth-item">
-                <span>Cabinet 4</span>
-                <span class="auth-status unauthorized">Locked</span>
-            </div>
-        </div>
+        <div class="auth-panel" id="authPanel"></div>
     </div>
 
     <!-- Center Panel: Video Display -->
@@ -310,20 +293,7 @@
                     <th>Dist (m)</th>
                 </tr>
             </thead>
-            <tbody id="trackingTable">
-                <tr>
-                    <td>T001</td>
-                    <td class="state-normal">Normal</td>
-                    <td>-</td>
-                    <td>1.20</td>
-                </tr>
-                <tr>
-                    <td>T002</td>
-                    <td class="state-warning">On Line</td>
-                    <td>Cab 1</td>
-                    <td>0.25</td>
-                </tr>
-            </tbody>
+            <tbody id="trackingTable"></tbody>
         </table>
 
         <div class="panel-header">Detection Results</div>
@@ -360,9 +330,77 @@
 
 {% block plugin_scripts %}
 <script>
-    // WebSocket connection for real-time updates
     const wsUrl = `ws://${window.location.host}/ws/stream`;
     let ws = null;
+
+    function stateClass(state) {
+        if (state === 'cross_line' || state === 'high_risk') return 'state-danger';
+        if (state === 'on_line' || state === 'misplaced') return 'state-warning';
+        return 'state-normal';
+    }
+
+    function renderTrackedPersons(persons) {
+        const tbody = document.getElementById('trackingTable');
+        if (!tbody) return;
+        if (!persons || persons.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="det-details">No tracked persons</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = persons.map(p => `
+            <tr>
+                <td>${p.person_id}</td>
+                <td class="${stateClass(p.state)}">${p.state}</td>
+                <td>${p.cabinet_id ?? '-'}</td>
+                <td>${typeof p.distance_to_line_m === 'number' ? p.distance_to_line_m.toFixed(2) : '-'}</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderCabinetAuth(cabinetStatus, allowList) {
+        const panel = document.getElementById('authPanel');
+        if (!panel) return;
+        const entries = Object.values(cabinetStatus || {});
+        if (entries.length === 0) {
+            panel.innerHTML = '<div class="det-details">No cabinet data</div>';
+            return;
+        }
+        panel.innerHTML = entries.map(cab => {
+            const authorized = (allowList || []).includes(cab.id);
+            return `
+                <div class="auth-item">
+                    <span>${cab.name || `Cabinet ${cab.id}`}</span>
+                    <span class="auth-status ${authorized ? 'authorized' : 'unauthorized'}">
+                        ${authorized ? 'Authorized' : 'Locked'}
+                    </span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderEvents(events) {
+        const log = document.getElementById('alarmLog');
+        if (!log) return;
+        if (!events || events.length === 0) return;
+
+        log.innerHTML = events.slice().reverse().map(e => {
+            const eventData = e.data || {};
+            const message = eventData.message || eventData.violation_type || e.type || 'Event';
+            const level = (eventData.level || 'info').toLowerCase();
+            const ts = (e.timestamp || '').split('T')[1]?.split('.')[0] || '--:--:--';
+            const levelClass = level === 'critical'
+                ? 'alarm-level-critical'
+                : level === 'warning'
+                    ? 'alarm-level-warning'
+                    : 'alarm-level-info';
+            return `
+                <div class="alarm-log-item">
+                    <span class="alarm-time">${ts}</span>
+                    <span class="${levelClass}">${level.toUpperCase()}</span>
+                    <span class="alarm-message">${message}</span>
+                </div>
+            `;
+        }).join('');
+    }
 
     function connectWebSocket() {
         ws = new WebSocket(wsUrl);
@@ -377,6 +415,48 @@
         };
     }
 
+    async function refreshStatus() {
+        try {
+            const res = await fetch('/api/status');
+            if (!res.ok) return;
+            const data = await res.json();
+            const stats = data.stats || {};
+            const health = data.health || {};
+            const details = health.details || {};
+            const trackedPersons = data.tracked_persons || [];
+
+            document.getElementById('statFrames').textContent = details.frame_count ?? stats.total_frames ?? 0;
+            document.getElementById('statAlerts').textContent = details.alert_count ?? stats.total_alarms ?? 0;
+            document.getElementById('statTracked').textContent = trackedPersons.length;
+            document.getElementById('statCabinets').textContent = details.cabinet_count ?? 0;
+            document.getElementById('statLatency').textContent = `${(details.last_process_time_ms || 0).toFixed(2)} ms`;
+            document.getElementById('overlayStats').textContent = `Frames: ${details.frame_count ?? 0} | Tracked: ${trackedPersons.length}`;
+            document.getElementById('fpsCounter').textContent = `${stats.fps || 0} FPS`;
+
+            const statusBadge = document.getElementById('statusBadge');
+            const statusValue = (data.status || 'unknown').toUpperCase();
+            statusBadge.textContent = statusValue;
+            statusBadge.classList.toggle('status-ready', data.status === 'ready');
+            statusBadge.classList.toggle('status-error', data.status !== 'ready');
+
+            renderTrackedPersons(trackedPersons);
+            renderCabinetAuth(data.cabinet_status || {}, data.allow_list || []);
+        } catch (err) {
+            // ignore polling errors
+        }
+    }
+
+    async function refreshEvents() {
+        try {
+            const res = await fetch('/api/indoor-fence/events?limit=30');
+            if (!res.ok) return;
+            const events = await res.json();
+            renderEvents(events);
+        } catch (err) {
+            // ignore polling errors
+        }
+    }
+
     function updateDashboard(data) {
         if (data.stats) {
             document.getElementById('statFrames').textContent = data.stats.total_frames;
@@ -387,5 +467,9 @@
     }
 
     connectWebSocket();
+    refreshStatus();
+    refreshEvents();
+    setInterval(refreshStatus, 1000);
+    setInterval(refreshEvents, 3000);
 </script>
 {% endblock %}

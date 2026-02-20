@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-室内电子围栏插件 V2.0
+室内电子围栏插件 V2.1
 ===================
 
 多人安全监测系统 - 基于视觉-雷达融合
@@ -18,7 +18,7 @@
     # 通过插件管理器加载
     # 或直接使用核心组件
 
-作者: G组 | 版本: 2.0.0
+作者: G组 | 版本: 2.1.0
 """
 
 from .plugin import IndoorFencePlugin, AuditLogger
@@ -63,7 +63,7 @@ except ImportError:
     WebSocketManager = None
     RealtimePushService = None
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "G组"
 
 __all__ = [
