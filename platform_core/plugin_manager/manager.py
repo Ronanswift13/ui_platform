@@ -2,10 +2,11 @@
 插件管理器
 
 负责:
-- 扫描和发现插件
+- 扫描和发现插件（支持按 indoor/outdoor 分类）
 - 加载和卸载插件
 - 管理插件生命周期
 - 提供插件调用接口
+- 支持单插件热重载（不影响其他插件）
 """
 
 
@@ -35,12 +36,17 @@ from platform_core.schema.validator import validate_plugin_output
 
 logger = get_logger(__name__)
 
+# 插件分类常量
+CATEGORY_INDOOR = "indoor"
+CATEGORY_OUTDOOR = "outdoor"
+
 
 class PluginManager:
     """
     插件管理器
 
     单例模式,管理所有插件的生命周期
+    支持按 indoor/outdoor 分类发现和加载插件
     """
 
     _instance: Optional["PluginManager"] = None
@@ -59,6 +65,7 @@ class PluginManager:
         self.plugins_dir = self.config.get_plugins_path()
         self.registry = PluginRegistry()
         self._plugins: dict[str, BasePlugin] = {}
+        self._manifests: dict[str, PluginManifest] = {}
         self._initialized = True
 
         logger.info(f"插件管理器初始化完成, 插件目录: {self.plugins_dir}")
@@ -90,11 +97,49 @@ class PluginManager:
                     manifest_data = json.load(f)
                 manifest = PluginManifest.from_dict(manifest_data)
                 manifests.append(manifest)
-                logger.info(f"发现插件: {manifest.id} v{manifest.version}")
+                self._manifests[manifest.id] = manifest
+                logger.info(
+                    f"发现插件: {manifest.id} v{manifest.version} "
+                    f"[{manifest.category or 'uncategorized'}]"
+                )
             except Exception as e:
                 logger.error(f"解析manifest失败 [{plugin_dir.name}]: {e}")
 
         return manifests
+
+    def discover_by_category(self, category: str) -> list[PluginManifest]:
+        """
+        按分类发现插件（室内/室外）
+
+        Args:
+            category: "indoor" 或 "outdoor"
+
+        Returns:
+            该分类下的插件清单列表
+        """
+        all_manifests = self.discover_plugins() if not self._manifests else list(self._manifests.values())
+        return [m for m in all_manifests if m.category == category]
+
+    def load_category(self, category: str) -> list[BasePlugin]:
+        """
+        按分类批量加载插件
+
+        Args:
+            category: "indoor" 或 "outdoor"
+
+        Returns:
+            成功加载的插件列表
+        """
+        manifests = self.discover_by_category(category)
+        loaded = []
+        for manifest in manifests:
+            try:
+                plugin = self.load_plugin(manifest.id)
+                loaded.append(plugin)
+            except Exception as e:
+                logger.error(f"加载{category}插件失败 [{manifest.id}]: {e}")
+        logger.info(f"[{category}] 加载完成: {len(loaded)}/{len(manifests)} 个插件")
+        return loaded
 
     def load_plugin(self, plugin_id: str) -> BasePlugin:
         """
@@ -180,8 +225,9 @@ class PluginManager:
                 raise PluginLoadError(plugin_id, "初始化失败")
 
             self._plugins[plugin_id] = plugin
+            self._manifests[plugin_id] = manifest
             self.registry.register(plugin)
-            logger.info(f"插件加载成功: {plugin}")
+            logger.info(f"插件加载成功: {plugin} [{manifest.category}]")
 
             return plugin
 
@@ -204,8 +250,9 @@ class PluginManager:
 
             # 清理sys.modules
             module_name = f"plugins.{plugin_id}"
-            if module_name in sys.modules:
-                del sys.modules[module_name]
+            keys_to_remove = [k for k in sys.modules if k.startswith(module_name)]
+            for key in keys_to_remove:
+                del sys.modules[key]
 
             logger.info(f"插件卸载成功: {plugin_id}")
             return True
@@ -214,7 +261,7 @@ class PluginManager:
             return False
 
     def reload_plugin(self, plugin_id: str) -> BasePlugin:
-        """重新加载插件"""
+        """热重载单个插件（不影响其他插件）"""
         self.unload_plugin(plugin_id)
         return self.load_plugin(plugin_id)
 
@@ -226,12 +273,33 @@ class PluginManager:
         """列出所有已加载的插件"""
         return list(self._plugins.values())
 
+    def list_plugins_by_category(self, category: str) -> list[BasePlugin]:
+        """按分类列出已加载的插件"""
+        return [
+            p for p in self._plugins.values()
+            if p.manifest.category == category
+        ]
+
     def get_plugins_by_capability(self, capability: PluginCapability) -> list[BasePlugin]:
         """按能力筛选插件"""
         return [
             p for p in self._plugins.values()
             if capability in p.manifest.capabilities
         ]
+
+    def get_category_summary(self) -> dict[str, list[str]]:
+        """
+        获取插件分类摘要
+
+        Returns:
+            {"indoor": ["indoor_fence", ...], "outdoor": ["transformer_inspection", ...]}
+        """
+        summary: dict[str, list[str]] = {"indoor": [], "outdoor": [], "uncategorized": []}
+        for manifest in self._manifests.values():
+            key = manifest.category if manifest.category in ("indoor", "outdoor") else "uncategorized"
+            summary[key].append(manifest.id)
+        # 不返回空分类
+        return {k: v for k, v in summary.items() if v}
 
     def execute_plugin(
         self,

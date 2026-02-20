@@ -4,6 +4,7 @@
     "version": "1.0.0",
     "description": "远距小目标检测、4K大视场识别、绝缘子/金具/导线缺陷检测、环境干扰过滤",
     "author": "C组",
+    "category": "outdoor",
     "entrypoint": "plugin.py",
     "plugin_class": "BusbarInspectionPlugin",
     "capabilities": [

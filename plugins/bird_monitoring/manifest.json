@@ -4,6 +4,7 @@
     "version": "1.0.0",
     "description": "室外输电线路鸟类识别、鸟类数据库对比、风险评估和驱离告警",
     "author": "F组",
+    "category": "outdoor",
     "entrypoint": "plugin.py",
     "plugin_class": "BirdMonitoringPlugin",
     "capabilities": [

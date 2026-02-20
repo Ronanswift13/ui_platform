@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "基于YOLOv8深度学习的室内小动物入侵检测，支持热成像融合、行为分类、声光驱离联动与统计报告",
     "author": "室内监测组",
-    "category": "safety",
+    "category": "indoor",
     "enabled": true,
 
     "entrypoint": "plugin.py",

@@ -4,6 +4,7 @@
     "version": "1.0.0",
     "description": "主变外观缺陷识别、状态识别、热成像分析",
     "author": "A组",
+    "category": "outdoor",
     "entrypoint": "plugin.py",
     "plugin_class": "TransformerInspectionPlugin",
     "capabilities": [

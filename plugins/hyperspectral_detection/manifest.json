@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "高光谱缺陷检测插件 - 使用高光谱成像分析锈蚀、腐蚀、油漆剥落和局部发热等细微异常",
     "author": "Substation AI Team",
-    "category": "defect_detection",
+    "category": "outdoor",
     "enabled": true,
     "entrypoint": "plugin.py",
     "plugin_class": "HyperspectralDetectionPlugin",

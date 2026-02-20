@@ -4,6 +4,7 @@
     "version": "1.0.0",
     "description": "任意角度表计读数、关键点检测透视矫正、自动量程识别、失败兜底策略",
     "author": "E组",
+    "category": "indoor",
     "entrypoint": "plugin.py",
     "plugin_class": "MeterReadingPlugin",
     "capabilities": [

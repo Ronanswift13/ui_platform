@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "基于YOLOv8深度学习的火焰与烟雾实时检测，集成多模态传感器融合、DeepSORT火势跟踪、主动灭火联动与应急指导",
     "author": "室内监测组",
-    "category": "safety",
+    "category": "indoor",
     "enabled": true,
 
     "entrypoint": "plugin.py",

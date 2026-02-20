@@ -36,6 +36,7 @@ class PluginManifest:
     version: str
     description: str = ""
     author: str = ""
+    category: str = ""  # "indoor" or "outdoor"
     entrypoint: str = "plugin.py"
     plugin_class: str = "Plugin"
     capabilities: list[PluginCapability] = field(default_factory=list)
@@ -57,6 +58,7 @@ class PluginManifest:
             version=data["version"],
             description=data.get("description", ""),
             author=data.get("author", ""),
+            category=data.get("category", ""),
             entrypoint=data.get("entrypoint", "plugin.py"),
             plugin_class=data.get("plugin_class", "Plugin"),
             capabilities=capabilities,

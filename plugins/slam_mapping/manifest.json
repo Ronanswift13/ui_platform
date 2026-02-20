@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "SLAM三维建图插件 - 利用LiDAR/雷达数据构建站区三维地图，实现设备定位、路径规划和地面沉降监测",
     "author": "Substation AI Team",
-    "category": "mapping",
+    "category": "outdoor",
     "enabled": true,
     "entrypoint": "plugin.py",
     "plugin_class": "SLAMMappingPlugin",

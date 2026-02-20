@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "整合声学、视觉、气体、高光谱等多种传感器数据进行综合故障诊断，支持特征级融合和决策级融合",
     "author": "AI巡检系统",
-    "category": "fusion",
+    "category": "outdoor",
     "enabled": true,
     
     "entrypoint": "plugin.py",

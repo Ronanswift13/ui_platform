@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "基于红外热成像与阵列传感器的室内温度监测，支持热力图生成、热点检测、温升趋势分析、LSTM预测与多模块联动告警",
     "author": "室内监测组",
-    "category": "monitoring",
+    "category": "indoor",
     "enabled": true,
 
     "entrypoint": "plugin.py",

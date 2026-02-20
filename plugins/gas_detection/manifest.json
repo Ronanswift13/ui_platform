@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "基于时序预测模型的气体泄漏检测，支持SF6/H2/CO/C2H2等多种气体监测和趋势预测",
     "author": "AI巡检系统",
-    "category": "monitoring",
+    "category": "outdoor",
     "enabled": true,
     
     "entrypoint": "plugin.py",

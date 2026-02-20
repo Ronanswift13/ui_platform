@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""声学监测插件 - 独立启动入口
+
+Usage:
+    python -m plugins.acoustic_monitoring
+"""
+from plugins.acoustic_monitoring.standalone.app import main
+
+if __name__ == "__main__":
+    main()

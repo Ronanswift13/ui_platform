@@ -4,6 +4,7 @@
     "version": "2.1.0",
     "description": "基于视觉+2D激光雷达融合的室内电子围栏系统，支持多人跟踪、越线检测、授权校验和独立运维",
     "author": "G组",
+    "category": "indoor",
     "entrypoint": "plugin.py",
     "plugin_class": "IndoorFencePlugin",
     "capabilities": [

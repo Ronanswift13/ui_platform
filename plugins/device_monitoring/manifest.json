@@ -4,7 +4,7 @@
     "version": "1.0.0",
     "description": "实时监测室内所有设备运行状态与健康指标，支持SNMP/Modbus协议接入、健康指数计算、故障预测、工单自动生成与统计报表导出",
     "author": "室内监测组",
-    "category": "monitoring",
+    "category": "indoor",
     "enabled": true,
 
     "entrypoint": "plugin.py",
