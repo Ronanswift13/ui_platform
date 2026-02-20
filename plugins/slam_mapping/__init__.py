@@ -1,42 +1,58 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-SLAM三维建图插件
-SLAM and 3D Mapping Plugin
+语义SLAM建图插件 V2.0
+======================
 
-功能：
-- LiDAR/雷达点云处理
-- 三维地图构建与更新（占据栅格地图）
-- ICP点云配准与位姿估计
-- 设备定位与追踪
-- A*路径规划
-- 地面沉降监测
-- 障碍物检测
+提供语义SLAM建图功能:
+- 点云语义分割
+- 环境变化检测
+- 语义地图维护
+- 与电子围栏联动
+
+作者: G组 | 版本: 2.0.0
 """
 
-from .plugin import (
-    SLAMMappingPlugin,
-    Point3D,
-    Pose,
-    MapCell,
-    SubsidencePoint,
-    PointCloudProcessor,
-    OccupancyGridMap,
-    ICPMatcher,
-    PathPlanner,
-    SubsidenceMonitor
+from .semantic_slam_plugin import (
+    # 类型
+    SemanticLabel,
+    ChangeType,
+    # 数据类
+    SemanticPoint,
+    PointCloud,
+    DetectedChange,
+    SemanticMapStats,
+    # 组件
+    SemanticSegmenter,
+    ChangeDetector,
+    SemanticMapManager,
+    # 插件
+    SemanticSLAMPlugin,
 )
 
-__all__ = [
-    'SLAMMappingPlugin',
-    'Point3D',
-    'Pose',
-    'MapCell',
-    'SubsidencePoint',
-    'PointCloudProcessor',
-    'OccupancyGridMap',
-    'ICPMatcher',
-    'PathPlanner',
-    'SubsidenceMonitor'
-]
+# 保持向后兼容
+try:
+    from .plugin import SLAMMappingPlugin
+except ImportError:
+    SLAMMappingPlugin = SemanticSLAMPlugin
 
-__version__ = '1.0.0'
-__author__ = 'Substation AI Team'
+__version__ = "2.0.0"
+__author__ = "G组"
+
+__all__ = [
+    # 类型
+    'SemanticLabel',
+    'ChangeType',
+    # 数据类
+    'SemanticPoint',
+    'PointCloud',
+    'DetectedChange',
+    'SemanticMapStats',
+    # 组件
+    'SemanticSegmenter',
+    'ChangeDetector',
+    'SemanticMapManager',
+    # 插件
+    'SemanticSLAMPlugin',
+    'SLAMMappingPlugin',  # 兼容
+]

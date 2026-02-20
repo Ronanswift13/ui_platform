@@ -1004,6 +1004,14 @@ def create_api_app() -> FastAPI:
     except ImportError as e:
         print(f"[Warning] 电压等级管理路由未加载: {e}")
 
+    # ============== 集成室外监测API路由 ==============
+    try:
+        from apps.outdoor_api import router as outdoor_router
+        app.include_router(outdoor_router)
+        print("[API] 室外监测API已注册")
+    except ImportError as e:
+        print(f"[Warning] 室外监测API路由未加载: {e}")
+
     return app
 
 

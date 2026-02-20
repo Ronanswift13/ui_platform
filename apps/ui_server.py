@@ -118,13 +118,28 @@ def create_app() -> FastAPI:
         except ImportError as e2:
             print(f"✗ 训练API导入完全失败: {e2}")
 
-    # ============== 集成室内监测中心API (V3.5) ==============
+    # ============== 集成室内监测中心API (V3.5 -> V2.0升级) ==============
     try:
-        from apps.indoor_api import integrate_indoor_api
-        integrate_indoor_api(app)
-        print("✓ 室内监测中心API已集成 (V3.5)")
+        from apps.indoor_api_v2 import integrate_indoor_api_v2
+        integrate_indoor_api_v2(app)
+        print("✓ 室内监测中心API已集成 (V2.0)")
     except ImportError as e:
-        print(f"✗ 室内监测中心API导入失败: {e}")
+        print(f"✗ 室内监测中心API V2.0导入失败: {e}")
+        # 回退到旧版本
+        try:
+            from apps.indoor_api import integrate_indoor_api
+            integrate_indoor_api(app)
+            print("✓ 室内监测中心API已集成 (V3.5旧版)")
+        except ImportError as e2:
+            print(f"✗ 室内监测中心API导入完全失败: {e2}")
+
+    # ============== 集成室内3D可视化API ==============
+    try:
+        from apps.indoor_3d_api import integrate_indoor_3d_api
+        integrate_indoor_3d_api(app)
+        print("✓ 室内3D可视化API已集成")
+    except ImportError as e:
+        print(f"✗ 室内3D可视化API导入失败: {e}")
 
     # ============== 集成室内电子围栏API (V3.0) ==============
     try:
