@@ -13,23 +13,14 @@
 作者: G组 | 版本: 1.0.0
 """
 
-from .plugin import (
-    # 类型
+from .plugin import FireDetectionPlugin
+from .detector import (
     FireType,
-    AlarmLevel,
-    SensorType,
-    # 数据类
     FireDetection,
     SensorReading,
-    FireZoneStatus,
-    FireEvent,
-    # 组件
-    FireSmokeDetector,
-    MultiModalFusion,
     FireTracker,
-    AlarmEvaluator,
-    # 插件
-    FireDetectionPlugin,
+    FireFusionEngine,
+    FireDetector,
 )
 
 __version__ = "1.0.0"
@@ -38,18 +29,13 @@ __author__ = "G组"
 __all__ = [
     # 类型
     'FireType',
-    'AlarmLevel',
-    'SensorType',
     # 数据类
     'FireDetection',
     'SensorReading',
-    'FireZoneStatus',
-    'FireEvent',
     # 组件
-    'FireSmokeDetector',
-    'MultiModalFusion',
+    'FireDetector',
+    'FireFusionEngine',
     'FireTracker',
-    'AlarmEvaluator',
     # 插件
     'FireDetectionPlugin',
 ]

@@ -30,6 +30,7 @@
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --border-color: #334155;
+            --sidebar-width: 280px;
         }
         body {
             background-color: var(--bg);
@@ -37,18 +38,205 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             min-height: 100vh;
         }
+
+        /* ── Sidebar ─────────────────────────────────────────── */
+        #platform-sidebar {
+            position: fixed;
+            top: 56px;              /* navbar height */
+            left: 0;
+            bottom: 28px;           /* status-bar height */
+            width: var(--sidebar-width);
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 1020;
+            transition: transform 0.25s ease, width 0.25s ease;
+        }
+        #platform-sidebar.collapsed {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+        }
+
+        #platform-sidebar .sidebar-section {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #platform-sidebar .sidebar-section-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* ── Main wrapper shifts with sidebar ────────────────── */
+        #main-wrapper {
+            margin-left: var(--sidebar-width);
+            transition: margin-left 0.25s ease;
+            min-height: calc(100vh - 56px - 28px);
+        }
+        #main-wrapper.sidebar-collapsed {
+            margin-left: 0;
+        }
+
+        /* ── Sidebar form controls ───────────────────────────── */
+        #platform-sidebar .form-label {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.2rem;
+        }
+        #platform-sidebar .form-control,
+        #platform-sidebar .form-select {
+            background-color: var(--bg);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+            font-size: 0.82rem;
+            padding: 0.3rem 0.5rem;
+        }
+        #platform-sidebar .form-control:focus,
+        #platform-sidebar .form-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 0.15rem rgba(59,130,246,0.25);
+        }
+
+        /* ── Plugin info badges ──────────────────────────────── */
+        .plugin-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.78rem;
+            padding: 0.2rem 0;
+        }
+        .plugin-info-row .info-label {
+            color: var(--text-secondary);
+        }
+
+        /* ── Offcanvas settings panel ────────────────────────── */
+        #settingsOffcanvas {
+            background-color: var(--panel-bg);
+            border-left: 1px solid var(--border-color);
+            color: var(--text-primary);
+            width: 340px;
+        }
+        #settingsOffcanvas .offcanvas-header {
+            border-bottom: 1px solid var(--border-color);
+        }
+        #settingsOffcanvas .settings-group {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #settingsOffcanvas .settings-group-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            margin-bottom: 0.6rem;
+        }
+        #settingsOffcanvas .form-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.2rem;
+        }
+        #settingsOffcanvas .form-control,
+        #settingsOffcanvas .form-select {
+            background-color: var(--bg);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+        #settingsOffcanvas .form-control:focus,
+        #settingsOffcanvas .form-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 0.15rem rgba(59,130,246,0.25);
+        }
+        #settingsOffcanvas .form-check-input {
+            background-color: var(--bg);
+            border-color: var(--border-color);
+        }
+        #settingsOffcanvas .form-check-input:checked {
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* ── Sidebar toggle button ───────────────────────────── */
+        #btn-sidebar-toggle {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            padding: 0.25rem 0.5rem;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+        #btn-sidebar-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        /* ── Data source card styles ─────────────────────────── */
+        .data-source-option {
+            cursor: pointer;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 0.35rem;
+            font-size: 0.8rem;
+            transition: border-color 0.15s, background-color 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .data-source-option:hover {
+            border-color: var(--accent);
+        }
+        .data-source-option.active {
+            border-color: var(--accent);
+            background-color: rgba(59,130,246,0.1);
+        }
+        .data-source-option i {
+            font-size: 0.9rem;
+            color: var(--accent);
+            width: 1.2rem;
+            text-align: center;
+        }
+
+        /* ── Responsive ──────────────────────────────────────── */
+        @media (max-width: 992px) {
+            #platform-sidebar {
+                transform: translateX(calc(-1 * var(--sidebar-width)));
+            }
+            #platform-sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            #main-wrapper {
+                margin-left: 0;
+            }
+        }
     </style>
 
+    {% block plugin_styles %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <!-- Top Navbar -->
-    <nav class="navbar navbar-dark" style="background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color);">
+    <!-- ═══════════════════════════════════════════════════════
+         Top Navbar
+         ═══════════════════════════════════════════════════════ -->
+    <nav class="navbar navbar-dark sticky-top" style="background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color); height: 56px; z-index: 1030;">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">
-                <i class="bi bi-lightning-charge-fill text-warning me-2"></i>
-                {% block navbar_title %}{{ title | default("DarkBreaker Plugin") }}{% endblock %}
-            </span>
+            <div class="d-flex align-items-center gap-2">
+                <!-- Sidebar Toggle -->
+                <button id="btn-sidebar-toggle" type="button" title="Toggle sidebar">
+                    <i class="bi bi-layout-sidebar-inset"></i>
+                </button>
+                <span class="navbar-brand mb-0 h1">
+                    <i class="bi bi-lightning-charge-fill text-warning me-2"></i>
+                    {% block navbar_title %}{{ title | default("DarkBreaker Plugin") }}{% endblock %}
+                </span>
+            </div>
             <div class="d-flex align-items-center gap-3">
                 <span id="connection-status" class="badge bg-secondary">
                     <i class="bi bi-circle-fill me-1"></i>Disconnected
@@ -56,16 +244,287 @@
                 <span class="text-secondary small">
                     v{{ plugin_version | default("1.0.0") }}
                 </span>
+                <!-- Settings Gear -->
+                <button class="btn btn-sm btn-outline-secondary border-0" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#settingsOffcanvas"
+                        title="Settings">
+                    <i class="bi bi-gear"></i>
+                </button>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <div class="container-fluid p-0">
-        {% block content %}{% endblock %}
+    <!-- ═══════════════════════════════════════════════════════
+         Left Sidebar  (Platform-Level Controls)
+         ═══════════════════════════════════════════════════════ -->
+    <aside id="platform-sidebar">
+        <!-- Voltage Level -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">
+                <i class="bi bi-lightning"></i> Voltage Level
+            </div>
+            <select id="sel-voltage-level" class="form-select form-select-sm">
+                <option value="0.4kV">低压 0.4kV</option>
+                <option value="10kV">中压 10kV</option>
+                <option value="35kV" selected>中压 35kV</option>
+                <option value="110kV">高压 110kV</option>
+                <option value="220kV">高压 220kV</option>
+                <option value="500kV">超高压 500kV</option>
+                <option value="1000kV">特高压 1000kV</option>
+            </select>
+        </div>
+
+        <!-- Device Type -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">
+                <i class="bi bi-cpu"></i> Device Type
+            </div>
+            <select id="sel-device-type" class="form-select form-select-sm">
+                <option value="">-- Select Device --</option>
+            </select>
+            <div id="device-type-hint" class="form-text text-secondary" style="font-size:0.72rem; margin-top:0.25rem;">
+                Available types loaded from platform
+            </div>
+        </div>
+
+        <!-- Model Configuration -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">
+                <i class="bi bi-sliders"></i> Model Configuration
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="cfg-model-path">Model Path</label>
+                <input type="text" class="form-control form-control-sm" id="cfg-model-path"
+                       placeholder="models/best.onnx">
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="cfg-input-size">Input Size</label>
+                <select id="cfg-input-size" class="form-select form-select-sm">
+                    <option value="320">320 x 320</option>
+                    <option value="416">416 x 416</option>
+                    <option value="640" selected>640 x 640</option>
+                    <option value="1280">1280 x 1280</option>
+                </select>
+            </div>
+            <div class="mb-2">
+                <label class="form-label" for="cfg-conf-threshold">Confidence Threshold</label>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="range" class="form-range flex-grow-1" id="cfg-conf-threshold"
+                           min="0.05" max="0.95" step="0.05" value="0.45">
+                    <span id="cfg-conf-threshold-val" class="text-nowrap" style="font-size:0.8rem; min-width:2.5rem; text-align:right;">0.45</span>
+                </div>
+            </div>
+            <div class="mb-1">
+                <label class="form-label" for="cfg-nms-threshold">NMS Threshold</label>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="range" class="form-range flex-grow-1" id="cfg-nms-threshold"
+                           min="0.1" max="0.9" step="0.05" value="0.50">
+                    <span id="cfg-nms-threshold-val" class="text-nowrap" style="font-size:0.8rem; min-width:2.5rem; text-align:right;">0.50</span>
+                </div>
+            </div>
+            <button id="btn-apply-config" class="btn btn-sm btn-primary w-100 mt-2">
+                <i class="bi bi-check2-circle me-1"></i>Apply Config
+            </button>
+        </div>
+
+        <!-- Data Source -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">
+                <i class="bi bi-database"></i> Data Source
+            </div>
+            <div id="data-source-options">
+                <div class="data-source-option active" data-source="file" tabindex="0">
+                    <i class="bi bi-file-earmark-image"></i>
+                    <span>File Upload</span>
+                </div>
+                <div class="data-source-option" data-source="rtsp" tabindex="0">
+                    <i class="bi bi-camera-video"></i>
+                    <span>RTSP Camera</span>
+                </div>
+                <div class="data-source-option" data-source="simulated" tabindex="0">
+                    <i class="bi bi-broadcast"></i>
+                    <span>Simulated Data</span>
+                </div>
+            </div>
+            <!-- RTSP URL input (hidden by default) -->
+            <div id="rtsp-input-group" class="mt-2" style="display:none;">
+                <input type="text" class="form-control form-control-sm" id="cfg-rtsp-url"
+                       placeholder="rtsp://192.168.1.100:554/stream">
+                <button id="btn-connect-rtsp" class="btn btn-sm btn-outline-primary w-100 mt-1">
+                    <i class="bi bi-plug me-1"></i>Connect
+                </button>
+            </div>
+        </div>
+
+        <!-- Plugin-specific sidebar content -->
+        {% block sidebar_extra %}{% endblock %}
+
+        <!-- Plugin Info -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">
+                <i class="bi bi-info-circle"></i> Plugin Info
+            </div>
+            <div class="plugin-info-row">
+                <span class="info-label">Name</span>
+                <span id="info-plugin-name">{{ plugin_name | default(plugin_id | default("unknown")) }}</span>
+            </div>
+            <div class="plugin-info-row">
+                <span class="info-label">Version</span>
+                <span id="info-plugin-version">{{ plugin_version | default("1.0.0") }}</span>
+            </div>
+            <div class="plugin-info-row">
+                <span class="info-label">Status</span>
+                <span id="info-plugin-status" class="badge bg-secondary" style="font-size:0.72rem;">Loading</span>
+            </div>
+            <div class="plugin-info-row">
+                <span class="info-label">Plugin ID</span>
+                <span class="text-secondary" style="font-size:0.72rem;">{{ plugin_id | default("--") }}</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════
+         Main Content Wrapper (shifts with sidebar)
+         ═══════════════════════════════════════════════════════ -->
+    <div id="main-wrapper">
+        <div class="container-fluid p-0">
+            {% block content %}{% endblock %}
+        </div>
     </div>
 
-    <!-- Bottom Status Bar -->
+    <!-- ═══════════════════════════════════════════════════════
+         Offcanvas Settings Panel (right side)
+         ═══════════════════════════════════════════════════════ -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="settingsOffcanvas" aria-labelledby="settingsOffcanvasLabel">
+        <div class="offcanvas-header">
+            <h6 class="offcanvas-title" id="settingsOffcanvasLabel">
+                <i class="bi bi-gear me-2"></i>Settings
+            </h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            <!-- Inference Settings -->
+            <div class="settings-group">
+                <div class="settings-group-title">
+                    <i class="bi bi-gpu-card me-1"></i> Inference Settings
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="set-backend-type">Backend Type</label>
+                    <select id="set-backend-type" class="form-select form-select-sm">
+                        <option value="onnxruntime" selected>ONNX Runtime</option>
+                        <option value="tensorrt">TensorRT</option>
+                        <option value="openvino">OpenVINO</option>
+                        <option value="ncnn">NCNN</option>
+                        <option value="pytorch">PyTorch</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="set-device">Device</label>
+                    <select id="set-device" class="form-select form-select-sm">
+                        <option value="cpu">CPU</option>
+                        <option value="cuda:0" selected>CUDA:0</option>
+                        <option value="cuda:1">CUDA:1</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="set-precision">Precision</label>
+                    <select id="set-precision" class="form-select form-select-sm">
+                        <option value="fp32">FP32</option>
+                        <option value="fp16" selected>FP16</option>
+                        <option value="int8">INT8</option>
+                    </select>
+                </div>
+                <div class="form-check mb-1">
+                    <input class="form-check-input" type="checkbox" id="set-warmup" checked>
+                    <label class="form-check-label" for="set-warmup" style="font-size:0.85rem;">
+                        Warm-up on start
+                    </label>
+                </div>
+            </div>
+
+            <!-- Alarm Settings -->
+            <div class="settings-group">
+                <div class="settings-group-title">
+                    <i class="bi bi-bell me-1"></i> Alarm Settings
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="set-alarm-sound" checked>
+                    <label class="form-check-label" for="set-alarm-sound" style="font-size:0.85rem;">
+                        Sound notifications
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="set-alarm-visual" checked>
+                    <label class="form-check-label" for="set-alarm-visual" style="font-size:0.85rem;">
+                        Visual flash alerts
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="set-alarm-push">
+                    <label class="form-check-label" for="set-alarm-push" style="font-size:0.85rem;">
+                        Push notifications
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="set-alarm-webhook">
+                    <label class="form-check-label" for="set-alarm-webhook" style="font-size:0.85rem;">
+                        Webhook callback
+                    </label>
+                </div>
+                <div id="webhook-url-group" class="mb-1" style="display:none;">
+                    <label class="form-label" for="set-webhook-url">Webhook URL</label>
+                    <input type="text" class="form-control form-control-sm" id="set-webhook-url"
+                           placeholder="https://example.com/hook">
+                </div>
+            </div>
+
+            <!-- Training Data Export -->
+            <div class="settings-group">
+                <div class="settings-group-title">
+                    <i class="bi bi-download me-1"></i> Training Data Export
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="set-export-images">
+                    <label class="form-check-label" for="set-export-images" style="font-size:0.85rem;">
+                        Auto-save detection images
+                    </label>
+                </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="set-export-labels">
+                    <label class="form-check-label" for="set-export-labels" style="font-size:0.85rem;">
+                        Export YOLO-format labels
+                    </label>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="set-export-path">Export Directory</label>
+                    <input type="text" class="form-control form-control-sm" id="set-export-path"
+                           placeholder="./exports/training_data">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label" for="set-export-format">Label Format</label>
+                    <select id="set-export-format" class="form-select form-select-sm">
+                        <option value="yolo">YOLO TXT</option>
+                        <option value="coco">COCO JSON</option>
+                        <option value="voc">Pascal VOC XML</option>
+                    </select>
+                </div>
+                <button id="btn-export-now" class="btn btn-sm btn-outline-primary w-100">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Export Now
+                </button>
+            </div>
+
+            <!-- Save Settings -->
+            <div class="p-3">
+                <button id="btn-save-settings" class="btn btn-primary w-100">
+                    <i class="bi bi-save me-1"></i>Save All Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         Bottom Status Bar
+         ═══════════════════════════════════════════════════════ -->
     {% block status_bar %}
     <div class="status-bar" style="background-color: var(--panel-bg); border-top: 1px solid var(--border-color);">
         <div class="container-fluid d-flex justify-content-between align-items-center py-1 px-3">
@@ -88,6 +547,375 @@
 
     <!-- SDK JavaScript -->
     <script src="/static/js/standalone.js"></script>
+
+    <!-- ═══════════════════════════════════════════════════════
+         Platform UI JavaScript
+         ═══════════════════════════════════════════════════════ -->
+    <script>
+    (function() {
+        'use strict';
+
+        /* ──────────────────────────────────────────────────────
+           Sidebar Toggle
+           ────────────────────────────────────────────────────── */
+        const sidebar      = document.getElementById('platform-sidebar');
+        const mainWrapper   = document.getElementById('main-wrapper');
+        const toggleBtn     = document.getElementById('btn-sidebar-toggle');
+
+        function setSidebarState(collapsed) {
+            if (collapsed) {
+                sidebar.classList.add('collapsed');
+                mainWrapper.classList.add('sidebar-collapsed');
+            } else {
+                sidebar.classList.remove('collapsed');
+                sidebar.classList.remove('mobile-open');
+                mainWrapper.classList.remove('sidebar-collapsed');
+            }
+            try { localStorage.setItem('db_sidebar_collapsed', collapsed); } catch(e) {}
+        }
+
+        toggleBtn.addEventListener('click', function() {
+            const isMobile = window.innerWidth <= 992;
+            if (isMobile) {
+                sidebar.classList.toggle('mobile-open');
+            } else {
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                setSidebarState(!isCollapsed);
+            }
+        });
+
+        // Restore saved state
+        try {
+            const saved = localStorage.getItem('db_sidebar_collapsed');
+            if (saved === 'true') setSidebarState(true);
+        } catch(e) {}
+
+        /* ──────────────────────────────────────────────────────
+           Range slider live value display
+           ────────────────────────────────────────────────────── */
+        const confSlider = document.getElementById('cfg-conf-threshold');
+        const confVal    = document.getElementById('cfg-conf-threshold-val');
+        const nmsSlider  = document.getElementById('cfg-nms-threshold');
+        const nmsVal     = document.getElementById('cfg-nms-threshold-val');
+
+        if (confSlider && confVal) {
+            confSlider.addEventListener('input', function() {
+                confVal.textContent = parseFloat(this.value).toFixed(2);
+            });
+        }
+        if (nmsSlider && nmsVal) {
+            nmsSlider.addEventListener('input', function() {
+                nmsVal.textContent = parseFloat(this.value).toFixed(2);
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Data Source Selection
+           ────────────────────────────────────────────────────── */
+        const sourceOptions  = document.querySelectorAll('.data-source-option');
+        const rtspGroup      = document.getElementById('rtsp-input-group');
+
+        sourceOptions.forEach(function(opt) {
+            opt.addEventListener('click', function() {
+                sourceOptions.forEach(function(o) { o.classList.remove('active'); });
+                opt.classList.add('active');
+                const src = opt.getAttribute('data-source');
+                if (rtspGroup) {
+                    rtspGroup.style.display = (src === 'rtsp') ? 'block' : 'none';
+                }
+            });
+            opt.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.click(); }
+            });
+        });
+
+        /* ──────────────────────────────────────────────────────
+           Webhook URL toggle
+           ────────────────────────────────────────────────────── */
+        const webhookCheck = document.getElementById('set-alarm-webhook');
+        const webhookGroup = document.getElementById('webhook-url-group');
+        if (webhookCheck && webhookGroup) {
+            webhookCheck.addEventListener('change', function() {
+                webhookGroup.style.display = this.checked ? 'block' : 'none';
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           API Helpers
+           ────────────────────────────────────────────────────── */
+        function apiBase() {
+            return (window.DarkBreakerSDK && DarkBreakerSDK.config && DarkBreakerSDK.config.apiBase) || '';
+        }
+
+        function showToast(msg, type) {
+            // Lightweight inline toast (no extra dependency)
+            var el = document.createElement('div');
+            el.className = 'position-fixed bottom-0 end-0 m-3 px-3 py-2 rounded shadow text-white';
+            el.style.cssText = 'z-index:9999; font-size:0.85rem; background-color:' +
+                (type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--accent)') + ';';
+            el.textContent = msg;
+            document.body.appendChild(el);
+            setTimeout(function() { el.remove(); }, 2500);
+        }
+
+        async function apiPut(path, body) {
+            try {
+                const resp = await fetch(apiBase() + path, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                return await resp.json();
+            } catch(e) {
+                console.error('API PUT ' + path + ' failed:', e);
+                return null;
+            }
+        }
+
+        async function apiGet(path) {
+            try {
+                const resp = await fetch(apiBase() + path);
+                return await resp.json();
+            } catch(e) {
+                console.error('API GET ' + path + ' failed:', e);
+                return null;
+            }
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Voltage Level API
+           ────────────────────────────────────────────────────── */
+        var selVoltage = document.getElementById('sel-voltage-level');
+        if (selVoltage) {
+            selVoltage.addEventListener('change', async function() {
+                var result = await apiPut('/api/settings/voltage_level', { voltage_level: this.value });
+                if (result && result.status === 'updated') {
+                    showToast('Voltage level updated: ' + this.value, 'success');
+                } else {
+                    showToast('Failed to update voltage level', 'error');
+                }
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Device Type API
+           ────────────────────────────────────────────────────── */
+        var selDevice = document.getElementById('sel-device-type');
+        if (selDevice) {
+            selDevice.addEventListener('change', async function() {
+                if (!this.value) return;
+                var result = await apiPut('/api/settings/device_type', { device_type: this.value });
+                if (result && result.status === 'updated') {
+                    showToast('Device type updated: ' + this.value, 'success');
+                } else {
+                    showToast('Failed to update device type', 'error');
+                }
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Apply Config (Model Configuration)
+           ────────────────────────────────────────────────────── */
+        var btnApplyConfig = document.getElementById('btn-apply-config');
+        if (btnApplyConfig) {
+            btnApplyConfig.addEventListener('click', async function() {
+                var configPayload = {
+                    config: {
+                        model_path:     document.getElementById('cfg-model-path').value,
+                        input_size:     parseInt(document.getElementById('cfg-input-size').value, 10),
+                        conf_threshold: parseFloat(document.getElementById('cfg-conf-threshold').value),
+                        nms_threshold:  parseFloat(document.getElementById('cfg-nms-threshold').value),
+                    }
+                };
+                btnApplyConfig.disabled = true;
+                btnApplyConfig.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Applying...';
+                var result = await apiPut('/api/config', configPayload);
+                if (result && (result.status === 'updated' || result.success)) {
+                    showToast('Model config applied', 'success');
+                    btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Applied';
+                    setTimeout(function() {
+                        btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Apply Config';
+                        btnApplyConfig.disabled = false;
+                    }, 1500);
+                } else {
+                    showToast('Failed to apply config', 'error');
+                    btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Apply Config';
+                    btnApplyConfig.disabled = false;
+                }
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Save All Settings (offcanvas)
+           ────────────────────────────────────────────────────── */
+        var btnSaveSettings = document.getElementById('btn-save-settings');
+        if (btnSaveSettings) {
+            btnSaveSettings.addEventListener('click', async function() {
+                var settingsPayload = {
+                    config: {
+                        inference: {
+                            backend:   document.getElementById('set-backend-type').value,
+                            device:    document.getElementById('set-device').value,
+                            precision: document.getElementById('set-precision').value,
+                            warmup:    document.getElementById('set-warmup').checked,
+                        },
+                        alarms: {
+                            sound:   document.getElementById('set-alarm-sound').checked,
+                            visual:  document.getElementById('set-alarm-visual').checked,
+                            push:    document.getElementById('set-alarm-push').checked,
+                            webhook: document.getElementById('set-alarm-webhook').checked,
+                            webhook_url: document.getElementById('set-webhook-url').value,
+                        },
+                        export: {
+                            auto_save_images: document.getElementById('set-export-images').checked,
+                            export_labels:    document.getElementById('set-export-labels').checked,
+                            export_path:      document.getElementById('set-export-path').value,
+                            label_format:     document.getElementById('set-export-format').value,
+                        }
+                    }
+                };
+                btnSaveSettings.disabled = true;
+                btnSaveSettings.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving...';
+                var result = await apiPut('/api/config', settingsPayload);
+                if (result && (result.status === 'updated' || result.success)) {
+                    showToast('Settings saved', 'success');
+                } else {
+                    showToast('Failed to save settings', 'error');
+                }
+                btnSaveSettings.innerHTML = '<i class="bi bi-save me-1"></i>Save All Settings';
+                btnSaveSettings.disabled = false;
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Export Now
+           ────────────────────────────────────────────────────── */
+        var btnExportNow = document.getElementById('btn-export-now');
+        if (btnExportNow) {
+            btnExportNow.addEventListener('click', async function() {
+                btnExportNow.disabled = true;
+                btnExportNow.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting...';
+                var result = await apiPut('/api/config', {
+                    action: 'export_training_data',
+                    config: {
+                        export_path:   document.getElementById('set-export-path').value,
+                        label_format:  document.getElementById('set-export-format').value,
+                    }
+                });
+                if (result && (result.status === 'updated' || result.success)) {
+                    showToast('Export started', 'success');
+                } else {
+                    showToast('Export failed', 'error');
+                }
+                btnExportNow.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i>Export Now';
+                btnExportNow.disabled = false;
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           RTSP Connect
+           ────────────────────────────────────────────────────── */
+        var btnRtsp = document.getElementById('btn-connect-rtsp');
+        if (btnRtsp) {
+            btnRtsp.addEventListener('click', async function() {
+                var url = document.getElementById('cfg-rtsp-url').value.trim();
+                if (!url) { showToast('Please enter an RTSP URL', 'error'); return; }
+                btnRtsp.disabled = true;
+                var result = await apiPut('/api/config', {
+                    config: { data_source: 'rtsp', rtsp_url: url }
+                });
+                if (result && (result.status === 'updated' || result.success)) {
+                    showToast('RTSP stream connected', 'success');
+                } else {
+                    showToast('Failed to connect RTSP', 'error');
+                }
+                btnRtsp.disabled = false;
+            });
+        }
+
+        /* ──────────────────────────────────────────────────────
+           Auto-detect Platform Info
+           ────────────────────────────────────────────────────── */
+        async function loadPlatformInfo() {
+            var data = await apiGet('/api/platform/info');
+            if (!data) return;
+
+            // Populate device types
+            if (data.device_types && selDevice) {
+                selDevice.innerHTML = '<option value="">-- Select Device --</option>';
+                data.device_types.forEach(function(dt) {
+                    var opt = document.createElement('option');
+                    opt.value = dt.value || dt;
+                    opt.textContent = dt.label || dt;
+                    selDevice.appendChild(opt);
+                });
+            }
+
+            // Set current voltage level
+            if (data.voltage_level && selVoltage) {
+                selVoltage.value = data.voltage_level;
+            }
+
+            // Set current device type
+            if (data.device_type && selDevice) {
+                selDevice.value = data.device_type;
+            }
+
+            // Populate model config from current settings
+            if (data.config) {
+                var cfg = data.config;
+                if (cfg.model_path)     document.getElementById('cfg-model-path').value = cfg.model_path;
+                if (cfg.input_size)     document.getElementById('cfg-input-size').value = String(cfg.input_size);
+                if (cfg.conf_threshold) {
+                    document.getElementById('cfg-conf-threshold').value = cfg.conf_threshold;
+                    confVal.textContent = parseFloat(cfg.conf_threshold).toFixed(2);
+                }
+                if (cfg.nms_threshold) {
+                    document.getElementById('cfg-nms-threshold').value = cfg.nms_threshold;
+                    nmsVal.textContent = parseFloat(cfg.nms_threshold).toFixed(2);
+                }
+            }
+
+            // Populate inference settings
+            if (data.inference) {
+                var inf = data.inference;
+                if (inf.backend)   document.getElementById('set-backend-type').value = inf.backend;
+                if (inf.device)    document.getElementById('set-device').value = inf.device;
+                if (inf.precision) document.getElementById('set-precision').value = inf.precision;
+                if (inf.warmup !== undefined) document.getElementById('set-warmup').checked = inf.warmup;
+            }
+
+            // Plugin status
+            if (data.status) {
+                var statusEl = document.getElementById('info-plugin-status');
+                if (statusEl) {
+                    var s = data.status;
+                    statusEl.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+                    statusEl.className = 'badge ' + (
+                        s === 'running' ? 'bg-success' :
+                        s === 'error'   ? 'bg-danger'  :
+                        s === 'ready'   ? 'bg-info'    : 'bg-secondary'
+                    );
+                    statusEl.style.fontSize = '0.72rem';
+                }
+            }
+
+            // Plugin name / version overrides
+            if (data.plugin_name) {
+                var nameEl = document.getElementById('info-plugin-name');
+                if (nameEl) nameEl.textContent = data.plugin_name;
+            }
+            if (data.plugin_version) {
+                var verEl = document.getElementById('info-plugin-version');
+                if (verEl) verEl.textContent = data.plugin_version;
+            }
+        }
+
+        // Kick off platform info load on DOM ready
+        loadPlatformInfo();
+
+    })();
+    </script>
 
     {% block extra_scripts %}{% endblock %}
 </body>

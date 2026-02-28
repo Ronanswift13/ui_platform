@@ -11,24 +11,24 @@
 
 from plugins.capacitor_inspection.plugin import CapacitorInspectionPlugin
 from plugins.capacitor_inspection.detector_enhanced import (
-    CapacitorEnhancedDetector,
+    CapacitorDetectorEnhanced,
     CapacitorDefectType,
     CapacitorDetection,
-    TrackedObject,
-    SimpleTracker,
-    TiltDetector,
-    DETECTION_LABELS,
-    ALARM_LEVELS,
+    IntrusionType,
+    IntrusionDetection,
+    IntrusionTracker,
+    CapacitorBankStatus,
+    CapacitorInspectionResult,
 )
 
 __all__ = [
     "CapacitorInspectionPlugin",
-    "CapacitorEnhancedDetector",
+    "CapacitorDetectorEnhanced",
     "CapacitorDefectType",
     "CapacitorDetection",
-    "TrackedObject",
-    "SimpleTracker",
-    "TiltDetector",
-    "DETECTION_LABELS",
-    "ALARM_LEVELS",
+    "IntrusionType",
+    "IntrusionDetection",
+    "IntrusionTracker",
+    "CapacitorBankStatus",
+    "CapacitorInspectionResult",
 ]

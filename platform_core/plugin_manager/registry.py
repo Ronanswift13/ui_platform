@@ -37,8 +37,8 @@ class PluginInfo:
             "name": self.name,
             "version": self.version,
             "code_hash": self.code_hash,
-            "status": self.status.value,
-            "capabilities": [c.value for c in self.capabilities],
+            "status": self.status.value if hasattr(self.status, 'value') else str(self.status),
+            "capabilities": [c.value if hasattr(c, 'value') else str(c) for c in self.capabilities],
             "device_types": self.device_types,
             "loaded_at": self.loaded_at.isoformat(),
             "last_used": self.last_used.isoformat() if self.last_used else None,
@@ -140,7 +140,7 @@ class PluginRegistry:
         total = len(self._plugins)
         by_status = {}
         for info in self._plugins.values():
-            status = info.status.value
+            status = info.status.value if hasattr(info.status, 'value') else str(info.status)
             by_status[status] = by_status.get(status, 0) + 1
 
         return {

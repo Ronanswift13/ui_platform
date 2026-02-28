@@ -200,6 +200,104 @@ class AudioFeatureExtractor:
             "energy_std": float(energy_std)
         }
 
+    def compute_ultrasonic_features(self, audio: np.ndarray,
+                                     freq_min: int = 20000,
+                                     freq_max: int = 100000) -> Dict[str, Any]:
+        """超声波频段特征提取 (线性/对数频带能量)
+
+        当 sample_rate > 48000 时启用。使用线性频带而非 Mel 频带,
+        因为 Mel 尺度针对人耳听觉设计, 不适用于超声波分析。
+        """
+        if self.sample_rate <= 48000:
+            return {}
+
+        spectrogram = self.compute_spectrogram(audio)
+        freqs = np.linspace(0, self.sample_rate / 2, spectrogram.shape[0])
+
+        mask = (freqs >= freq_min) & (freqs <= freq_max)
+        us_spec = spectrogram[mask, :]
+        us_freqs = freqs[mask]
+
+        if us_spec.size == 0:
+            return {"ultrasonic_available": False}
+
+        # 线性等宽频带能量
+        n_bands = 8
+        band_edges = np.linspace(freq_min, freq_max, n_bands + 1)
+        band_energies = []
+        for i in range(n_bands):
+            band_mask = (us_freqs >= band_edges[i]) & (us_freqs < band_edges[i + 1])
+            energy = float(np.sum(us_spec[band_mask, :] ** 2))
+            band_energies.append(energy)
+
+        total_energy = sum(band_energies) + 1e-8
+        band_ratios = [e / total_energy for e in band_energies]
+
+        # 对数频带能量 (低频段分辨率更高)
+        log_edges = np.logspace(np.log10(max(freq_min, 1)), np.log10(freq_max), n_bands + 1)
+        log_band_energies = []
+        for i in range(n_bands):
+            band_mask = (us_freqs >= log_edges[i]) & (us_freqs < log_edges[i + 1])
+            energy = float(np.sum(us_spec[band_mask, :] ** 2))
+            log_band_energies.append(energy)
+
+        return {
+            "ultrasonic_available": True,
+            "linear_band_energies": band_energies,
+            "linear_band_ratios": band_ratios,
+            "log_band_energies": log_band_energies,
+            "ultrasonic_total_energy": float(total_energy),
+            "band_edges_linear": band_edges.tolist(),
+            "band_edges_log": log_edges.tolist(),
+        }
+
+    def compute_hf_impulse_analysis(self, audio: np.ndarray,
+                                      freq_min: int = 20000) -> Dict[str, Any]:
+        """高频脉冲时间分辨率分析
+
+        检测超声频段中的短时脉冲事件 (局部放电特征),
+        使用 3σ 阈值检测脉冲, 并分析脉冲的时间间距和周期性。
+        """
+        if self.sample_rate <= 48000:
+            return {}
+
+        spectrogram = self.compute_spectrogram(audio)
+        freqs = np.linspace(0, self.sample_rate / 2, spectrogram.shape[0])
+
+        hf_mask = freqs >= freq_min
+        hf_energy_over_time = np.sum(spectrogram[hf_mask, :] ** 2, axis=0)
+
+        if len(hf_energy_over_time) == 0:
+            return {}
+
+        # 3σ 阈值脉冲检测
+        mean_hf = np.mean(hf_energy_over_time)
+        std_hf = np.std(hf_energy_over_time)
+        threshold = mean_hf + 3 * std_hf
+
+        impulse_frames = np.where(hf_energy_over_time > threshold)[0]
+        impulse_count = len(impulse_frames)
+        impulse_density = impulse_count / max(len(hf_energy_over_time), 1)
+
+        # 脉冲时间间距分析
+        if len(impulse_frames) > 1:
+            spacing = np.diff(impulse_frames) * (self.hop_length / self.sample_rate)
+            mean_spacing = float(np.mean(spacing))
+            std_spacing = float(np.std(spacing))
+            periodicity = 1.0 - min(std_spacing / (mean_spacing + 1e-8), 1.0)
+        else:
+            mean_spacing = 0.0
+            std_spacing = 0.0
+            periodicity = 0.0
+
+        return {
+            "hf_impulse_count": impulse_count,
+            "hf_impulse_density": float(impulse_density),
+            "hf_impulse_mean_spacing_sec": mean_spacing,
+            "hf_impulse_periodicity": periodicity,
+            "hf_energy_profile": hf_energy_over_time.tolist(),
+        }
+
 
 # =============================================================================
 # 传统声学检测器
@@ -218,27 +316,7 @@ class AcousticDetector:
             n_fft=config.n_fft,
             hop_length=config.hop_length
         )
-        
-        # 异常阈值 (可调整)
-        self.thresholds = {
-            "partial_discharge": {
-                "high_freq_energy_ratio": 0.3,    # 高频能量占比
-                "impulse_density": 0.1             # 脉冲密度
-            },
-            "corona_discharge": {
-                "hiss_freq_range": (5000, 15000),  # 嘶嘶声频率范围
-                "continuous_energy_ratio": 0.2
-            },
-            "bearing_fault": {
-                "periodic_component_strength": 0.15,
-                "base_freq_range": (20, 200)
-            },
-            "transformer_hum": {
-                "harmonic_freq": 100,              # 基频100Hz (50Hz工频的二次谐波)
-                "harmonic_strength": 0.3
-            }
-        }
-    
+
     def detect(self, audio: np.ndarray, sample_rate: int = None) -> Dict[str, Any]:
         """
         检测声学异常
@@ -260,7 +338,18 @@ class AcousticDetector:
         mel_spec = self.feature_extractor.compute_mel_spectrogram(audio)
         spectral_features = self.feature_extractor.compute_spectral_features(audio)
         temporal_features = self.feature_extractor.compute_temporal_features(audio)
-        
+
+        # 超声波特征 (sample_rate > 48kHz 时启用)
+        ultrasonic_features = {}
+        hf_impulse_features = {}
+        if sample_rate and sample_rate > 48000:
+            ultrasonic_features = self.feature_extractor.compute_ultrasonic_features(
+                audio, self.config.ultrasonic_freq_min, self.config.ultrasonic_freq_max
+            )
+            hf_impulse_features = self.feature_extractor.compute_hf_impulse_analysis(
+                audio, self.config.ultrasonic_freq_min
+            )
+
         # 各类异常检测
         anomaly_scores = {}
         
@@ -300,7 +389,9 @@ class AcousticDetector:
             "spectrogram": mel_spec,
             "features": {
                 "spectral": spectral_features,
-                "temporal": temporal_features
+                "temporal": temporal_features,
+                "ultrasonic": ultrasonic_features,
+                "hf_impulse": hf_impulse_features,
             }
         }
     
@@ -319,123 +410,169 @@ class AcousticDetector:
         return audio.astype(np.float32)
     
     def _resample(self, audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
-        """重采样"""
+        """抗混叠多相重采样"""
         if orig_sr == target_sr:
             return audio
-        
-        ratio = target_sr / orig_sr
-        new_length = int(len(audio) * ratio)
-        
-        return np.interp(
-            np.linspace(0, len(audio), new_length),
-            np.arange(len(audio)),
-            audio
-        )
+        from math import gcd
+        from scipy.signal import resample_poly
+        g = gcd(orig_sr, target_sr)
+        up = target_sr // g
+        down = orig_sr // g
+        return resample_poly(audio, up, down).astype(audio.dtype)
     
     def _detect_partial_discharge(self, audio: np.ndarray, mel_spec: np.ndarray) -> float:
-        """检测局部放电 (特征: 高频短脉冲)"""
+        """检测局部放电 (特征: 高频短脉冲)
+
+        局部放电产生短暂的高频脉冲，特征是:
+        1. 高频能量占比显著高于背景噪声
+        2. 存在明显的能量突变 (脉冲)
+        两个条件必须同时满足才会给出高分。
+        """
         # 1. 高频能量占比
         high_freq_bins = mel_spec.shape[0] * 2 // 3  # 上1/3频率
         high_freq_energy = np.sum(mel_spec[high_freq_bins:])
         total_energy = np.sum(mel_spec) + 1e-8
         high_freq_ratio = high_freq_energy / total_energy
-        
+
         # 2. 脉冲检测 (短时能量突变)
         frame_energies = np.sum(mel_spec, axis=0)
         energy_diff = np.abs(np.diff(frame_energies))
-        impulse_count = np.sum(energy_diff > np.mean(energy_diff) * 3)
+        mean_diff = np.mean(energy_diff) + 1e-8
+        # 使用更严格的阈值以减少噪声引起的误报
+        impulse_count = np.sum(energy_diff > mean_diff * self.config.pd_impulse_multiplier)
         impulse_density = impulse_count / len(energy_diff)
-        
-        # 综合评分
-        score = 0.5 * min(high_freq_ratio / 0.3, 1.0) + 0.5 * min(impulse_density / 0.1, 1.0)
-        
+
+        # 高频能量占比阈值，减少白噪声误报
+        hf_score = min(high_freq_ratio / self.config.pd_high_freq_energy_ratio, 1.0)
+        imp_score = min(impulse_density / self.config.pd_impulse_density, 1.0)
+
+        # 两个特征使用乘法融合，要求两者同时存在
+        score = np.sqrt(hf_score * imp_score)
+
         return float(np.clip(score, 0, 1))
-    
+
     def _detect_corona_discharge(self, audio: np.ndarray, spectral_features: Dict) -> float:
-        """检测电晕放电 (特征: 持续高频嘶嘶声)"""
-        # 频谱质心在高频区域
+        """检测电晕放电 (特征: 持续高频嘶嘶声)
+
+        电晕放电产生 5-15kHz 的持续嘶嘶声，频谱质心必须在高频区域。
+        低于 3kHz 的质心表示信号以低频为主 (如工频谐波)，不可能是电晕。
+        """
         centroid = spectral_features["spectral_centroid_mean"]
-        
-        # 电晕的频谱质心通常在5-15kHz
-        if 5000 < centroid < 15000:
+
+        # 质心低于阈值时，信号以低频为主，不可能是电晕放电
+        if centroid < self.config.corona_centroid_min:
+            return 0.0
+
+        # 电晕的频谱质心通常在最优频率范围内
+        if self.config.corona_optimal_freq_low <= centroid <= self.config.corona_optimal_freq_high:
             centroid_score = 1.0
-        elif centroid > 15000:
+        elif centroid > self.config.corona_optimal_freq_high:
             centroid_score = 0.5
         else:
-            centroid_score = centroid / 5000
-        
+            # 线性过渡
+            centroid_score = (centroid - self.config.corona_centroid_min) / (self.config.corona_optimal_freq_low - self.config.corona_centroid_min)
+
         # 频谱平坦度高 (嘶嘶声较为平坦)
         flatness = spectral_features["spectral_flatness_mean"]
-        flatness_score = min(flatness / 0.3, 1.0)
-        
-        score = 0.6 * centroid_score + 0.4 * flatness_score
-        
+        flatness_score = min(flatness / self.config.corona_flatness_threshold, 1.0)
+
+        # 两个特征都必须存在 (乘法融合)
+        score = centroid_score * flatness_score
+
         return float(np.clip(score, 0, 1))
     
     def _detect_bearing_fault(self, audio: np.ndarray) -> float:
-        """检测轴承故障 (特征: 周期性冲击)"""
-        # 计算自相关函数
+        """检测轴承故障 (特征: 周期性冲击)
+
+        轴承故障产生周期性冲击脉冲，具有高峰度 (kurtosis > 3)。
+        正常的工频信号 (50Hz 正弦波) 峰度约 1.5，不应触发此检测。
+        使用峰度作为前置条件，避免将变电站正常工频信号误判为轴承故障。
+        """
+        # 峰度检查: 轴承故障的冲击脉冲使信号峰度显著高于正弦波
+        # 正弦波峰度 ~1.5, 高斯噪声 ~3.0, 冲击脉冲 > 4.0
         n = len(audio)
+        mean = np.mean(audio)
+        std = np.std(audio) + 1e-8
+        kurtosis = np.mean(((audio - mean) / std) ** 4)
+
+        # 峰度低于阈值表示信号平滑无冲击，不可能是轴承故障
+        if kurtosis < self.config.bearing_kurtosis_gate:
+            return 0.0
+
+        # 计算自相关函数
         autocorr = np.correlate(audio, audio, mode='full')
         autocorr = autocorr[n-1:] / (autocorr[n-1] + 1e-8)
-        
-        # 寻找周期性峰值
-        # 轴承故障频率通常在20-200Hz
-        min_lag = int(self.config.sample_rate / 200)
-        max_lag = int(self.config.sample_rate / 20)
-        
+
+        # 寻找周期性峰值 (轴承故障频率范围)
+        min_lag = int(self.config.sample_rate / self.config.bearing_freq_max)
+        max_lag = int(self.config.sample_rate / self.config.bearing_freq_min)
+
         if max_lag < len(autocorr):
             search_range = autocorr[min_lag:max_lag]
             peak_value = np.max(search_range)
-            
-            # 周期性强度
-            score = min(peak_value / 0.15, 1.0)
+
+            # 结合峰度和周期性评分
+            kurtosis_score = min((kurtosis - self.config.bearing_kurtosis_gate) / self.config.bearing_kurtosis_scaling, 1.0)
+            periodicity_score = min(peak_value / self.config.bearing_periodicity_threshold, 1.0)
+            score = 0.5 * kurtosis_score + 0.5 * periodicity_score
         else:
             score = 0
-        
+
         return float(np.clip(score, 0, 1))
     
     def _detect_transformer_hum(self, audio: np.ndarray) -> float:
-        """检测变压器异常嗡鸣 (特征: 100/120Hz及谐波)"""
-        # FFT分析
+        """检测变压器异常嗡鸣 (特征: 100/120Hz及谐波)
+
+        变压器异常嗡鸣表现为 100Hz (50Hz工频二次谐波) 及其倍频 (200/300/400Hz)
+        的能量显著增强。使用能量 (幅度平方) 而非幅度进行比较，以准确反映频率集中度。
+        """
         n = len(audio)
-        fft_result = np.abs(np.fft.rfft(audio))
+        fft_magnitude = np.abs(np.fft.rfft(audio))
         freqs = np.fft.rfftfreq(n, 1 / self.config.sample_rate)
-        
-        # 检测100Hz和200Hz分量
-        harmonic_freqs = [100, 200, 300, 400]  # 基频及谐波
-        harmonic_powers = []
-        
+        fft_energy = fft_magnitude ** 2
+
+        # 检测谐波能量
+        harmonic_freqs = self.config.transformer_harmonic_freqs
+        harmonic_energy = 0.0
+
         for hf in harmonic_freqs:
-            # 找到最接近的频率bin
             idx = np.argmin(np.abs(freqs - hf))
-            # 取周围几个bin的平均
-            power = np.mean(fft_result[max(0, idx-2):min(len(fft_result), idx+3)])
-            harmonic_powers.append(power)
-        
-        # 谐波能量占比
-        total_power = np.sum(fft_result) + 1e-8
-        harmonic_ratio = sum(harmonic_powers) / total_power
-        
-        # 如果100Hz分量显著强于正常值
-        score = min(harmonic_ratio / 0.3, 1.0)
-        
+            # 取峰值附近 +/- bandwidth bin 的能量之和
+            low = max(0, idx - self.config.transformer_bin_bandwidth)
+            high = min(len(fft_energy), idx + self.config.transformer_bin_bandwidth + 1)
+            harmonic_energy += np.sum(fft_energy[low:high])
+
+        # 使用能量比 (平方和)
+        total_energy = np.sum(fft_energy) + 1e-8
+        harmonic_ratio = harmonic_energy / total_energy
+
+        # 谐波能量比评分
+        score = min(harmonic_ratio / self.config.transformer_ratio_threshold, 1.0)
+
         return float(np.clip(score, 0, 1))
     
     def _detect_mechanical_fault(self, audio: np.ndarray, temporal_features: Dict) -> float:
-        """检测机械故障 (特征: 能量波动大、峰值因子高)"""
+        """检测机械故障 (特征: 能量波动大、峰值因子高)
+
+        机械故障产生宽带振动和冲击，具有高峰值因子 (>4) 和能量波动。
+        峰值因子是核心指标，能量变化作为辅助验证。
+        """
         crest_factor = temporal_features["crest_factor"]
+        rms_energy = temporal_features["rms_energy"]
         energy_std = temporal_features["energy_std"]
-        
-        # 机械故障通常有较高的峰值因子
-        cf_score = min((crest_factor - 3) / 5, 1.0)  # 正常约3, 故障可能达到8+
+
+        # 机械故障通常有较高的峰值因子 (正常约2-3, 故障可能达到6+)
+        cf_score = min((crest_factor - self.config.mechanical_crest_factor_threshold) / self.config.mechanical_crest_factor_threshold, 1.0)
         cf_score = max(cf_score, 0)
-        
-        # 能量变化大
-        energy_score = min(energy_std / 0.1, 1.0)
-        
-        score = 0.6 * cf_score + 0.4 * energy_score
-        
+
+        # 能量变化使用相对变异系数 (相对于均值)
+        mean_energy = rms_energy ** 2 * self.config.n_fft
+        energy_cv = energy_std / (mean_energy + 1e-8)  # 变异系数
+        energy_score = min(energy_cv / self.config.mechanical_energy_cv_threshold, 1.0)
+
+        # 峰值因子是核心指标
+        score = self.config.mechanical_cf_weight * cf_score + self.config.mechanical_energy_weight * energy_score
+
         return float(np.clip(score, 0, 1))
 
 

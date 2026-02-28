@@ -11,26 +11,26 @@
 
 from plugins.busbar_inspection.plugin import BusbarInspectionPlugin
 from plugins.busbar_inspection.detector_enhanced import (
-    BusbarEnhancedDetector,
+    BusbarDetectorEnhanced,
     BusbarDefectType,
     BusbarDetection,
-    QualityAssessment,
-    QualityAssessor,
-    TileProcessor,
-    NMSProcessor,
-    DEFECT_LABELS,
-    DEFECT_ALARM_LEVELS,
+    QualityGateStatus,
+    QualityGateResult,
+    ZoomSuggestion,
+    BusbarInspectionResult,
+    DetectROIResult,
+    create_detector,
 )
 
 __all__ = [
     "BusbarInspectionPlugin",
-    "BusbarEnhancedDetector",
+    "BusbarDetectorEnhanced",
     "BusbarDefectType",
     "BusbarDetection",
-    "QualityAssessment",
-    "QualityAssessor",
-    "TileProcessor",
-    "NMSProcessor",
-    "DEFECT_LABELS",
-    "DEFECT_ALARM_LEVELS",
+    "QualityGateStatus",
+    "QualityGateResult",
+    "ZoomSuggestion",
+    "BusbarInspectionResult",
+    "DetectROIResult",
+    "create_detector",
 ]

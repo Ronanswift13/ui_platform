@@ -2,10 +2,21 @@
 DarkBreaker SDK
 
 Lightweight SDK for building standalone DarkBreaker plugins.
-Provides interfaces, schemas, standalone runner, and utilities.
+Provides interfaces, schemas, standalone runner, local services, and utilities.
+
+Each plugin can operate in two modes:
+  - Integrated Mode: Loaded by PluginManager within the full platform
+  - Standalone Mode: Runs independently with SDK-provided local services
+
+Local services (darkbreaker_sdk.services):
+  - LocalInferenceEngine: ONNX/PyTorch inference
+  - LocalModelRegistry: Model discovery and management
+  - LocalDataManager: Data persistence with voltage level support
+  - LocalAlarmManager: Alarm lifecycle management
+  - LocalConfigManager: Configuration with device type support
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 from darkbreaker_sdk.interfaces.lifecycle import (
     PluginCapability,

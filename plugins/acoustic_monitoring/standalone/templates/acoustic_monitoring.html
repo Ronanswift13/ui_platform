@@ -1,7 +1,7 @@
 {% extends "base_standalone.html" %}
 
-{% block title %}Acoustic Monitoring - DarkBreaker{% endblock %}
-{% block navbar_title %}Acoustic Monitoring Dashboard{% endblock %}
+{% block title %}声学监测 - DarkBreaker{% endblock %}
+{% block navbar_title %}声学监测仪表盘{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -42,7 +42,122 @@
     }
     .event-item:last-child { border-bottom: none; }
     canvas { max-height: 250px; }
+
+    /* Sidebar control sections */
+    .control-section {
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: rgba(255,255,255,0.03);
+    }
+    .control-section-title {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.6rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .control-section .form-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.2rem;
+    }
+    .control-section .form-select,
+    .control-section .form-control {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .btn-control {
+        width: 100%;
+        font-size: 0.8rem;
+        padding: 0.4rem;
+        margin-top: 0.5rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+    }
+    .status-badge-sm {
+        font-size: 0.68rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+    }
+    .mode-indicator {
+        display: inline-block;
+        font-size: 0.7rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        margin-left: 0.5rem;
+    }
+    .mode-sim { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+    .mode-mon { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .cycle-counter {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+        margin-top: 0.3rem;
+    }
 </style>
+{% endblock %}
+
+{% block sidebar_extra %}
+<!-- ═══════ Simulation Controls ═══════ -->
+<div class="sidebar-section">
+    <div class="sidebar-section-title">
+        <i class="bi bi-broadcast-pin"></i> 仿真模拟
+        <span id="sim-status-badge" class="badge bg-secondary status-badge-sm ms-auto">空闲</span>
+    </div>
+    <div class="control-section">
+        <div class="mb-2">
+            <label class="form-label" for="sim-anomaly-type">异常类型</label>
+            <select id="sim-anomaly-type" class="form-select form-select-sm">
+                <option value="normal" selected>正常</option>
+                <option value="partial_discharge">局部放电</option>
+                <option value="corona">电晕放电</option>
+                <option value="bearing">轴承故障</option>
+                <option value="transformer_hum">变压器嗡鸣</option>
+                <option value="mechanical">机械故障</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" for="sim-intensity">强度: <span id="sim-intensity-val">0.70</span></label>
+            <input type="range" class="form-range" id="sim-intensity" min="0.1" max="1.0" step="0.05" value="0.70">
+        </div>
+        <div class="mb-2">
+            <label class="form-label" for="sim-interval">间隔 (秒): <span id="sim-interval-val">2.0</span></label>
+            <input type="range" class="form-range" id="sim-interval" min="0.5" max="5.0" step="0.5" value="2.0">
+        </div>
+        <div id="sim-cycle-counter" class="cycle-counter">周期: 0</div>
+        <button id="btn-sim-start" class="btn btn-outline-primary btn-control">
+            <i class="bi bi-play-fill me-1"></i>开始仿真
+        </button>
+        <button id="btn-sim-stop" class="btn btn-outline-danger btn-control" style="display:none;">
+            <i class="bi bi-stop-fill me-1"></i>停止仿真
+        </button>
+    </div>
+</div>
+
+<!-- ═══════ Monitoring Controls ═══════ -->
+<div class="sidebar-section">
+    <div class="sidebar-section-title">
+        <i class="bi bi-headphones"></i> 工作监测
+        <span id="mon-status-badge" class="badge bg-secondary status-badge-sm ms-auto">空闲</span>
+    </div>
+    <div class="control-section">
+        <div class="mb-2">
+            <label class="form-label" for="mon-device-id">设备编号</label>
+            <input type="text" class="form-control form-control-sm" id="mon-device-id" value="mic_001" placeholder="e.g. mic_001">
+        </div>
+        <div id="mon-cycle-counter" class="cycle-counter">周期: 0</div>
+        <button id="btn-mon-start" class="btn btn-outline-success btn-control">
+            <i class="bi bi-play-fill me-1"></i>开始监测
+        </button>
+        <button id="btn-mon-stop" class="btn btn-outline-danger btn-control" style="display:none;">
+            <i class="bi bi-stop-fill me-1"></i>停止监测
+        </button>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -50,37 +165,39 @@
     <!-- Top Metrics -->
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Anomaly Score</div>
+            <div class="panel-title">异常评分</div>
             <div class="metric-value" id="anomaly-score">0.00</div>
-            <div class="metric-label">Threshold: 0.50</div>
+            <div class="metric-label">阈值: 0.50</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Detection Status</div>
-            <div class="metric-value status-normal" id="detection-status">Normal</div>
-            <div class="metric-label" id="anomaly-type">No anomaly</div>
+            <div class="panel-title">检测状态</div>
+            <div class="metric-value status-normal" id="detection-status">正常</div>
+            <div class="metric-label" id="anomaly-type">无异常
+                <span id="active-mode-indicator"></span>
+            </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Dominant Frequency</div>
+            <div class="panel-title">主频率</div>
             <div class="metric-value" id="dominant-freq">-- Hz</div>
-            <div class="metric-label">Frequency analysis</div>
+            <div class="metric-label">频率分析</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Noise Level</div>
+            <div class="panel-title">噪声电平</div>
             <div class="metric-value" id="noise-level">-- dB</div>
-            <div class="metric-label">RMS noise floor</div>
+            <div class="metric-label">RMS 底噪</div>
         </div>
     </div>
 
     <!-- Waveform Display -->
     <div class="col-md-6">
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-soundwave me-1"></i>Waveform Display</div>
+            <div class="panel-title"><i class="bi bi-soundwave me-1"></i>波形显示</div>
             <canvas id="waveformChart"></canvas>
         </div>
     </div>
@@ -88,7 +205,7 @@
     <!-- Spectrogram Visualization -->
     <div class="col-md-6">
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-bar-chart-fill me-1"></i>Spectrogram / Frequency Spectrum</div>
+            <div class="panel-title"><i class="bi bi-bar-chart-fill me-1"></i>频率频谱</div>
             <canvas id="spectrumChart"></canvas>
         </div>
     </div>
@@ -96,7 +213,7 @@
     <!-- Band Energy -->
     <div class="col-md-4">
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-equalizer me-1"></i>Band Energy Distribution</div>
+            <div class="panel-title"><i class="bi bi-equalizer me-1"></i>频带能量分布</div>
             <canvas id="bandEnergyChart"></canvas>
         </div>
     </div>
@@ -104,9 +221,9 @@
     <!-- Partial Discharge Events -->
     <div class="col-md-4">
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-lightning-fill me-1"></i>Partial Discharge Events</div>
+            <div class="panel-title"><i class="bi bi-lightning-fill me-1"></i>局部放电事件</div>
             <div class="event-list" id="pd-events">
-                <div class="event-item text-secondary">No events detected</div>
+                <div class="event-item text-secondary">暂无检测事件</div>
             </div>
         </div>
     </div>
@@ -114,9 +231,9 @@
     <!-- Anomaly Detection Alerts -->
     <div class="col-md-4">
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-exclamation-triangle-fill me-1"></i>Anomaly Alerts</div>
+            <div class="panel-title"><i class="bi bi-exclamation-triangle-fill me-1"></i>异常告警</div>
             <div class="event-list" id="anomaly-alerts">
-                <div class="event-item text-secondary">No alerts</div>
+                <div class="event-item text-secondary">暂无告警</div>
             </div>
         </div>
     </div>
@@ -125,16 +242,31 @@
 
 {% block extra_scripts %}
 <script>
-    // Waveform chart
+(function() {
+    'use strict';
+
+    // ════════════════════════════════════════════════════════════════
+    //  Chart.js Setup
+    // ════════════════════════════════════════════════════════════════
+
+    const chartColors = {
+        gridColor: '#1e293b',
+        tickColor: '#94a3b8',
+        waveform: '#3b82f6',
+        spectrum: '#22c55e',
+        spectrumBg: 'rgba(34,197,94,0.15)',
+        bands: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444']
+    };
+
     const waveformCtx = document.getElementById('waveformChart').getContext('2d');
     const waveformChart = new Chart(waveformCtx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [{
-                label: 'Amplitude',
+                label: '幅值',
                 data: [],
-                borderColor: '#3b82f6',
+                borderColor: chartColors.waveform,
                 borderWidth: 1,
                 pointRadius: 0,
                 fill: false,
@@ -145,24 +277,23 @@
             responsive: true,
             animation: false,
             scales: {
-                x: { display: true, title: { display: true, text: 'Time (samples)', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
-                y: { title: { display: true, text: 'Amplitude', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                x: { display: true, title: { display: true, text: '采样点', color: chartColors.tickColor }, ticks: { color: chartColors.tickColor, maxTicksLimit: 10 }, grid: { color: chartColors.gridColor } },
+                y: { title: { display: true, text: '幅值', color: chartColors.tickColor }, ticks: { color: chartColors.tickColor }, grid: { color: chartColors.gridColor } }
             },
             plugins: { legend: { display: false } }
         }
     });
 
-    // Spectrum chart
     const spectrumCtx = document.getElementById('spectrumChart').getContext('2d');
     const spectrumChart = new Chart(spectrumCtx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [{
-                label: 'Magnitude',
+                label: '幅度',
                 data: [],
-                borderColor: '#22c55e',
-                backgroundColor: 'rgba(34,197,94,0.15)',
+                borderColor: chartColors.spectrum,
+                backgroundColor: chartColors.spectrumBg,
                 borderWidth: 1,
                 pointRadius: 0,
                 fill: true
@@ -172,85 +303,328 @@
             responsive: true,
             animation: false,
             scales: {
-                x: { display: true, title: { display: true, text: 'Frequency (Hz)', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
-                y: { title: { display: true, text: 'Magnitude', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                x: { display: true, title: { display: true, text: '频率 (Hz)', color: chartColors.tickColor }, ticks: { color: chartColors.tickColor, maxTicksLimit: 10 }, grid: { color: chartColors.gridColor } },
+                y: { title: { display: true, text: '幅度', color: chartColors.tickColor }, ticks: { color: chartColors.tickColor }, grid: { color: chartColors.gridColor } }
             },
             plugins: { legend: { display: false } }
         }
     });
 
-    // Band energy chart
     const bandCtx = document.getElementById('bandEnergyChart').getContext('2d');
     const bandEnergyChart = new Chart(bandCtx, {
         type: 'bar',
         data: {
-            labels: ['Low', 'Mid-Low', 'Mid', 'Mid-High', 'High'],
+            labels: ['低频', '中低频', '中频', '中高频', '高频'],
             datasets: [{
-                label: 'Energy %',
+                label: '能量 %',
                 data: [0, 0, 0, 0, 0],
-                backgroundColor: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444']
+                backgroundColor: chartColors.bands
             }]
         },
         options: {
             responsive: true,
             scales: {
-                y: { beginAtZero: true, title: { display: true, text: '%', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
-                x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } }
+                y: { beginAtZero: true, title: { display: true, text: '%', color: chartColors.tickColor }, ticks: { color: chartColors.tickColor }, grid: { color: chartColors.gridColor } },
+                x: { ticks: { color: chartColors.tickColor }, grid: { color: chartColors.gridColor } }
             },
             plugins: { legend: { display: false } }
         }
     });
 
+    // ════════════════════════════════════════════════════════════════
+    //  WebSocket Initialization
+    // ════════════════════════════════════════════════════════════════
+
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = wsProtocol + '//' + location.host + '/ws/stream';
+
+    DarkBreakerSDK.init({
+        wsUrl: wsUrl,
+        apiBase: '',
+    });
+
+    // Override the SDK's WebSocket onmessage to handle our custom type
+    function installCustomMessageHandler() {
+        if (!DarkBreakerSDK.ws) {
+            setTimeout(installCustomMessageHandler, 500);
+            return;
+        }
+
+        const originalOnMessage = DarkBreakerSDK.ws.onmessage;
+        DarkBreakerSDK.ws.onmessage = function(event) {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'acoustic_result') {
+                    updateDashboard(msg.data);
+                    return;
+                }
+            } catch (e) {
+                // fall through to original handler
+            }
+            // Call original handler for detection/stats messages
+            if (originalOnMessage) {
+                originalOnMessage.call(DarkBreakerSDK.ws, event);
+            }
+        };
+
+        // Also patch reconnect so custom handler survives reconnection
+        const origConnect = DarkBreakerSDK._connectWebSocket.bind(DarkBreakerSDK);
+        DarkBreakerSDK._connectWebSocket = function() {
+            origConnect();
+            setTimeout(installCustomMessageHandler, 200);
+        };
+    }
+
+    setTimeout(installCustomMessageHandler, 300);
+
+    // ════════════════════════════════════════════════════════════════
+    //  Dashboard Update
+    // ════════════════════════════════════════════════════════════════
+
     function updateDashboard(data) {
         if (!data || !data.success) return;
 
-        // Metrics
+        // ── Metrics ──
         document.getElementById('anomaly-score').textContent = (data.anomaly_score || 0).toFixed(2);
+
         const statusEl = document.getElementById('detection-status');
         if (data.anomaly_detected) {
-            statusEl.textContent = data.severity || 'Anomaly';
+            statusEl.textContent = data.severity || '异常';
             statusEl.className = 'metric-value status-alarm';
         } else {
-            statusEl.textContent = 'Normal';
+            statusEl.textContent = '正常';
             statusEl.className = 'metric-value status-normal';
         }
-        document.getElementById('anomaly-type').textContent = data.anomaly_type || 'No anomaly';
+        document.getElementById('anomaly-type').textContent = data.anomaly_type || '无异常';
 
+        // Mode indicator
+        const modeEl = document.getElementById('active-mode-indicator');
+        if (modeEl && data.mode) {
+            if (data.mode === 'simulation') {
+                modeEl.innerHTML = '<span class="mode-indicator mode-sim">SIM</span>';
+            } else if (data.mode === 'monitoring') {
+                modeEl.innerHTML = '<span class="mode-indicator mode-mon">MON</span>';
+            }
+        }
+
+        // Frequency info
         const freq = data.frequency_analysis || {};
         document.getElementById('dominant-freq').textContent = (freq.dominant_frequency || 0).toFixed(1) + ' Hz';
         document.getElementById('noise-level').textContent = (freq.noise_level_db || 0).toFixed(1) + ' dB';
 
-        // Spectrum
-        if (freq.spectrum) {
-            spectrumChart.data.labels = freq.spectrum.frequencies.map(f => f.toFixed(0));
-            spectrumChart.data.datasets[0].data = freq.spectrum.magnitude_normalized;
-            spectrumChart.update();
+        // ── Waveform ──
+        if (data.waveform && data.waveform.length > 0) {
+            waveformChart.data.labels = data.waveform.map((_, i) => i);
+            waveformChart.data.datasets[0].data = data.waveform;
+            waveformChart.update('none');
         }
 
-        // Band energy
+        // ── Spectrum ──
+        const spectrum = data.spectrum || {};
+        if (spectrum.frequencies && spectrum.magnitudes) {
+            // Downsample for display if too many points
+            let freqs = spectrum.frequencies;
+            let mags = spectrum.magnitudes;
+            if (freqs.length > 500) {
+                const step = Math.floor(freqs.length / 500);
+                freqs = freqs.filter((_, i) => i % step === 0);
+                mags = mags.filter((_, i) => i % step === 0);
+            }
+            spectrumChart.data.labels = freqs.map(f => typeof f === 'number' ? f.toFixed(0) : f);
+            spectrumChart.data.datasets[0].data = mags;
+            spectrumChart.update('none');
+        } else if (freq.spectrum) {
+            // Fallback: use frequency_analysis.spectrum
+            spectrumChart.data.labels = freq.spectrum.frequencies.map(f => typeof f === 'number' ? f.toFixed(0) : f);
+            spectrumChart.data.datasets[0].data = freq.spectrum.magnitude_normalized;
+            spectrumChart.update('none');
+        }
+
+        // ── Band energy ──
         if (freq.band_energy) {
             const be = freq.band_energy;
             bandEnergyChart.data.datasets[0].data = [
                 be.low || 0, be.mid_low || 0, be.mid || 0, be.mid_high || 0, be.high || 0
             ];
-            bandEnergyChart.update();
+            bandEnergyChart.update('none');
         }
 
-        // PD events
+        // ── PD events ──
         if (data.pd_detected) {
             const pdEl = document.getElementById('pd-events');
             const now = new Date().toLocaleTimeString();
-            pdEl.innerHTML = `<div class="event-item text-danger"><i class="bi bi-lightning-fill me-1"></i>${now} - PD Level: ${data.pd_level} (conf: ${(data.pd_confidence || 0).toFixed(2)})</div>` + pdEl.innerHTML;
+            const newEvent = document.createElement('div');
+            newEvent.className = 'event-item text-danger';
+            newEvent.innerHTML = '<i class="bi bi-lightning-fill me-1"></i>' + now + ' - 放电等级: ' + data.pd_level + ' (conf: ' + (data.pd_confidence || 0).toFixed(2) + ')';
+            // Remove placeholder if first event
+            if (pdEl.querySelector('.text-secondary')) {
+                pdEl.innerHTML = '';
+            }
+            pdEl.insertBefore(newEvent, pdEl.firstChild);
+            // Keep max 50 events
+            while (pdEl.children.length > 50) pdEl.removeChild(pdEl.lastChild);
         }
 
-        // Alarms
+        // ── Anomaly alerts ──
         if (data.alarms && data.alarms.length > 0) {
             const alertEl = document.getElementById('anomaly-alerts');
-            data.alarms.forEach(a => {
+            data.alarms.forEach(function(a) {
                 const now = new Date().toLocaleTimeString();
-                alertEl.innerHTML = `<div class="event-item text-warning"><i class="bi bi-exclamation-triangle me-1"></i>${now} - ${a.message}</div>` + alertEl.innerHTML;
+                const newAlert = document.createElement('div');
+                newAlert.className = 'event-item text-warning';
+                newAlert.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + now + ' - ' + a.message;
+                if (alertEl.querySelector('.text-secondary')) {
+                    alertEl.innerHTML = '';
+                }
+                alertEl.insertBefore(newAlert, alertEl.firstChild);
+                while (alertEl.children.length > 50) alertEl.removeChild(alertEl.lastChild);
             });
         }
+
+        // ── Update cycle counters ──
+        if (data.mode === 'simulation' && data.cycle !== undefined) {
+            document.getElementById('sim-cycle-counter').textContent = '周期: ' + (data.cycle + 1);
+        } else if (data.mode === 'monitoring' && data.cycle !== undefined) {
+            document.getElementById('mon-cycle-counter').textContent = '周期: ' + (data.cycle + 1);
+        }
     }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Sidebar Controls - Simulation
+    // ════════════════════════════════════════════════════════════════
+
+    const simIntensity = document.getElementById('sim-intensity');
+    const simIntensityVal = document.getElementById('sim-intensity-val');
+    const simInterval = document.getElementById('sim-interval');
+    const simIntervalVal = document.getElementById('sim-interval-val');
+
+    simIntensity.addEventListener('input', function() {
+        simIntensityVal.textContent = parseFloat(this.value).toFixed(2);
+    });
+    simInterval.addEventListener('input', function() {
+        simIntervalVal.textContent = parseFloat(this.value).toFixed(1);
+    });
+
+    document.getElementById('btn-sim-start').addEventListener('click', async function() {
+        const anomalyType = document.getElementById('sim-anomaly-type').value;
+        const intensity = parseFloat(simIntensity.value);
+        const interval = parseFloat(simInterval.value);
+
+        try {
+            const resp = await fetch('/api/acoustic/simulation/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    anomaly_type: anomalyType,
+                    anomaly_intensity: intensity,
+                    interval_sec: interval
+                })
+            });
+            const result = await resp.json();
+            if (result.status === 'started' || result.status === 'already_running') {
+                setSimState(true);
+            }
+        } catch (e) {
+            console.error('Failed to start simulation:', e);
+        }
+    });
+
+    document.getElementById('btn-sim-stop').addEventListener('click', async function() {
+        try {
+            await fetch('/api/acoustic/simulation/stop', { method: 'POST' });
+            setSimState(false);
+        } catch (e) {
+            console.error('Failed to stop simulation:', e);
+        }
+    });
+
+    function setSimState(running) {
+        document.getElementById('btn-sim-start').style.display = running ? 'none' : 'block';
+        document.getElementById('btn-sim-stop').style.display = running ? 'block' : 'none';
+        const badge = document.getElementById('sim-status-badge');
+        if (running) {
+            badge.className = 'badge bg-primary status-badge-sm ms-auto';
+            badge.textContent = '运行中';
+        } else {
+            badge.className = 'badge bg-secondary status-badge-sm ms-auto';
+            badge.textContent = '空闲';
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Sidebar Controls - Monitoring
+    // ════════════════════════════════════════════════════════════════
+
+    document.getElementById('btn-mon-start').addEventListener('click', async function() {
+        const deviceId = document.getElementById('mon-device-id').value || 'mic_001';
+
+        try {
+            const resp = await fetch('/api/acoustic/monitoring/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: deviceId })
+            });
+            const result = await resp.json();
+            if (result.status === 'started' || result.status === 'already_running') {
+                setMonState(true);
+            }
+        } catch (e) {
+            console.error('Failed to start monitoring:', e);
+        }
+    });
+
+    document.getElementById('btn-mon-stop').addEventListener('click', async function() {
+        try {
+            await fetch('/api/acoustic/monitoring/stop', { method: 'POST' });
+            setMonState(false);
+        } catch (e) {
+            console.error('Failed to stop monitoring:', e);
+        }
+    });
+
+    function setMonState(running) {
+        document.getElementById('btn-mon-start').style.display = running ? 'none' : 'block';
+        document.getElementById('btn-mon-stop').style.display = running ? 'block' : 'none';
+        const badge = document.getElementById('mon-status-badge');
+        if (running) {
+            badge.className = 'badge bg-success status-badge-sm ms-auto';
+            badge.textContent = '运行中';
+        } else {
+            badge.className = 'badge bg-secondary status-badge-sm ms-auto';
+            badge.textContent = '空闲';
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Load Initial Status
+    // ════════════════════════════════════════════════════════════════
+
+    async function loadAcousticStatus() {
+        try {
+            const resp = await fetch('/api/acoustic/status');
+            const status = await resp.json();
+
+            if (status.simulation && status.simulation.running) {
+                setSimState(true);
+                document.getElementById('sim-anomaly-type').value = status.simulation.config.anomaly_type || 'normal';
+                simIntensity.value = status.simulation.config.anomaly_intensity || 0.7;
+                simIntensityVal.textContent = parseFloat(simIntensity.value).toFixed(2);
+                document.getElementById('sim-cycle-counter').textContent = '周期: ' + status.simulation.cycles;
+            }
+
+            if (status.monitoring && status.monitoring.running) {
+                setMonState(true);
+                document.getElementById('mon-device-id').value = status.monitoring.config.device_id || 'mic_001';
+                document.getElementById('mon-cycle-counter').textContent = '周期: ' + status.monitoring.cycles;
+            }
+        } catch (e) {
+            console.error('Failed to load acoustic status:', e);
+        }
+    }
+
+    // Load status on page ready
+    loadAcousticStatus();
+
+})();
 </script>
 {% endblock %}

@@ -108,14 +108,14 @@ def create_app() -> FastAPI:
         from training.training_api import router as training_router
         app.include_router(training_router)
         print("✓ 训练API路由已集成 (增强版)")
-    except ImportError as e:
+    except Exception as e:
         print(f"✗ 训练API导入失败: {e}")
         # 回退到旧版本
         try:
             from apps.training_api import router as training_router
             app.include_router(training_router)
             print("✓ 训练API路由已集成 (旧版)")
-        except ImportError as e2:
+        except Exception as e2:
             print(f"✗ 训练API导入完全失败: {e2}")
 
     # ============== 集成室内监测中心API (V3.5 -> V2.0升级) ==============
@@ -123,14 +123,14 @@ def create_app() -> FastAPI:
         from apps.indoor_api_v2 import integrate_indoor_api_v2
         integrate_indoor_api_v2(app)
         print("✓ 室内监测中心API已集成 (V2.0)")
-    except ImportError as e:
+    except Exception as e:
         print(f"✗ 室内监测中心API V2.0导入失败: {e}")
         # 回退到旧版本
         try:
             from apps.indoor_api import integrate_indoor_api
             integrate_indoor_api(app)
             print("✓ 室内监测中心API已集成 (V3.5旧版)")
-        except ImportError as e2:
+        except Exception as e2:
             print(f"✗ 室内监测中心API导入完全失败: {e2}")
 
     # ============== 集成室内3D可视化API ==============
@@ -138,7 +138,7 @@ def create_app() -> FastAPI:
         from apps.indoor_3d_api import integrate_indoor_3d_api
         integrate_indoor_3d_api(app)
         print("✓ 室内3D可视化API已集成")
-    except ImportError as e:
+    except Exception as e:
         print(f"✗ 室内3D可视化API导入失败: {e}")
 
     # ============== 集成室内电子围栏API (V3.0) ==============
@@ -146,7 +146,7 @@ def create_app() -> FastAPI:
         from apps.indoor_fence_api_v3 import integrate_indoor_fence_api_v3
         integrate_indoor_fence_api_v3(app)
         print("✓ 室内电子围栏API已集成 (V3.0)")
-    except ImportError as e:
+    except Exception as e:
         print(f"✗ 室内电子围栏API导入失败: {e}")
 
     # ============== 集成室外监测中心API (V4.0) ==============
@@ -154,7 +154,7 @@ def create_app() -> FastAPI:
         from apps.outdoor_api import integrate_outdoor_api
         integrate_outdoor_api(app)
         print("✓ 室外监测中心API已集成 (V4.0)")
-    except ImportError as e:
+    except Exception as e:
         print(f"✗ 室外监测中心API导入失败: {e}")
 
     # ============== 集成数据上传API (V2.0) ==============
@@ -162,7 +162,7 @@ def create_app() -> FastAPI:
         from apps.data_upload_api import integrate_data_upload_routes
         integrate_data_upload_routes(app)
         print("✓ 数据上传API已集成 (V2.0)")
-    except ImportError as e:
+    except Exception as e:
         print(f"✗ 数据上传API导入失败: {e}")
 
     # ============== 页面路由 ==============

@@ -23,6 +23,8 @@ import sys
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from pathlib import Path
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import JSONResponse as StarletteJSONResponse
 import numpy as np
 
 from darkbreaker_sdk.interfaces import HealthStatus, PluginStatus, PluginManifest
@@ -37,6 +39,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AcousticConfig:
     """声学监测配置"""
+    # === 基础参数 ===
     sample_rate: int = 16000
     audio_duration: float = 2.0
     n_mels: int = 128
@@ -54,6 +57,35 @@ class AcousticConfig:
         "ultrasonic": "ultrasonic_pd_detector",
         "classifier": "audio_classifier"
     })
+
+    # === 局部放电 (PD) 检测阈值 ===
+    pd_high_freq_energy_ratio: float = 0.4      # 高频能量占比阈值
+    pd_impulse_density: float = 0.1              # 脉冲密度阈值
+    pd_impulse_multiplier: float = 4.0           # 脉冲判定倍数 (能量差 > 均值*此值)
+
+    # === 电晕放电 (Corona) 检测阈值 ===
+    corona_centroid_min: float = 3000.0          # 频谱质心最低门限 (Hz)
+    corona_optimal_freq_low: float = 5000.0      # 最佳检测频率下限 (Hz)
+    corona_optimal_freq_high: float = 15000.0    # 最佳检测频率上限 (Hz)
+    corona_flatness_threshold: float = 0.5       # 频谱平坦度阈值
+
+    # === 轴承故障 (Bearing) 检测阈值 ===
+    bearing_kurtosis_gate: float = 3.5           # 峰度门限 (正弦~1.5, 噪声~3.0, 冲击>4.0)
+    bearing_freq_min: float = 20.0               # 故障频率搜索下限 (Hz)
+    bearing_freq_max: float = 200.0              # 故障频率搜索上限 (Hz)
+    bearing_kurtosis_scaling: float = 4.0        # 峰度评分缩放因子
+    bearing_periodicity_threshold: float = 0.3   # 周期性阈值
+
+    # === 变压器嗡鸣 (Transformer) 检测阈值 ===
+    transformer_harmonic_freqs: List[float] = field(default_factory=lambda: [100, 200, 300, 400])
+    transformer_bin_bandwidth: int = 3           # FFT bin 搜索半径 (±N bins)
+    transformer_ratio_threshold: float = 0.5     # 谐波能量占比阈值
+
+    # === 机械故障 (Mechanical) 检测阈值 ===
+    mechanical_crest_factor_threshold: float = 4.0  # 峰值因子门限
+    mechanical_energy_cv_threshold: float = 0.5     # 能量变异系数阈值
+    mechanical_cf_weight: float = 0.7               # 峰值因子权重
+    mechanical_energy_weight: float = 0.3           # 能量变异权重
 
 
 # =============================================================================
@@ -146,14 +178,60 @@ class AcousticMonitoringPlugin:
         # 告警缓冲区
         self._alarm_buffer: List[Dict] = []
         self._alarm_accumulation = {}
-        
+
+        # Standalone session manager (lazily created)
+        self._audio_manager = None
+        self._ws_clients = None
+
         logger.info(f"[{self.PLUGIN_NAME}] 实例已创建")
     
     def _parse_config(self, config_dict: Dict) -> AcousticConfig:
         """解析配置字典"""
+        detection_params = config_dict.get("detection_params", {})
+        pd = detection_params.get("partial_discharge", {})
+        corona = detection_params.get("corona_discharge", {})
+        bearing = detection_params.get("bearing_fault", {})
+        transformer = detection_params.get("transformer_hum", {})
+        mechanical = detection_params.get("mechanical_fault", {})
+
         return AcousticConfig(
+            # 基础参数
             sample_rate=config_dict.get("sample_rate", 16000),
-            anomaly_threshold=config_dict.get("detection_params", {}).get("anomaly_threshold", 0.5)
+            audio_duration=config_dict.get("audio_duration", 2.0),
+            n_mels=config_dict.get("n_mels", 128),
+            n_fft=config_dict.get("n_fft", 2048),
+            hop_length=config_dict.get("hop_length", 512),
+            ultrasonic_sample_rate=config_dict.get("ultrasonic_sample_rate", 192000),
+            ultrasonic_freq_min=config_dict.get("ultrasonic_freq_min", 20000),
+            ultrasonic_freq_max=config_dict.get("ultrasonic_freq_max", 100000),
+            anomaly_threshold=detection_params.get("anomaly_threshold", config_dict.get("anomaly_threshold", 0.5)),
+            alarm_accumulation_count=config_dict.get("alarm_accumulation_count", 3),
+            monitoring_window=detection_params.get("monitoring_window", 2.0),
+            hop_size=detection_params.get("hop_size", 0.5),
+            # 局部放电阈值
+            pd_high_freq_energy_ratio=pd.get("high_freq_energy_ratio", 0.4),
+            pd_impulse_density=pd.get("impulse_density", 0.1),
+            pd_impulse_multiplier=pd.get("impulse_multiplier", 4.0),
+            # 电晕放电阈值
+            corona_centroid_min=corona.get("centroid_min", 3000.0),
+            corona_optimal_freq_low=corona.get("optimal_freq_low", 5000.0),
+            corona_optimal_freq_high=corona.get("optimal_freq_high", 15000.0),
+            corona_flatness_threshold=corona.get("flatness_threshold", 0.5),
+            # 轴承故障阈值
+            bearing_kurtosis_gate=bearing.get("kurtosis_gate", 3.5),
+            bearing_freq_min=bearing.get("freq_min", 20.0),
+            bearing_freq_max=bearing.get("freq_max", 200.0),
+            bearing_kurtosis_scaling=bearing.get("kurtosis_scaling", 4.0),
+            bearing_periodicity_threshold=bearing.get("periodicity_threshold", 0.3),
+            # 变压器嗡鸣阈值
+            transformer_harmonic_freqs=transformer.get("harmonic_freqs", [100, 200, 300, 400]),
+            transformer_bin_bandwidth=transformer.get("bin_bandwidth", 3),
+            transformer_ratio_threshold=transformer.get("ratio_threshold", 0.5),
+            # 机械故障阈值
+            mechanical_crest_factor_threshold=mechanical.get("crest_factor_threshold", 4.0),
+            mechanical_energy_cv_threshold=mechanical.get("energy_cv_threshold", 0.5),
+            mechanical_cf_weight=mechanical.get("cf_weight", 0.7),
+            mechanical_energy_weight=mechanical.get("energy_weight", 0.3),
         )
     
     # =========================================================================
@@ -389,6 +467,10 @@ class AcousticMonitoringPlugin:
             alarms = self._generate_alarms(anomaly_detected, anomaly_type, anomaly_score, device_id)
             recommendations = self._generate_recommendations(anomaly_detected, anomaly_type, pd_detected, pd_level)
             
+            # 7. Visualization data (downsampled for WebSocket transfer)
+            waveform = audio[::max(1, len(audio) // 500)][:500].tolist()
+            spectrum_data = frequency_analysis.get("spectrum", {})
+
             return {
                 "success": True,
                 "device_id": device_id,
@@ -404,7 +486,12 @@ class AcousticMonitoringPlugin:
                 "spectrogram": detection_result.get("spectrogram"),
                 "time_analysis": analysis_result.get("time_analysis", {}),
                 "alarms": alarms,
-                "recommendations": recommendations
+                "recommendations": recommendations,
+                "waveform": waveform,
+                "spectrum": {
+                    "frequencies": spectrum_data.get("frequencies", []),
+                    "magnitudes": spectrum_data.get("magnitude_normalized", []),
+                },
             }
             
         except Exception as e:
@@ -491,14 +578,91 @@ class AcousticMonitoringPlugin:
     # 模拟和辅助方法
     # =========================================================================
     
-    def _generate_mock_audio(self, sample_rate: int) -> np.ndarray:
-        """生成模拟音频数据"""
+    def _generate_mock_audio(self, sample_rate: int, anomaly_type: str = "normal",
+                              intensity: float = 0.0) -> np.ndarray:
+        """多模态声学模拟器 - 生成各类变电站音频信号
+
+        支持模拟:
+        - normal: 正常工频背景 (50Hz + 谐波 + 环境噪声)
+        - partial_discharge: 局部放电 (超短时宽带脉冲 + 高频能量)
+        - corona_discharge: 电晕放电 (5-15kHz 持续嘶嘶声)
+        - bearing_fault: 轴承故障 (周期性冲击 + 谐振衰减)
+        - transformer_hum: 变压器嗡鸣 (强谐波能量集中)
+        - mechanical_fault: 机械故障 (高峰值因子冲击)
+        """
         duration = self.config.audio_duration
-        t = np.linspace(0, duration, int(sample_rate * duration))
-        audio = np.sin(2 * np.pi * 50 * t)
-        audio += 0.5 * np.sin(2 * np.pi * 100 * t)
-        audio += 0.3 * np.sin(2 * np.pi * 150 * t)
-        audio += 0.1 * np.random.randn(len(t))
+        n_samples = int(sample_rate * duration)
+        t = np.linspace(0, duration, n_samples)
+
+        # 基底信号: 50Hz 工频 + 100Hz 谐波 + 环境噪声
+        audio = 0.3 * np.sin(2 * np.pi * 50 * t)
+        audio += 0.15 * np.sin(2 * np.pi * 100 * t)
+        audio += 0.05 * np.random.randn(n_samples)
+
+        if anomaly_type == "partial_discharge":
+            # 局部放电: 50Hz 相位锁定的超短时宽带脉冲 + 高频噪声
+            n_impulses = int(30 * max(intensity, 0.1))
+            power_period = sample_rate / 50.0
+            for _ in range(n_impulses):
+                cycle = np.random.randint(0, max(1, int(n_samples / power_period)))
+                phase_offset = np.random.choice([0.25, 0.75])
+                pos = int(cycle * power_period + phase_offset * power_period)
+                pos = min(max(pos, 0), n_samples - 1)
+                decay_len = max(int(sample_rate * 0.0005), 2)
+                end = min(pos + decay_len, n_samples)
+                decay = np.exp(-np.arange(end - pos) * 10.0 / decay_len)
+                audio[pos:end] += intensity * 1.5 * decay * np.random.randn(end - pos)
+            # 高频带通噪声
+            hf_noise = np.random.randn(n_samples)
+            hf_fft = np.fft.rfft(hf_noise)
+            freqs = np.arange(len(hf_fft)) * sample_rate / (2 * len(hf_fft))
+            hf_fft[freqs < sample_rate / 4] = 0
+            hf_noise = np.fft.irfft(hf_fft, n=n_samples)
+            audio += intensity * 0.2 * hf_noise
+
+        elif anomaly_type == "corona_discharge":
+            # 电晕放电: 5-15kHz 带限高斯噪声 (嘶嘶声)
+            noise = np.random.randn(n_samples)
+            noise_fft = np.fft.rfft(noise)
+            freqs = np.arange(len(noise_fft)) * sample_rate / (2 * len(noise_fft))
+            center = 10000
+            bandwidth = 5000
+            mask = np.exp(-0.5 * ((freqs - center) / bandwidth) ** 2)
+            noise_fft *= mask
+            hiss = np.fft.irfft(noise_fft, n=n_samples)
+            audio += intensity * 0.6 * hiss
+
+        elif anomaly_type == "bearing_fault":
+            # 轴承故障: 45Hz 周期性冲击 + 2500Hz 谐振衰减环
+            bearing_freq = 45.0
+            impulse_period = int(sample_rate / bearing_freq)
+            resonance_freq = 2500.0
+            for i in range(0, n_samples, impulse_period):
+                jitter = int(np.random.normal(0, impulse_period * 0.02))
+                pos = max(0, min(i + jitter, n_samples - 1))
+                ring_len = int(sample_rate * 0.005)
+                end = min(pos + ring_len, n_samples)
+                ring_t = np.arange(end - pos) / sample_rate
+                ring_signal = np.sin(2 * np.pi * resonance_freq * ring_t)
+                envelope = np.exp(-ring_t * 500)
+                audio[pos:end] += intensity * 2.0 * ring_signal * envelope
+
+        elif anomaly_type == "transformer_hum":
+            # 变压器嗡鸣: 强化工频谐波能量
+            harmonic_freqs = self.config.transformer_harmonic_freqs
+            for i, hf in enumerate(harmonic_freqs):
+                amp = intensity * (1.0 - 0.2 * i)
+                audio += amp * np.sin(2 * np.pi * hf * t)
+
+        elif anomaly_type == "mechanical_fault":
+            # 机械故障: 低频周期性强冲击 (高峰值因子)
+            impact_freq = 15.0
+            impact_period = int(sample_rate / impact_freq)
+            for i in range(0, n_samples, impact_period):
+                width = int(sample_rate * 0.003)
+                end = min(i + width, n_samples)
+                audio[i:end] += intensity * 3.0
+
         return audio.astype(np.float32)
     
     def _mock_detection(self) -> Dict[str, Any]:
@@ -570,9 +734,103 @@ class AcousticMonitoringPlugin:
         instance.init(config)
         return instance
 
+    def _ensure_audio_manager(self):
+        """Lazily create AudioSessionManager (needs runner's _ws_clients)."""
+        if self._audio_manager is None:
+            from plugins.acoustic_monitoring.standalone.audio_manager import AudioSessionManager
+            self._audio_manager = AudioSessionManager(
+                self, ws_clients=self._ws_clients
+            )
+        return self._audio_manager
+
     def get_standalone_routes(self) -> list:
-        """Return additional standalone routes for this plugin."""
-        return []
+        """Return additional standalone routes for acoustic monitoring.
+
+        Provides 7 custom API routes:
+          - /api/acoustic/simulation/start|stop  (POST)
+          - /api/acoustic/monitoring/start|stop   (POST)
+          - /api/acoustic/status                  (GET)
+          - /api/acoustic/process                 (POST)
+          - /api/acoustic/context                 (GET)
+        """
+        plugin = self  # capture for closures
+
+        async def sim_start(request: StarletteRequest):
+            body = {}
+            try:
+                body = await request.json()
+            except Exception:
+                pass
+            mgr = plugin._ensure_audio_manager()
+            result = await mgr.start_simulation(body)
+            return StarletteJSONResponse(result)
+
+        async def sim_stop(request: StarletteRequest):
+            mgr = plugin._ensure_audio_manager()
+            result = await mgr.stop_simulation()
+            return StarletteJSONResponse(result)
+
+        async def mon_start(request: StarletteRequest):
+            body = {}
+            try:
+                body = await request.json()
+            except Exception:
+                pass
+            mgr = plugin._ensure_audio_manager()
+            result = await mgr.start_monitoring(body)
+            return StarletteJSONResponse(result)
+
+        async def mon_stop(request: StarletteRequest):
+            mgr = plugin._ensure_audio_manager()
+            result = await mgr.stop_monitoring()
+            return StarletteJSONResponse(result)
+
+        async def acoustic_status(request: StarletteRequest):
+            import json as _json
+            mgr = plugin._ensure_audio_manager()
+            status = mgr.get_status()
+            # Sanitize: last_result may contain numpy types
+            sanitized = _json.loads(_json.dumps(status, default=str))
+            return StarletteJSONResponse(sanitized)
+
+        async def process_audio_route(request: StarletteRequest):
+            import json as _json
+            body = await request.json()
+            audio_list = body.get("audio", [])
+            sr = body.get("sample_rate", plugin.config.sample_rate)
+            device_id = body.get("device_id", "api")
+            audio = np.array(audio_list, dtype=np.float32) if audio_list else None
+            result = plugin.process({
+                "audio": audio,
+                "sample_rate": sr,
+                "device_id": device_id,
+            })
+            # Sanitize numpy types for JSON serialization
+            sanitized = _json.loads(_json.dumps(result, default=str))
+            return StarletteJSONResponse(sanitized)
+
+        async def acoustic_context(request: StarletteRequest):
+            return StarletteJSONResponse({
+                "sample_rate": plugin.config.sample_rate,
+                "audio_duration": plugin.config.audio_duration,
+                "anomaly_threshold": plugin.config.anomaly_threshold,
+                "n_mels": plugin.config.n_mels,
+                "n_fft": plugin.config.n_fft,
+                "anomaly_types": [
+                    "normal", "partial_discharge", "corona",
+                    "bearing", "transformer_hum", "mechanical",
+                ],
+            })
+
+        return [
+            {"path": "/api/acoustic/simulation/start", "endpoint": sim_start, "methods": ["POST"], "summary": "Start simulation"},
+            {"path": "/api/acoustic/simulation/stop", "endpoint": sim_stop, "methods": ["POST"], "summary": "Stop simulation"},
+            {"path": "/api/acoustic/monitoring/start", "endpoint": mon_start, "methods": ["POST"], "summary": "Start monitoring"},
+            {"path": "/api/acoustic/monitoring/stop", "endpoint": mon_stop, "methods": ["POST"], "summary": "Stop monitoring"},
+            {"path": "/api/acoustic/status", "endpoint": acoustic_status, "methods": ["GET"], "summary": "Get acoustic session status"},
+            {"path": "/api/acoustic/process", "endpoint": process_audio_route, "methods": ["POST"], "summary": "Process single audio buffer"},
+            {"path": "/api/acoustic/context", "endpoint": acoustic_context, "methods": ["GET"], "summary": "Get plugin config context"},
+        ]
 
     @property
     def plugin_info(self) -> Dict:

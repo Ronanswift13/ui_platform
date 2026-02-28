@@ -21,6 +21,10 @@ def main():
         plugin_templates_dir=Path(__file__).parent / "templates",
         plugin_static_dir=Path(__file__).parent / "static",
     )
+
+    # Wire WebSocket clients so AudioSessionManager can broadcast
+    plugin._ws_clients = runner._ws_clients
+
     runner.run(host="0.0.0.0", port=8093)
 
 

@@ -28,7 +28,7 @@
        ======================================== */
     .indoor-container {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: 280px 1fr 360px;
         grid-template-rows: auto 1fr auto;
         height: calc(100vh - 60px);
         gap: 0;
@@ -39,6 +39,7 @@
        顶部工具栏
        ======================================== */
     .top-toolbar {
+        grid-column: 1 / -1;
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         padding: 0.6rem 1.25rem;
         display: flex;
@@ -104,15 +105,198 @@
     }
 
     /* ========================================
+       左侧导航栏 - 3D场景和设备列表
+       ======================================== */
+    .left-sidebar {
+        background: var(--panel-bg);
+        border-right: 1px solid var(--panel-border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .sidebar-section {
+        flex-shrink: 0;
+    }
+
+    .sidebar-section.scrollable {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .section-header-sidebar {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--panel-border);
+        background: rgba(15, 23, 42, 0.3);
+    }
+
+    .section-title-sidebar {
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .section-title-sidebar i {
+        color: var(--accent-info);
+    }
+
+    /* 设备列表 */
+    .device-list {
+        padding: 0.5rem 0;
+    }
+
+    .device-group {
+        margin-bottom: 0.5rem;
+    }
+
+    .device-group-header {
+        color: var(--text-muted);
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .device-item {
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+        gap: 0.6rem;
+    }
+
+    .device-item:hover {
+        background: rgba(255,255,255,0.05);
+        color: var(--text-primary);
+    }
+
+    .device-item.active {
+        background: rgba(59, 130, 246, 0.1);
+        border-left-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .device-item i {
+        font-size: 1rem;
+        width: 20px;
+        text-align: center;
+    }
+
+    .device-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .device-item-name {
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .device-item-status {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+    }
+
+    .device-item-status.online { color: var(--accent-success); }
+    .device-item-status.offline { color: var(--text-muted); }
+    .device-item-status.alarm { color: var(--accent-danger); }
+
+    .device-item .badge {
+        font-size: 0.6rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 10px;
+    }
+
+    /* ========================================
        左侧主区域
        ======================================== */
     .left-panel {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 0;
+        overflow: hidden;
+    }
+
+    /* 中间主视图区域 */
+    .center-panel {
+        background: #0d1117;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .view-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        background: rgba(0,0,0,0.3);
+        border-bottom: 1px solid var(--panel-border);
+        flex-shrink: 0;
+    }
+
+    .view-btn {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid var(--panel-border);
+        color: var(--text-secondary);
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .view-btn.active, .view-btn:hover {
+        background: var(--accent-primary);
+        color: #fff;
+        border-color: var(--accent-primary);
+    }
+
+    .main-video-area {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    #main-video-canvas {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #0a1628 0%, #1a2744 100%);
+    }
+
+    .video-overlay-info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: #fff;
+        font-size: 0.75rem;
+        background: rgba(0,0,0,0.6);
+        padding: 0.4rem 0.7rem;
+        border-radius: 6px;
+        backdrop-filter: blur(4px);
+    }
+
+    /* 证据链区域（在中间面板底部） */
+    .center-evidence-section {
+        border-top: 1px solid var(--panel-border);
+        background: var(--panel-bg);
         padding: 0.75rem;
+        flex-shrink: 0;
+        max-height: 200px;
         overflow-y: auto;
-        overflow-x: hidden;
     }
 
     /* 3D数字孪生区域 */
@@ -229,7 +413,7 @@
     }
 
     /* ========================================
-       右侧面板 - 告警与处理
+       右侧面板 - 动态控制面板与告警
        ======================================== */
     .right-panel {
         background: var(--panel-bg);
@@ -237,6 +421,148 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+    }
+
+    /* 动态控制面板 */
+    .control-panel-section {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--panel-border);
+    }
+
+    .control-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .control-panel-title {
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .control-panel-title i {
+        color: var(--accent-primary);
+    }
+
+    .control-panel-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .control-group {
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 8px;
+        padding: 0.75rem;
+    }
+
+    .control-label {
+        color: var(--text-primary);
+        font-size: 0.75rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .control-slider {
+        width: 100%;
+        height: 4px;
+        border-radius: 2px;
+        background: rgba(148, 163, 184, 0.2);
+        outline: none;
+        -webkit-appearance: none;
+    }
+
+    .control-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        cursor: pointer;
+    }
+
+    .control-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent-primary);
+        cursor: pointer;
+        border: none;
+    }
+
+    .control-value {
+        color: var(--accent-primary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-top: 0.3rem;
+    }
+
+    .control-select {
+        width: 100%;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        color: var(--text-primary);
+        padding: 0.4rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        cursor: pointer;
+    }
+
+    .control-select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .control-operations {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+    }
+
+    .control-operation-btn {
+        width: 100%;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        color: var(--accent-primary);
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+
+    .control-operation-btn:hover {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: var(--accent-primary);
+    }
+
+    .control-placeholder {
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        padding: 2rem 1rem;
+    }
+
+    .control-placeholder i {
+        font-size: 2rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+        display: block;
     }
 
     .right-panel-header {
@@ -342,6 +668,140 @@
         display: flex;
         align-items: center;
         gap: 0.2rem;
+    }
+
+    /* ========================================
+       融合证据链
+       ======================================== */
+    .fusion-section {
+        border-top: 1px solid var(--panel-border);
+        padding: 0.75rem;
+        flex-shrink: 0;
+        background: rgba(15, 23, 42, 0.3);
+    }
+
+    .fusion-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.6rem;
+    }
+
+    .fusion-title {
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .fusion-title i {
+        color: var(--accent-info);
+    }
+
+    .fusion-confidence {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        font-weight: 500;
+        background: var(--accent-success);
+        color: #fff;
+    }
+
+    .fusion-modalities {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .modality-item {
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 6px;
+        padding: 0.4rem 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.7rem;
+        transition: all 0.2s;
+    }
+
+    .modality-item:hover {
+        background: rgba(15, 23, 42, 0.7);
+        border-color: var(--accent-primary);
+    }
+
+    .modality-info {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--text-primary);
+    }
+
+    .modality-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+    }
+
+    .modality-icon.vision { background: rgba(59, 130, 246, 0.2); color: var(--accent-primary); }
+    .modality-icon.acoustic { background: rgba(34, 197, 94, 0.2); color: var(--accent-success); }
+    .modality-icon.gas { background: rgba(234, 179, 8, 0.2); color: var(--accent-warning); }
+    .modality-icon.thermal { background: rgba(239, 68, 68, 0.2); color: var(--accent-danger); }
+
+    .modality-result {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .modality-status {
+        font-size: 0.65rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-weight: 500;
+    }
+
+    .modality-status.normal { background: var(--accent-success); color: #fff; }
+    .modality-status.warning { background: var(--accent-warning); color: #000; }
+    .modality-status.danger { background: var(--accent-danger); color: #fff; }
+
+    .modality-confidence {
+        color: var(--text-secondary);
+        font-size: 0.65rem;
+    }
+
+    .fusion-result {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 6px;
+        padding: 0.5rem 0.6rem;
+        text-align: center;
+    }
+
+    .fusion-result-label {
+        color: var(--text-secondary);
+        font-size: 0.65rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .fusion-result-value {
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+    }
+
+    .fusion-recommendation {
+        color: var(--text-primary);
+        font-size: 0.7rem;
+        line-height: 1.3;
     }
 
     /* 告警处理流程 */
@@ -822,400 +1282,236 @@
         </div>
     </div>
 
-    <!-- 主内容区 -->
-    <div class="main-content">
-        <!-- 左侧主区域 -->
-        <div class="left-panel">
-            <!-- 3D数字孪生区域 -->
-            <div class="viewer-section">
-                <div class="monitor-card indoor-3d-card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <i class="bi bi-boxes text-info"></i>
-                            室内3D数字孪生
-                            <span class="status-badge online">实时</span>
-                        </div>
-                        <div class="card-status">
-                            <button class="btn-expand" type="button" id="indoor-3d-reset" title="重置视角">
-                                <i class="bi bi-crosshair"></i>
-                            </button>
-                            <button class="btn-expand" type="button" onclick="openModuleDetail('3d')" title="全屏">
-                                <i class="bi bi-arrows-fullscreen"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="indoor-3d-container">
-                            <div class="viewer-placeholder">
-                                <i class="bi bi-cube"></i>
-                                <div>3D视图加载中</div>
-                                <div>点云 / 模型 / 热力图叠加</div>
-                            </div>
-                        </div>
-                        <div class="viewer-metrics">
-                            <div class="viewer-metric">
-                                <i class="bi bi-cloud-check text-success"></i>
-                                点云: 在线
-                            </div>
-                            <div class="viewer-metric">
-                                <i class="bi bi-people text-info"></i>
-                                目标: <span id="indoor-3d-targets">6</span>
-                            </div>
-                            <div class="viewer-metric">
-                                <i class="bi bi-exclamation-circle text-warning"></i>
-                                告警: <span id="indoor-3d-alarms">2</span>
-                            </div>
-                        </div>
-                    </div>
+    <!-- 左侧导航栏 - 3D场景和设备列表 -->
+    <div class="left-sidebar">
+        <!-- 3D数字孪生区域 -->
+        <div class="sidebar-section">
+            <div class="section-header-sidebar">
+                <div class="section-title-sidebar">
+                    <i class="bi bi-boxes"></i>
+                    3D数字孪生
                 </div>
             </div>
-
-            <!-- 监测模块区域 -->
-            <div class="modules-section">
-                <div class="section-header">
-                    <div class="section-title">
-                        <i class="bi bi-grid-3x2-gap"></i>
-                        监测模块
-                    </div>
-                    <div class="section-actions">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllModules()">
-                            <i class="bi bi-toggles"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="monitor-grid">
-                    <!-- 1. 电子围栏/越线检测 -->
-                    <div class="monitor-card" id="card-fence">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="bi bi-shield-shaded text-primary"></i>
-                                电子围栏
-                            </div>
-                            <div class="card-status">
-                                <span class="status-badge online">在线</span>
-                                <button class="btn-expand" onclick="openModuleDetail('fence')" title="放大查看">
-                                    <i class="bi bi-arrows-fullscreen"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="monitor-view">
-                                <canvas id="fence-canvas"></canvas>
-                            </div>
-                            <div class="cabinet-grid">
-                                <div class="cabinet-cell" id="cabinet-1">
-                                    <div class="cabinet-id">#1</div>
-                                    <div class="cabinet-status">空闲</div>
-                                </div>
-                                <div class="cabinet-cell occupied" id="cabinet-2">
-                                    <div class="cabinet-id">#2</div>
-                                    <div class="cabinet-status">作业中</div>
-                                </div>
-                                <div class="cabinet-cell" id="cabinet-3">
-                                    <div class="cabinet-id">#3</div>
-                                    <div class="cabinet-status">空闲</div>
-                                </div>
-                                <div class="cabinet-cell" id="cabinet-4">
-                                    <div class="cabinet-id">#4</div>
-                                    <div class="cabinet-status">空闲</div>
-                                </div>
-                                <div class="cabinet-cell alarm" id="cabinet-5">
-                                    <div class="cabinet-id">#5</div>
-                                    <div class="cabinet-status">越线!</div>
-                                </div>
-                                <div class="cabinet-cell" id="cabinet-6">
-                                    <div class="cabinet-id">#6</div>
-                                    <div class="cabinet-status">空闲</div>
-                                </div>
-                            </div>
-                            <div class="person-list" id="person-list">
-                                <div class="person-item">
-                                    <span class="person-info"><i class="bi bi-person"></i> 张工 - 机柜#2</span>
-                                    <span class="person-status safe">安全</span>
-                                </div>
-                                <div class="person-item">
-                                    <span class="person-info"><i class="bi bi-person"></i> 李工 - 机柜#5</span>
-                                    <span class="person-status danger">越线</span>
-                                </div>
-                            </div>
-                            <div class="card-actions">
-                                <button class="btn btn-outline-primary" onclick="toggleFence('fence')">
-                                    <i class="bi bi-shield-check"></i> 配置围栏
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="viewHistory('fence')">
-                                    <i class="bi bi-clock-history"></i> 历史
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 2. 动物入侵检测 -->
-                    <div class="monitor-card" id="card-animal">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="bi bi-bug text-warning"></i>
-                                动物入侵检测
-                            </div>
-                            <div class="card-status">
-                                <span class="status-badge online">在线</span>
-                                <button class="btn-expand" onclick="openModuleDetail('animal')" title="放大查看">
-                                    <i class="bi bi-arrows-fullscreen"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="monitor-view">
-                                <canvas id="animal-canvas"></canvas>
-                            </div>
-                            <div class="card-actions">
-                                <button class="btn btn-outline-warning" onclick="activateDeterrent()">
-                                    <i class="bi bi-volume-up"></i> 启动驱离
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="viewHistory('animal')">
-                                    <i class="bi bi-clock-history"></i> 历史
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. 温度监测 -->
-                    <div class="monitor-card" id="card-temperature">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="bi bi-thermometer-half text-danger"></i>
-                                温度监测
-                            </div>
-                            <div class="card-status">
-                                <span class="status-badge attention">注意</span>
-                                <button class="btn-expand" onclick="openModuleDetail('temperature')" title="放大查看">
-                                    <i class="bi bi-arrows-fullscreen"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="monitor-view">
-                                <canvas id="temp-canvas"></canvas>
-                            </div>
-                            <div class="card-actions">
-                                <button class="btn btn-outline-info" onclick="showTempDetail()">
-                                    <i class="bi bi-graph-up"></i> 详细数据
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="viewHistory('temperature')">
-                                    <i class="bi bi-clock-history"></i> 历史
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 4. 设备状态监测 -->
-                    <div class="monitor-card" id="card-device">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="bi bi-hdd-stack text-info"></i>
-                                设备状态监测
-                            </div>
-                            <div class="card-status">
-                                <span class="status-badge online">正常</span>
-                                <button class="btn-expand" onclick="openModuleDetail('device')" title="放大查看">
-                                    <i class="bi bi-arrows-fullscreen"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="monitor-view">
-                                <canvas id="device-canvas"></canvas>
-                            </div>
-                            <div class="card-actions">
-                                <button class="btn btn-outline-primary" onclick="scanDevices()">
-                                    <i class="bi bi-search"></i> 扫描设备
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="viewDeviceList()">
-                                    <i class="bi bi-list-ul"></i> 设备列表
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 5. 消防监测 -->
-                    <div class="monitor-card" id="card-fire">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="bi bi-fire text-danger"></i>
-                                消防监测
-                            </div>
-                            <div class="card-status">
-                                <span class="status-badge online">正常</span>
-                                <button class="btn-expand" onclick="openModuleDetail('fire')" title="放大查看">
-                                    <i class="bi bi-arrows-fullscreen"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="monitor-view">
-                                <canvas id="fire-canvas"></canvas>
-                            </div>
-                            <div class="card-actions">
-                                <button class="btn btn-outline-danger" onclick="testFireAlarm()">
-                                    <i class="bi bi-bell"></i> 测试报警
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="viewHistory('fire')">
-                                    <i class="bi bi-clock-history"></i> 历史
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 6. 环境监测 -->
-                    <div class="monitor-card" id="card-environment">
-                        <div class="card-header">
-                            <div class="card-title">
-                                <i class="bi bi-cloud-haze2 text-success"></i>
-                                环境监测
-                            </div>
-                            <div class="card-status">
-                                <span class="status-badge good">良好</span>
-                                <button class="btn-expand" onclick="openModuleDetail('environment')" title="放大查看">
-                                    <i class="bi bi-arrows-fullscreen"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="monitor-view">
-                                <canvas id="env-canvas"></canvas>
-                            </div>
-                            <div class="trend-labels">
-                                <div class="trend-label">
-                                    <div class="trend-label-name">SF6浓度</div>
-                                    <div class="trend-label-value" id="sf6-value">--</div>
-                                </div>
-                                <div class="trend-label">
-                                    <div class="trend-label-name">O2浓度</div>
-                                    <div class="trend-label-value" id="o2-value">--</div>
-                                </div>
-                                <div class="trend-label">
-                                    <div class="trend-label-name">CO浓度</div>
-                                    <div class="trend-label-value" id="co-value">--</div>
-                                </div>
-                            </div>
-                            <div class="card-actions">
-                                <button class="btn btn-outline-success" onclick="viewSensorData()">
-                                    <i class="bi bi-graph-up"></i> 传感器数据
-                                </button>
-                                <button class="btn btn-outline-secondary" onclick="viewHistory('environment')">
-                                    <i class="bi bi-clock-history"></i> 历史
-                                </button>
-                            </div>
-                        </div>
+            <div style="height: 280px; position: relative;">
+                <div id="indoor-3d-container">
+                    <div class="viewer-placeholder">
+                        <i class="bi bi-cube"></i>
+                        <div>3D视图加载中</div>
+                        <div>点云 / 模型 / 热力图叠加</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 右侧面板 - 告警与处理 -->
-        <div class="right-panel">
-            <div class="right-panel-header">
-                <div class="right-panel-title">
-                    <i class="bi bi-bell-fill"></i>
-                    实时告警
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <button class="btn btn-sm btn-outline-light" type="button" onclick="viewAlarms()">
-                        查看全部
-                    </button>
-                    <span class="alarm-count-badge" id="indoor-alarm-count-badge">2</span>
+        <!-- 设备列表 -->
+        <div class="sidebar-section scrollable">
+            <div class="section-header-sidebar">
+                <div class="section-title-sidebar">
+                    <i class="bi bi-hdd-network"></i>
+                    监测设备
                 </div>
             </div>
+            <div class="device-list">
+                <div class="device-group">
+                    <div class="device-group-header">
+                        <i class="bi bi-shield-shaded"></i>
+                        安全监测
+                    </div>
+                    <div class="device-item active" data-module="fence" onclick="selectDevice('fence')">
+                        <i class="bi bi-shield-shaded"></i>
+                        <div class="device-item-info">
+                            <div class="device-item-name">电子围栏</div>
+                            <div class="device-item-status online">在线</div>
+                        </div>
+                        <span class="badge bg-danger">2</span>
+                    </div>
+                    <div class="device-item" data-module="animal" onclick="selectDevice('animal')">
+                        <i class="bi bi-bug"></i>
+                        <div class="device-item-info">
+                            <div class="device-item-name">动物入侵检测</div>
+                            <div class="device-item-status online">在线</div>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- 告警列表 -->
-            <div class="alarm-section">
-                <div class="alarm-list" id="indoor-alarm-list">
-                    <div class="alarm-item critical" data-alarm-id="1">
-                        <div class="alarm-header">
-                            <span class="alarm-type">
-                                <i class="bi bi-shield-exclamation"></i>
-                                越线告警
-                            </span>
-                            <span>00:28 前</span>
-                        </div>
-                        <div class="alarm-title">机柜#5 电子围栏被触发</div>
-                        <div class="alarm-meta">
-                            <span><i class="bi bi-geo-alt"></i> GIS室</span>
-                            <span><i class="bi bi-person"></i> 李工</span>
-                        </div>
+                <div class="device-group">
+                    <div class="device-group-header">
+                        <i class="bi bi-thermometer-half"></i>
+                        环境监测
                     </div>
-                    <div class="alarm-item" data-alarm-id="2">
-                        <div class="alarm-header">
-                            <span class="alarm-type">
-                                <i class="bi bi-thermometer-high"></i>
-                                温度预警
-                            </span>
-                            <span>02:10 前</span>
+                    <div class="device-item" data-module="temperature" onclick="selectDevice('temperature')">
+                        <i class="bi bi-thermometer-half"></i>
+                        <div class="device-item-info">
+                            <div class="device-item-name">温度监测</div>
+                            <div class="device-item-status online">注意</div>
                         </div>
-                        <div class="alarm-title">主控室温度上升</div>
-                        <div class="alarm-meta">
-                            <span><i class="bi bi-thermometer-half"></i> 32.4°C</span>
-                            <span><i class="bi bi-geo-alt"></i> 主控室</span>
-                        </div>
+                        <span class="badge bg-warning">1</span>
                     </div>
-                    <div class="alarm-item notice" data-alarm-id="3">
-                        <div class="alarm-header">
-                            <span class="alarm-type">
-                                <i class="bi bi-bug"></i>
-                                动物活动
-                            </span>
-                            <span>05:40 前</span>
-                        </div>
-                        <div class="alarm-title">检测到小动物进入通道</div>
-                        <div class="alarm-meta">
-                            <span><i class="bi bi-geo-alt"></i> GIS室</span>
-                            <span><i class="bi bi-shield-check"></i> 已驱离</span>
+                    <div class="device-item" data-module="environment" onclick="selectDevice('environment')">
+                        <i class="bi bi-cloud-haze2"></i>
+                        <div class="device-item-info">
+                            <div class="device-item-name">环境监测</div>
+                            <div class="device-item-status online">良好</div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 告警处理流程 -->
-            <div class="process-section">
-                <div class="process-header">
-                    <div class="process-title">
-                        <i class="bi bi-diagram-3"></i>
-                        处理流程
+                <div class="device-group">
+                    <div class="device-group-header">
+                        <i class="bi bi-hdd-stack"></i>
+                        设备监测
                     </div>
-                    <span class="process-status-badge" id="indoor-process-status">处理中</span>
-                </div>
-                <div class="process-steps" id="indoor-process-steps">
-                    <div class="process-step active" data-step="1">
-                        <div class="step-index">1</div>
-                        确认
+                    <div class="device-item" data-module="device" onclick="selectDevice('device')">
+                        <i class="bi bi-hdd-stack"></i>
+                        <div class="device-item-info">
+                            <div class="device-item-name">设备状态监测</div>
+                            <div class="device-item-status online">正常</div>
+                        </div>
                     </div>
-                    <div class="process-step" data-step="2">
-                        <div class="step-index">2</div>
-                        处置
+                    <div class="device-item" data-module="fire" onclick="selectDevice('fire')">
+                        <i class="bi bi-fire"></i>
+                        <div class="device-item-info">
+                            <div class="device-item-name">消防监测</div>
+                            <div class="device-item-status online">正常</div>
+                        </div>
                     </div>
-                    <div class="process-step" data-step="3">
-                        <div class="step-index">3</div>
-                        记录
-                    </div>
-                    <div class="process-step" data-step="4">
-                        <div class="step-index">4</div>
-                        关闭
-                    </div>
-                </div>
-                <div class="process-actions">
-                    <button class="btn btn-outline-warning btn-sm" type="button" data-alarm-action="confirm">
-                        <i class="bi bi-check-circle"></i> 确认
-                    </button>
-                    <button class="btn btn-outline-danger btn-sm" type="button" data-alarm-action="disperse">
-                        <i class="bi bi-person-walking"></i> 处置
-                    </button>
-                    <button class="btn btn-outline-info btn-sm" type="button" data-alarm-action="report">
-                        <i class="bi bi-file-text"></i> 报告
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" data-alarm-action="resolve">
-                        <i class="bi bi-x-circle"></i> 关闭
-                    </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 中间主视图区域 -->
+    <div class="center-panel">
+        <!-- 视图工具栏 -->
+        <div class="view-toolbar">
+            <button class="view-btn active" data-view="video">
+                <i class="bi bi-camera-video"></i> 实时视频
+            </button>
+            <button class="view-btn" data-view="grid">
+                <i class="bi bi-grid-3x2"></i> 网格视图
+            </button>
+            <button class="view-btn" data-view="thermal">
+                <i class="bi bi-thermometer-half"></i> 热力图
+            </button>
+        </div>
+
+        <!-- 主视频区域 -->
+        <div class="main-video-area">
+            <canvas id="main-video-canvas"></canvas>
+            <div class="video-overlay-info">
+                <div><i class="bi bi-camera-video"></i> 电子围栏 - 主控室</div>
+                <div style="margin-top: 0.3rem; font-size: 0.7rem; opacity: 0.8;">
+                    <span id="current-module-name">电子围栏</span> |
+                    <span id="current-fps">30 FPS</span> |
+                    <span id="current-resolution">1920x1080</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 融合证据链区域 -->
+        <div class="center-evidence-section">
+            <div class="fusion-header">
+                <div class="fusion-title">
+                    <i class="bi bi-layers"></i>
+                    融合证据链
+                </div>
+                <span class="fusion-confidence" id="fusion-confidence">--</span>
+            </div>
+            <div class="fusion-modalities" id="fusion-modalities">
+                <!-- 动态生成模态条目 -->
+            </div>
+            <div class="fusion-result" id="fusion-result">
+                <div class="fusion-result-label">综合判定</div>
+                <div class="fusion-result-value" id="fusion-result-value">正常</div>
+                <div class="fusion-recommendation" id="fusion-recommendation">所有监测指标正常</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧控制面板 -->
+    <div class="right-panel">
+        <!-- 动态控制面板 -->
+        <div class="control-panel-section">
+            <div class="control-panel-header">
+                <div class="control-panel-title">
+                    <i class="bi bi-sliders"></i>
+                    <span id="control-panel-module-name">控制面板</span>
+                </div>
+            </div>
+            <div class="control-panel-content" id="control-panel-content">
+                <div class="control-placeholder">
+                    <i class="bi bi-hand-index"></i>
+                    <div>选择左侧设备查看控制选项</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 告警列表 -->
+        <div class="right-panel-header">
+            <div class="right-panel-title">
+                <i class="bi bi-bell-fill"></i>
+                实时告警
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-light" type="button" onclick="viewAlarms()">
+                    查看全部
+                </button>
+                <span class="alarm-count-badge" id="indoor-alarm-count-badge">2</span>
+            </div>
+        </div>
+
+        <div class="alarm-section">
+            <div class="alarm-list" id="indoor-alarm-list">
+                <div class="alarm-item critical" data-alarm-id="1">
+                    <div class="alarm-header">
+                        <span class="alarm-type">
+                            <i class="bi bi-shield-exclamation"></i>
+                            越线告警
+                        </span>
+                        <span>00:28 前</span>
+                    </div>
+                    <div class="alarm-title">机柜#5 电子围栏被触发</div>
+                    <div class="alarm-meta">
+                        <span><i class="bi bi-geo-alt"></i> GIS室</span>
+                        <span><i class="bi bi-person"></i> 李工</span>
+                    </div>
+                </div>
+                <div class="alarm-item" data-alarm-id="2">
+                    <div class="alarm-header">
+                        <span class="alarm-type">
+                            <i class="bi bi-thermometer-high"></i>
+                            温度预警
+                        </span>
+                        <span>02:10 前</span>
+                    </div>
+                    <div class="alarm-title">主控室温度上升</div>
+                    <div class="alarm-meta">
+                        <span><i class="bi bi-thermometer-half"></i> 32.4°C</span>
+                        <span><i class="bi bi-geo-alt"></i> 主控室</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="bottom-statusbar">
+        <div class="status-indicators">
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>监测系统: 正常</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot"></span>
+                <span>传感器: <span id="sensor-count">48/48</span>在线</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot warning"></span>
+                <span>告警: <span id="alarm-count">2</span>条待处理</span>
+            </div>
+        </div>
+        <div class="status-time">
+            <span>最后更新: <span id="last-update-time">--</span></span>
         </div>
     </div>
 
