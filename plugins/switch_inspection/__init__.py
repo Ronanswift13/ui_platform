@@ -7,6 +7,15 @@
 - 图像清晰度评价: 识别结果可信度评估
 """
 
-from plugins.switch_inspection.plugin import SwitchInspectionPlugin
+import importlib as _importlib
 
 __all__ = ["SwitchInspectionPlugin"]
+
+
+def __getattr__(name: str):
+    """PEP 562 延迟加载，避免包级 import 触发 plugin.py → torch 链。"""
+    _plugin_names = {"SwitchInspectionPlugin"}
+    if name in _plugin_names:
+        mod = _importlib.import_module("plugins.switch_inspection.plugin")
+        return getattr(mod, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

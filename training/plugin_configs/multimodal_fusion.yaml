@@ -1,0 +1,123 @@
+# 多模态融合诊断 - 训练配置模板
+plugin_id: multimodal_fusion
+display_name: 多模态融合诊断
+
+model:
+  family: multimodal_attention_fusion
+  backbone: cross_modal_transformer
+  input_modality: multimodal
+  paradigm: attention_pooling
+
+task:
+  primary: multimodal_feature_fusion
+  secondary:
+    - multimodal_decision_fusion
+  label_schema: multimodal_sample
+  supported_modalities:
+    - visual
+    - thermal
+    - acoustic
+    - ultrasonic
+    - gas
+    - hyperspectral
+    - vibration
+  plugin_dependency_map:
+    visual: transformer_monitoring
+    thermal: transformer_monitoring
+    acoustic: acoustic_monitoring
+    ultrasonic: acoustic_monitoring
+    gas: gas_detection
+    hyperspectral: hyperspectral_detection
+    vibration: null
+
+fusion:
+  supported_strategies: [feature_level, decision_level, hybrid]
+  runtime_modes: [rules_only, model_only, rule_model_hybrid]
+  missing_modality_policy: mask_and_gate
+  required_modalities: [visual, thermal]
+
+training_profiles:
+  multimodal_feature_fusion:
+    paradigm: attention_pooling
+    description: 特征级融合，统一编码多模态特征
+  multimodal_decision_fusion:
+    paradigm: stacking_ensemble
+    description: 决策级融合，整合各模态结果并做规则校准
+
+modality_dims:
+  visual: 512
+  thermal: 256
+  acoustic: 256
+  ultrasonic: 128
+  gas: 64
+  hyperspectral: 224
+  vibration: 128
+
+diagnostic_rules:
+  - name: 变压器综合过热诊断
+    conditions: [visual:overheating, gas:dga_fault]
+    priority: critical
+  - name: 绝缘劣化诊断
+    conditions: [acoustic:partial_discharge, hyperspectral:insulation_aging]
+    priority: alarm
+  - name: 接触电阻升高
+    conditions: [acoustic:poor_contact, visual:overheating]
+    priority: warning
+
+missing_modality_compensation:
+  allow_sparse: true
+  modality_presence_mask: true
+  fallback_order:
+    - rule_model_hybrid
+    - decision_level
+    - rules_only
+  teacher_modalities:
+    visual: [thermal]
+    acoustic: [ultrasonic]
+    gas: []
+    hyperspectral: [visual]
+
+output_mapping:
+  overall_status:
+    source: fused_classifier
+  confidence:
+    source: calibrated_confidence_head
+  detections:
+    source: correlated_detection_merger
+  modality_contributions:
+    source: attention_weights_or_decision_weights
+  diagnostic_report:
+    source: rule_model_diagnosis_generator
+
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.0005
+  optimizer: AdamW
+  scheduler: cosine
+  alignment_tolerance_ms: 5000
+
+evaluation:
+  metrics:
+    - overall_accuracy
+    - macro_f1
+    - ece
+    - modality_dropout_robustness
+    - diagnosis_hit_rate
+    - rule_consistency
+  qualification:
+    overall_accuracy: 0.85
+    modality_dropout_robustness: 0.75
+
+export:
+  formats: [onnx]
+  model_roles:
+    multimodal_fusion:
+      task_type: multimodal_feature_fusion
+      runtime: onnxruntime
+    multimodal_feature_fusion:
+      task_type: multimodal_feature_fusion
+      runtime: onnxruntime
+    multimodal_decision_fusion:
+      task_type: multimodal_decision_fusion
+      runtime: onnxruntime

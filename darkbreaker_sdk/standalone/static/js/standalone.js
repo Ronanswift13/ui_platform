@@ -76,7 +76,7 @@ const DarkBreakerSDK = {
             this.ws.onopen = () => {
                 if (statusEl) {
                     statusEl.className = 'badge connected';
-                    statusEl.innerHTML = '<i class="bi bi-circle-fill me-1"></i>Connected';
+                    statusEl.innerHTML = '<i class="bi bi-circle-fill me-1"></i>已连接';
                 }
             };
 
@@ -96,7 +96,7 @@ const DarkBreakerSDK = {
             this.ws.onclose = () => {
                 if (statusEl) {
                     statusEl.className = 'badge disconnected';
-                    statusEl.innerHTML = '<i class="bi bi-circle-fill me-1"></i>Disconnected';
+                    statusEl.innerHTML = '<i class="bi bi-circle-fill me-1"></i>未连接';
                 }
                 // Reconnect after 3 seconds
                 setTimeout(() => this._connectWebSocket(), 3000);
@@ -105,7 +105,7 @@ const DarkBreakerSDK = {
             this.ws.onerror = () => {
                 if (statusEl) {
                     statusEl.className = 'badge error';
-                    statusEl.innerHTML = '<i class="bi bi-circle-fill me-1"></i>Error';
+                    statusEl.innerHTML = '<i class="bi bi-circle-fill me-1"></i>错误';
                 }
             };
         } catch (e) {
@@ -145,7 +145,7 @@ const DarkBreakerSDK = {
         const statusEl = document.getElementById('input-status');
         if (statusEl) {
             statusEl.className = 'badge bg-success';
-            statusEl.textContent = 'Ready';
+            statusEl.textContent = '就绪';
         }
     },
 
@@ -158,7 +158,7 @@ const DarkBreakerSDK = {
         const detectBtn = document.getElementById('btn-detect');
         if (detectBtn) {
             detectBtn.disabled = true;
-            detectBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Processing...';
+            detectBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>处理中...';
         }
 
         const formData = new FormData();
@@ -182,7 +182,7 @@ const DarkBreakerSDK = {
         } finally {
             if (detectBtn) {
                 detectBtn.disabled = false;
-                detectBtn.innerHTML = '<i class="bi bi-play-fill me-1"></i>Run Detection';
+                detectBtn.innerHTML = '<i class="bi bi-play-fill me-1"></i>运行检测';
             }
         }
     },
@@ -208,7 +208,7 @@ const DarkBreakerSDK = {
         if (!listEl) return;
 
         if (results.length === 0) {
-            listEl.innerHTML = '<div class="list-group-item bg-dark border-secondary text-secondary text-center small py-3">No detections</div>';
+            listEl.innerHTML = '<div class="list-group-item bg-dark border-secondary text-secondary text-center small py-3">暂无检测结果</div>';
             if (countEl) countEl.textContent = '0';
             return;
         }
@@ -238,7 +238,7 @@ const DarkBreakerSDK = {
         if (!listEl) return;
 
         if (alarms.length === 0) {
-            listEl.innerHTML = '<div class="list-group-item bg-dark border-secondary text-secondary text-center small py-3">No alarms</div>';
+            listEl.innerHTML = '<div class="list-group-item bg-dark border-secondary text-secondary text-center small py-3">暂无告警</div>';
             if (countEl) countEl.textContent = '0';
             return;
         }
@@ -296,7 +296,7 @@ const DarkBreakerSDK = {
             clearInterval(this.autoRefreshInterval);
             this.autoRefreshInterval = null;
             btn.dataset.active = 'false';
-            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-Refresh: Off';
+            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>自动刷新: 关闭';
             btn.classList.remove('btn-primary');
             btn.classList.add('btn-outline-secondary');
         } else {
@@ -306,7 +306,7 @@ const DarkBreakerSDK = {
                 }
             }, 2000);
             btn.dataset.active = 'true';
-            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Auto-Refresh: On';
+            btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>自动刷新: 开启';
             btn.classList.remove('btn-outline-secondary');
             btn.classList.add('btn-primary');
         }
@@ -336,7 +336,7 @@ const DarkBreakerSDK = {
         if (saveBtn) saveBtn.disabled = false;
 
         if (Object.keys(config).length === 0) {
-            formEl.innerHTML = '<div class="text-secondary small text-center py-2">No configuration parameters</div>';
+            formEl.innerHTML = '<div class="text-secondary small text-center py-2">无配置参数</div>';
             return;
         }
 
@@ -397,7 +397,7 @@ const DarkBreakerSDK = {
                 const saveBtn = document.getElementById('btn-save-config');
                 if (saveBtn) {
                     const original = saveBtn.innerHTML;
-                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Saved';
+                    saveBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>已保存';
                     saveBtn.classList.replace('btn-outline-primary', 'btn-success');
                     setTimeout(() => {
                         saveBtn.innerHTML = original;

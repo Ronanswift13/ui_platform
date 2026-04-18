@@ -1,0 +1,90 @@
+# 温度监测 - 训练配置模板 (热像/温度视觉任务)
+plugin_id: temperature_monitoring
+display_name: 温度监测
+
+# 主模型: 热像异常分类 CNN
+model:
+  family: cnn
+  backbone: resnet18
+  input_modality: thermal
+  image_size: 224
+
+task:
+  primary: thermal_anomaly
+  label_schema: thermal_anomaly
+  classes:
+    temperature_level:
+      - normal
+      - attention
+      - warning
+      - alarm
+      - critical
+    anomaly_type:
+      - hotspot
+      - overheating
+      - temperature_gradient
+      - cold_spot
+
+# 辅助模型
+secondary_models:
+  temperature_predictor:
+    family: lstm
+    task_type: regression
+    sequence_length: 24
+    features: [max_temp, mean_temp, min_temp, ambient_temp]
+
+# 温度阈值 (℃)
+thermal_thresholds:
+  normal:
+    max_celsius: 60
+  attention:
+    min_celsius: 60
+    max_celsius: 75
+  warning:
+    min_celsius: 75
+    max_celsius: 90
+  alarm:
+    min_celsius: 90
+    max_celsius: 105
+  critical:
+    min_celsius: 105
+
+training:
+  epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 3
+  # 异常样本通常少于正常样本
+  class_weights:
+    critical: 5.0
+    alarm: 3.0
+    warning: 2.0
+    attention: 1.5
+    normal: 1.0
+
+augmentation:
+  # 热像专用增强
+  temperature_jitter: 5.0  # ±5℃ 随机偏移
+  noise: 0.1
+  fliplr: 0.5
+  rotation: 15
+  # 不使用 HSV (热像不是 RGB)
+  mosaic: 0.0
+
+preprocessing:
+  normalize_temperature: true
+  colormap: jet
+  bit_depth: 16
+
+evaluation:
+  metrics: [anomaly_accuracy, false_alarm_rate, detection_latency_ms, mae_celsius]
+  qualification:
+    anomaly_accuracy: 0.85
+    false_alarm_rate: 0.10
+
+export:
+  formats: [onnx]
+
+voltage_levels: [all]

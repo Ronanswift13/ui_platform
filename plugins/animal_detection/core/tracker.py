@@ -18,7 +18,6 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
-from collections import defaultdict
 
 import numpy as np
 

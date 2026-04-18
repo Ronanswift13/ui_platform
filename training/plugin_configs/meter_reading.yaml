@@ -1,0 +1,76 @@
+# 表计读数识别 - 训练配置模板 (OCR 任务，独立于普通目标检测)
+plugin_id: meter_reading
+legacy_alias: meter
+display_name: 表计读数识别
+
+# 主模型: CRNN 序列识别
+model:
+  family: crnn
+  backbone: resnet34_lstm
+  input_modality: rgb
+  input_height: 64
+  input_width: 200
+
+task:
+  primary: ocr
+  label_schema: ocr_reading
+  charset: "0123456789.-"
+  max_label_length: 10
+  classes:
+    meter_type:
+      - sf6_pressure
+      - oil_temperature
+      - oil_level
+      - ammeter
+      - voltmeter
+    display_type:
+      - analog_dial
+      - digital_display
+      - pointer_gauge
+
+# 辅助模型
+secondary_models:
+  meter_detector:
+    family: yolov8
+    backbone: yolov8n
+    task_type: detection
+    image_size: 640
+    classes: [meter_face, display_area, pointer, scale_mark]
+  keypoint_detector:
+    family: hrnet
+    backbone: hrnet_w32
+    task_type: detection
+    label_schema: keypoint
+    num_keypoints: 8  # 表盘四角 + 量程端点
+
+training:
+  epochs: 150
+  batch_size: 32
+  learning_rate: 0.0005
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 5
+  loss: ctc  # CTC loss 用于序列识别
+
+augmentation:
+  # OCR 专用增强
+  perspective_distortion: 0.1
+  blur: 0.2
+  noise: 0.15
+  brightness: 0.3
+  rotation: 10  # degrees
+  # 不使用 mosaic/mixup
+  mosaic: 0.0
+  mixup: 0.0
+
+evaluation:
+  metrics: [reading_accuracy, digit_accuracy, mae, rmse]
+  qualification:
+    reading_accuracy: 0.90
+    digit_accuracy: 0.95
+
+export:
+  formats: [onnx]
+  opset_version: 11
+
+voltage_levels: [all]

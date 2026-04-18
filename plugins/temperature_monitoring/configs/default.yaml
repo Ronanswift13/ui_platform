@@ -44,6 +44,7 @@ linkage:
 
 history:
   buffer_size: 3600                # 保存最近1小时 (1条/秒)
+  min_rise_interval_seconds: 15    # 小于该间隔不计算温升速率，避免毫秒级调用放大趋势
   archive_interval_minutes: 5
 
 performance:

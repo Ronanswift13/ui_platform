@@ -39,6 +39,7 @@ from darkbreaker_sdk.interfaces import HealthStatus
 from darkbreaker_sdk.schemas import (
     Alarm, AlarmLevel, RecognitionResult, BoundingBox,
 )
+from platform_core.visual_output_protocol import build_visual_meta
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,19 @@ class FireDetectionPlugin:
     PLUGIN_ID = "fire_detection"
     PLUGIN_NAME = "消防监测"
     PLUGIN_VERSION = "1.0.0"
+    VERIFIED_CAPABILITIES: tuple[str, ...] = ()
+    EXPERIMENTAL_CAPABILITIES: tuple[str, ...] = (
+        "fire_detection",
+        "smoke_detection",
+        "drill_simulation",
+    )
+    BLOCKED_CAPABILITIES: tuple[str, ...] = (
+        "thermal_anomaly_detection",
+        "multi_sensor_fusion",
+        "active_suppression_control",
+        "evacuation_guidance",
+        "real_dl_onnx_inference",
+    )
 
     def __init__(self, manifest=None, plugin_dir=None, config=None):
         """
@@ -111,6 +125,8 @@ class FireDetectionPlugin:
         # 训练数据缓冲 (支持前端上传)
         self._training_buffer: List[Dict] = []
         self._training_config: Dict = {}
+        self._drill_active = False
+        self._drill_scenario = ""
 
         logger.info(f"[{self.PLUGIN_NAME}] 实例已创建")
 
@@ -251,8 +267,26 @@ class FireDetectionPlugin:
         Returns:
             统一输出格式字典
         """
+        capability_states = self._get_capability_states()
+        runtime_mode = self._build_runtime_mode(thermal_frame, sensor_data)
+
         if not self._is_initialized or self._detector is None:
-            return self._error_result("插件未初始化")
+            return self._error_result(
+                "插件未初始化",
+                reason="plugin_not_initialized",
+                recommended_actions=["initialize_plugin"],
+                capability_states=capability_states,
+                runtime_mode=runtime_mode,
+            )
+
+        if not self._is_valid_frame(frame):
+            return self._error_result(
+                "无效输入帧",
+                reason="invalid_frame_input",
+                recommended_actions=["provide_non_empty_bgr_frame", "manual_visual_review"],
+                capability_states=capability_states,
+                runtime_mode=runtime_mode,
+            )
 
         try:
             self._status = PluginStatus.RUNNING
@@ -260,6 +294,17 @@ class FireDetectionPlugin:
 
             # 调用检测器
             assessment = self._detector.detect(frame, thermal_frame, sensor_data)
+            review_status, reason, recommended_action, reason_codes = self._summarize_assessment(
+                assessment=assessment,
+                thermal_frame=thermal_frame,
+                sensor_data=sensor_data,
+                capability_states=capability_states,
+                runtime_mode=runtime_mode,
+            )
+            metadata = dict(assessment.metadata or {})
+            metadata["reason_codes"] = reason_codes
+            metadata["drill_active"] = self._drill_active
+            metadata["runtime_mode"] = runtime_mode
 
             # 构建统一输出
             result = {
@@ -269,7 +314,19 @@ class FireDetectionPlugin:
                 "task_id": (context or {}).get("task_id", ""),
                 "timestamp": datetime.now().isoformat(),
                 "success": True,
+                "semantic_type": "visual_detection",
+                "is_real_detection": True,
                 "status": self._level_to_status(assessment.fire_level.value),
+                "severity": assessment.fire_level.value,
+                "confidence": round(float(assessment.fusion_confidence), 4),
+                "reason": reason,
+                "recommended_action": recommended_action,
+                "review_status": review_status,
+                "runtime_mode": runtime_mode,
+                "capability_states": capability_states,
+                "blocked_capabilities": sorted(
+                    [cap for cap, state in capability_states.items() if state == "blocked"]
+                ),
                 "fire_level": assessment.fire_level.value,
                 "detections": [
                     {
@@ -280,16 +337,16 @@ class FireDetectionPlugin:
                         "zone_id": d.zone_id,
                         "zone_name": d.zone_name,
                         "track_id": d.track_id,
-                        "spread_rate": round(d.spread_rate, 6),
+                        "spread_rate": round(float(d.spread_rate), 6),
                     }
                     for d in assessment.detections
                 ],
-                "fusion_confidence": assessment.fusion_confidence,
+                "fusion_confidence": round(float(assessment.fusion_confidence), 4),
                 "sensor_status": {
-                    "smoke": assessment.sensor_reading.smoke_concentration if assessment.sensor_reading else 0,
-                    "temperature": assessment.sensor_reading.temperature if assessment.sensor_reading else 0,
-                    "co": assessment.sensor_reading.co_concentration if assessment.sensor_reading else 0,
-                    "humidity": assessment.sensor_reading.humidity if assessment.sensor_reading else 0,
+                    "smoke": float(assessment.sensor_reading.smoke_concentration) if assessment.sensor_reading else 0.0,
+                    "temperature": float(assessment.sensor_reading.temperature) if assessment.sensor_reading else 0.0,
+                    "co": float(assessment.sensor_reading.co_concentration) if assessment.sensor_reading else 0.0,
+                    "humidity": float(assessment.sensor_reading.humidity) if assessment.sensor_reading else 0.0,
                 } if assessment.sensor_reading else {},
                 "spread_trend": assessment.spread_trend,
                 "suppression_actions": assessment.suppression_actions,
@@ -297,7 +354,7 @@ class FireDetectionPlugin:
                 "evacuation_routes": self._detector.get_evacuation_routes() if assessment.evacuation_needed else [],
                 "alarms": self._generate_alarms(assessment),
                 "inference_time_ms": assessment.metadata.get("inference_time_ms", 0),
-                "metadata": assessment.metadata,
+                "metadata": metadata,
             }
 
             self._status = PluginStatus.READY
@@ -306,7 +363,13 @@ class FireDetectionPlugin:
         except Exception as e:
             self._last_error = str(e)
             logger.error(f"[{self.PLUGIN_NAME}] 检测失败: {e}")
-            return self._error_result(str(e))
+            return self._error_result(
+                str(e),
+                reason="detection_pipeline_exception",
+                recommended_actions=["inspect_failure_reason", "manual_visual_review"],
+                capability_states=capability_states,
+                runtime_mode=runtime_mode,
+            )
 
     # =========================================================================
     # BasePlugin 兼容接口
@@ -337,6 +400,15 @@ class FireDetectionPlugin:
                     confidence=det.get("confidence", 0),
                     model_version=self.version,
                     code_version=self.code_hash,
+                    metadata=build_visual_meta(
+                        plugin_name="fire_detection",
+                        task_type="detection",
+                        modality="fire",
+                        runtime_mode="traditional_fallback",
+                        algorithm_stage="baseline",
+                        quality_gate_status="pass",
+                        evidence_hint="visual_frame",
+                    ),
                 ))
             
             return results
@@ -428,19 +500,70 @@ class FireDetectionPlugin:
     def start_drill(self, scenario: str = "electrical_fire") -> Dict:
         """启动消防演练"""
         drill_cfg = self.config.get("drill", {})
-        
+        self._drill_active = True
+        self._drill_scenario = scenario
+        capability_states = self._get_capability_states()
+
         return {
             "success": True,
+            "semantic_type": "drill_simulation",
+            "is_real_detection": False,
             "scenario": scenario,
+            "drill_active": True,
             "auto_reset_seconds": drill_cfg.get("auto_reset_seconds", 300),
+            "severity": "simulation",
+            "confidence": 1.0,
+            "reason": "drill_simulation_started",
+            "recommended_action": [
+                "treat_as_simulation_only",
+                "do_not_trigger_hardware_automatically",
+            ],
+            "review_status": "simulation_only",
+            "runtime_mode": {
+                "analysis_mode": "simulation_only",
+                "visual_detection": "simulation",
+                "drill": "simulation",
+            },
+            "capability_states": capability_states,
+            "blocked_capabilities": sorted(
+                [cap for cap, state in capability_states.items() if state == "blocked"]
+            ),
             "message": f"消防演练已启动 - 场景: {scenario}",
         }
 
     def stop_drill(self) -> Dict:
         """停止消防演练"""
+        previous_scenario = self._drill_scenario
+        self._drill_active = False
+        self._drill_scenario = ""
         if self._detector:
             self._detector.reset()
-        return {"success": True, "message": "消防演练已停止"}
+        capability_states = self._get_capability_states()
+        return {
+            "success": True,
+            "semantic_type": "drill_simulation",
+            "is_real_detection": False,
+            "scenario": previous_scenario,
+            "drill_active": False,
+            "severity": "simulation",
+            "confidence": 1.0,
+            "reason": "drill_simulation_stopped",
+            "recommended_action": [
+                "restore_normal_monitoring",
+                "confirm_real_alarm_pipeline_ready",
+            ],
+            "review_status": "simulation_only",
+            "runtime_mode": {
+                "analysis_mode": "simulation_only",
+                "visual_detection": "simulation",
+                "drill": "stopped",
+            },
+            "capability_states": capability_states,
+            "blocked_capabilities": sorted(
+                [cap for cap, state in capability_states.items() if state == "blocked"]
+            ),
+            "message": "消防演练已停止",
+        }
 
     # =========================================================================
     # UI配置
@@ -580,17 +703,157 @@ class FireDetectionPlugin:
         }
         return mapping.get(level, "normal")
 
-    def _error_result(self, message: str) -> Dict:
+    def _get_capability_states(self) -> Dict[str, str]:
+        manifest_verified = tuple(getattr(self.manifest, "verified_capabilities", []) or self.VERIFIED_CAPABILITIES)
+        manifest_experimental = tuple(
+            getattr(self.manifest, "experimental_capabilities", []) or self.EXPERIMENTAL_CAPABILITIES
+        )
+        manifest_blocked = tuple(getattr(self.manifest, "blocked_capabilities", []) or self.BLOCKED_CAPABILITIES)
+
+        states: Dict[str, str] = {}
+        for capability in manifest_verified:
+            states[capability] = "verified"
+        for capability in manifest_experimental:
+            states.setdefault(capability, "experimental")
+        for capability in manifest_blocked:
+            states[capability] = "blocked"
+        return states
+
+    def _build_runtime_mode(
+        self,
+        thermal_frame: Optional[np.ndarray],
+        sensor_data: Optional[Dict[str, Any]],
+    ) -> Dict[str, str]:
+        model_loaded = bool(self._detector and self._detector.stats.get("model_loaded"))
+        return {
+            "analysis_mode": "real_dl" if model_loaded else "simulation_only",
+            "visual_detection": "real_dl" if model_loaded else "simulation",
+            "thermal_input": "provided" if thermal_frame is not None else "missing",
+            "sensor_input": "provided" if sensor_data else "missing",
+            "drill": "active" if self._drill_active else "inactive",
+        }
+
+    @staticmethod
+    def _is_valid_frame(frame: Any) -> bool:
+        return (
+            isinstance(frame, np.ndarray)
+            and frame.size > 0
+            and frame.ndim == 3
+            and frame.shape[2] == 3
+        )
+
+    def _has_sensor_risk(self, sensor_data: Optional[Dict[str, Any]]) -> bool:
+        if not sensor_data:
+            return False
+
+        fusion = getattr(self._detector, "_fusion", None)
+        temp_warning = getattr(fusion, "temp_warning", 55)
+        co_alarm = getattr(fusion, "co_alarm_ppm", 50)
+
+        return any(
+            [
+                float(sensor_data.get("smoke_concentration", 0)) >= 30.0,
+                float(sensor_data.get("temperature", 0)) >= float(temp_warning),
+                float(sensor_data.get("co_concentration", 0)) >= float(co_alarm) * 0.5,
+            ]
+        )
+
+    def _has_thermal_risk(self, thermal_frame: Optional[np.ndarray]) -> bool:
+        if thermal_frame is None:
+            return False
+        arr = np.asarray(thermal_frame)
+        if arr.size == 0:
+            return False
+        fusion = getattr(self._detector, "_fusion", None)
+        temp_warning = getattr(fusion, "temp_warning", 55)
+        return float(np.max(arr)) >= float(temp_warning)
+
+    def _summarize_assessment(
+        self,
+        assessment,
+        thermal_frame: Optional[np.ndarray],
+        sensor_data: Optional[Dict[str, Any]],
+        capability_states: Dict[str, str],
+        runtime_mode: Dict[str, str],
+    ) -> tuple[str, str, list[str], list[str]]:
+        reason_codes: list[str] = []
+        actions: list[str] = []
+        review_status = "clear"
+
+        detection_types = sorted({d.fire_type.value for d in assessment.detections})
+        if detection_types:
+            reason_codes.append(f"visual_{'_'.join(detection_types)}_detected")
+        else:
+            reason_codes.append("no_confirmed_visual_detection")
+
+        if assessment.fire_level.value != "none":
+            reason_codes.append(f"severity_{assessment.fire_level.value}")
+            if assessment.fire_level.value in {"smoldering", "small"}:
+                actions.append("notify_on_site_staff")
+            else:
+                actions.extend(["trigger_emergency_response", "evacuate_personnel"])
+
+        if detection_types and assessment.fire_level.value == "none":
+            review_status = "manual_review_required"
+            reason_codes.append("below_alarm_threshold")
+            actions.append("manual_visual_review")
+
+        if sensor_data and self._has_sensor_risk(sensor_data):
+            reason_codes.append("sensor_signal_present")
+            if capability_states.get("multi_sensor_fusion") == "blocked":
+                review_status = "manual_review_required"
+                reason_codes.append("multi_sensor_fusion_blocked")
+                actions.append("dispatch_manual_sensor_check")
+
+        if thermal_frame is not None:
+            reason_codes.append("thermal_input_provided")
+            if self._has_thermal_risk(thermal_frame):
+                if capability_states.get("thermal_anomaly_detection") == "blocked":
+                    review_status = "manual_review_required"
+                    reason_codes.append("thermal_anomaly_detection_blocked")
+                    actions.append("dispatch_manual_thermal_check")
+
+        if runtime_mode.get("analysis_mode") == "simulation_only":
+            reason_codes.append("simulation_mode_only")
+
+        if assessment.fire_level.value == "none" and not actions:
+            actions.append("continue_monitoring")
+
+        deduped_actions = list(dict.fromkeys(actions))
+        return review_status, ";".join(reason_codes), deduped_actions, reason_codes
+
+    def _error_result(
+        self,
+        message: str,
+        *,
+        reason: str = "plugin_error",
+        recommended_actions: Optional[list[str]] = None,
+        capability_states: Optional[Dict[str, str]] = None,
+        runtime_mode: Optional[Dict[str, str]] = None,
+    ) -> Dict:
+        states = capability_states or self._get_capability_states()
+        mode = runtime_mode or self._build_runtime_mode(None, None)
         return {
             "plugin_id": self.id,
             "plugin_version": self.version,
             "task_id": "",
             "timestamp": datetime.now().isoformat(),
             "success": False,
+            "semantic_type": "visual_detection",
+            "is_real_detection": True,
             "status": "error",
+            "severity": "none",
+            "confidence": 0.0,
+            "reason": reason,
+            "recommended_action": recommended_actions or ["inspect_failure_reason"],
+            "review_status": "manual_review_required",
+            "runtime_mode": mode,
+            "capability_states": states,
+            "blocked_capabilities": sorted([cap for cap, state in states.items() if state == "blocked"]),
             "fire_level": "none",
             "detections": [],
             "alarms": [],
+            "metadata": {"failure_reason": message},
             "error_message": message,
             "inference_time_ms": 0,
         }

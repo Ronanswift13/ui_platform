@@ -1,0 +1,301 @@
+# ===========================================================================
+# 大理220kV变电站 设备拓扑配置
+# ===========================================================================
+# 本文件定义厂站→母线→间隔→一次/二次设备→信号点的完整关系。
+# 由 ActionEventMonitoringPlugin.init() 自动加载。
+# 可按实际台账增删设备和信号点。
+
+station:
+  station_id: "ST-DALI-220"
+  station_name: "大理220kV变电站"
+  voltage_level: "220kV"
+  region: "大理"
+
+# ---------------------------------------------------------------------------
+# 母线段
+# ---------------------------------------------------------------------------
+bus_sections:
+  - bus_id: "BUS-220-I"
+    bus_name: "220kV I母"
+    station_id: "ST-DALI-220"
+    voltage_level: "220kV"
+    bus_type: "double"
+  - bus_id: "BUS-220-II"
+    bus_name: "220kV II母"
+    station_id: "ST-DALI-220"
+    voltage_level: "220kV"
+    bus_type: "double"
+
+# ---------------------------------------------------------------------------
+# 间隔 (含母线连接关系)
+# ---------------------------------------------------------------------------
+bays:
+  # ---- 220kV甲线间隔 ----
+  - bay_id: "BAY-DALI-JIA"
+    bay_name: "220kV甲线间隔"
+    station_id: "ST-DALI-220"
+    voltage_level: "220kV"
+    bay_type: "line"
+    bus_connections:
+      - bus_id: "BUS-220-I"
+        breaker_id: "CB-JIA"
+        disconnector_ids: ["DS-JIA-I"]
+      - bus_id: "BUS-220-II"
+        breaker_id: "CB-JIA"
+        disconnector_ids: ["DS-JIA-II"]
+
+  # ---- 220kV乙线间隔 ----
+  - bay_id: "BAY-DALI-YI"
+    bay_name: "220kV乙线间隔"
+    station_id: "ST-DALI-220"
+    voltage_level: "220kV"
+    bay_type: "line"
+    bus_connections:
+      - bus_id: "BUS-220-I"
+        breaker_id: "CB-YI"
+        disconnector_ids: ["DS-YI-I"]
+      - bus_id: "BUS-220-II"
+        breaker_id: "CB-YI"
+        disconnector_ids: ["DS-YI-II"]
+
+  # ---- 220kV母联间隔 ----
+  - bay_id: "BAY-DALI-ML"
+    bay_name: "220kV母联间隔"
+    station_id: "ST-DALI-220"
+    voltage_level: "220kV"
+    bay_type: "bus_coupler"
+    bus_connections:
+      - bus_id: "BUS-220-I"
+        breaker_id: "CB-ML"
+        disconnector_ids: ["DS-ML-I"]
+      - bus_id: "BUS-220-II"
+        breaker_id: "CB-ML"
+        disconnector_ids: ["DS-ML-II"]
+
+# ---------------------------------------------------------------------------
+# 一次设备
+# ---------------------------------------------------------------------------
+primary_devices:
+  # 甲线间隔
+  - device_id: "CB-JIA"
+    device_name: "220kV甲线断路器"
+    device_type: "breaker"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    voltage_level: "220kV"
+  - device_id: "LINE-JIA"
+    device_name: "220kV甲线"
+    device_type: "line"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    voltage_level: "220kV"
+  - device_id: "DS-JIA-I"
+    device_name: "甲线I母侧刀闸"
+    device_type: "disconnector"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    voltage_level: "220kV"
+  - device_id: "DS-JIA-II"
+    device_name: "甲线II母侧刀闸"
+    device_type: "disconnector"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    voltage_level: "220kV"
+
+  # 乙线间隔
+  - device_id: "CB-YI"
+    device_name: "220kV乙线断路器"
+    device_type: "breaker"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-YI"
+    voltage_level: "220kV"
+  - device_id: "LINE-YI"
+    device_name: "220kV乙线"
+    device_type: "line"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-YI"
+    voltage_level: "220kV"
+
+  # 母联间隔
+  - device_id: "CB-ML"
+    device_name: "220kV母联断路器"
+    device_type: "breaker"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-ML"
+    voltage_level: "220kV"
+
+# ---------------------------------------------------------------------------
+# 二次设备
+# ---------------------------------------------------------------------------
+secondary_devices:
+  # 甲线保护
+  - device_id: "PR-JIA-MAIN"
+    device_name: "甲线主保护"
+    device_type: "protection"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    cabinet_id: "C-01"
+    manufacturer: "南瑞继保"
+    model: "RCS-931"
+  - device_id: "RC-JIA"
+    device_name: "甲线重合闸"
+    device_type: "recloser"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    cabinet_id: "C-01"
+  - device_id: "FR-JIA"
+    device_name: "甲线录波装置"
+    device_type: "fault_recorder"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-JIA"
+    cabinet_id: "C-02"
+
+  # 乙线保护
+  - device_id: "PR-YI-MAIN"
+    device_name: "乙线主保护"
+    device_type: "protection"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-YI"
+    cabinet_id: "C-03"
+    manufacturer: "南瑞继保"
+    model: "RCS-931"
+  - device_id: "RC-YI"
+    device_name: "乙线重合闸"
+    device_type: "recloser"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-YI"
+    cabinet_id: "C-03"
+
+  # 母线保护
+  - device_id: "PR-BUS-DIFF"
+    device_name: "220kV母线差动保护"
+    device_type: "protection"
+    station_id: "ST-DALI-220"
+    bay_id: "BAY-DALI-ML"
+    cabinet_id: "C-05"
+    manufacturer: "南瑞继保"
+    model: "RCS-915"
+
+# ---------------------------------------------------------------------------
+# 保护区域 (保护装置→保护范围→跳闸断路器)
+# ---------------------------------------------------------------------------
+protection_zones:
+  # 甲线主保护 → 纵联
+  - zone_id: "PZ-JIA-MAIN"
+    secondary_device_id: "PR-JIA-MAIN"
+    protection_type: "main_pilot"
+    protected_bay_ids: ["BAY-DALI-JIA"]
+    protected_primary_ids: ["LINE-JIA"]
+    trip_breaker_ids: ["CB-JIA"]
+  # 甲线后备距离I段
+  - zone_id: "PZ-JIA-DIS1"
+    secondary_device_id: "PR-JIA-MAIN"
+    protection_type: "backup_distance_1"
+    protected_bay_ids: ["BAY-DALI-JIA"]
+    trip_breaker_ids: ["CB-JIA"]
+  # 甲线零序
+  - zone_id: "PZ-JIA-ZERO"
+    secondary_device_id: "PR-JIA-MAIN"
+    protection_type: "backup_zero_seq_1"
+    protected_bay_ids: ["BAY-DALI-JIA"]
+    trip_breaker_ids: ["CB-JIA"]
+
+  # 乙线主保护
+  - zone_id: "PZ-YI-MAIN"
+    secondary_device_id: "PR-YI-MAIN"
+    protection_type: "main_pilot"
+    protected_bay_ids: ["BAY-DALI-YI"]
+    protected_primary_ids: ["LINE-YI"]
+    trip_breaker_ids: ["CB-YI"]
+
+  # 母差保护 → 跳母线上所有断路器
+  - zone_id: "PZ-BUS-DIFF"
+    secondary_device_id: "PR-BUS-DIFF"
+    protection_type: "bus_diff"
+    protected_bay_ids: ["BAY-DALI-JIA", "BAY-DALI-YI", "BAY-DALI-ML"]
+    trip_breaker_ids: ["CB-JIA", "CB-YI", "CB-ML"]
+
+# ---------------------------------------------------------------------------
+# 信号点 (精确到每个保护装置的具体信号)
+# ---------------------------------------------------------------------------
+signal_points:
+  # 甲线主保护信号
+  - signal_id: "SIG-JIA-START"
+    signal_name: "甲线保护启动"
+    signal_group: "protection"
+    secondary_device_id: "PR-JIA-MAIN"
+    primary_device_id: "CB-JIA"
+    bay_id: "BAY-DALI-JIA"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+  - signal_id: "SIG-JIA-TRIP"
+    signal_name: "甲线保护出口"
+    signal_group: "protection"
+    secondary_device_id: "PR-JIA-MAIN"
+    primary_device_id: "CB-JIA"
+    bay_id: "BAY-DALI-JIA"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+  - signal_id: "SIG-JIA-CB-OPEN"
+    signal_name: "甲线断路器分位"
+    signal_group: "breaker"
+    secondary_device_id: "PR-JIA-MAIN"
+    primary_device_id: "CB-JIA"
+    bay_id: "BAY-DALI-JIA"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+
+  # 甲线重合闸信号
+  - signal_id: "SIG-JIA-RC-ACT"
+    signal_name: "甲线重合闸动作"
+    signal_group: "recloser"
+    secondary_device_id: "RC-JIA"
+    primary_device_id: "CB-JIA"
+    bay_id: "BAY-DALI-JIA"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+
+  # 甲线录波信号
+  - signal_id: "SIG-JIA-FR-TRIG"
+    signal_name: "甲线录波启动"
+    signal_group: "protection"
+    secondary_device_id: "FR-JIA"
+    primary_device_id: "CB-JIA"
+    bay_id: "BAY-DALI-JIA"
+    station_id: "ST-DALI-220"
+    source_system: "fault_recorder"
+
+  # 乙线信号
+  - signal_id: "SIG-YI-START"
+    signal_name: "乙线保护启动"
+    signal_group: "protection"
+    secondary_device_id: "PR-YI-MAIN"
+    primary_device_id: "CB-YI"
+    bay_id: "BAY-DALI-YI"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+  - signal_id: "SIG-YI-TRIP"
+    signal_name: "乙线保护出口"
+    signal_group: "protection"
+    secondary_device_id: "PR-YI-MAIN"
+    primary_device_id: "CB-YI"
+    bay_id: "BAY-DALI-YI"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+  - signal_id: "SIG-YI-CB-OPEN"
+    signal_name: "乙线断路器分位"
+    signal_group: "breaker"
+    secondary_device_id: "PR-YI-MAIN"
+    primary_device_id: "CB-YI"
+    bay_id: "BAY-DALI-YI"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"
+
+  # 母差保护信号
+  - signal_id: "SIG-BUS-DIFF-ACT"
+    signal_name: "母差保护动作"
+    signal_group: "protection"
+    secondary_device_id: "PR-BUS-DIFF"
+    bay_id: "BAY-DALI-ML"
+    station_id: "ST-DALI-220"
+    source_system: "protection_info"

@@ -1,0 +1,580 @@
+{
+  "_description": "DarkBreaker 插件 → 训练任务类型映射表。兼容视觉任务与时序/数值异常任务。",
+  "_version": "1.1.0",
+
+  "plugins": {
+    "busbar_inspection": {
+      "plugin_id": "busbar_inspection",
+      "legacy_alias": "busbar",
+      "display_name": "母线巡检",
+      "task_types": ["detection", "segmentation"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb",
+      "default_backbone": "yolov8n",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "insulator_defect": ["insulator_normal", "insulator_damaged", "insulator_flashover"],
+        "fitting_defect": ["fitting_normal", "fitting_loose", "fitting_corroded"],
+        "wire_defect": ["wire_normal", "wire_broken", "wire_displaced"],
+        "foreign_object": ["bird_nest", "debris", "kite"]
+      },
+      "evaluation_metrics": ["mAP@0.5", "mAP@0.5:0.95", "recall", "precision"],
+      "export_formats": ["onnx", "tensorrt"],
+      "voltage_levels": ["UHV_1000kV_AC", "EHV_500kV", "HV_220kV", "HV_110kV", "MV_35kV"]
+    },
+
+    "capacitor_inspection": {
+      "plugin_id": "capacitor_inspection",
+      "legacy_alias": "capacitor",
+      "display_name": "电容器巡检",
+      "task_types": ["detection", "classification", "segmentation"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb",
+      "default_backbone": "yolov8n",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "structural": ["capacitor_normal", "capacitor_tilted", "capacitor_collapsed", "capacitor_missing"],
+        "component": ["fuse_normal", "fuse_blown", "connector_loose"],
+        "intrusion": ["intrusion_person", "intrusion_vehicle", "intrusion_animal"]
+      },
+      "evaluation_metrics": ["mAP@0.5", "mAP@0.5:0.95", "recall", "precision"],
+      "export_formats": ["onnx", "tensorrt"],
+      "voltage_levels": ["HV_220kV", "HV_110kV", "MV_35kV", "LV_10kV"]
+    },
+
+    "switch_inspection": {
+      "plugin_id": "switch_inspection",
+      "legacy_alias": "switch",
+      "display_name": "开关间隔检测",
+      "task_types": ["detection", "classification"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb",
+      "default_backbone": "yolov8n",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "breaker_state": ["breaker_open", "breaker_closed", "breaker_intermediate"],
+        "isolator_state": ["isolator_open", "isolator_closed"],
+        "grounding_state": ["grounding_on", "grounding_off"],
+        "indicator": ["indicator_red", "indicator_green", "indicator_off"]
+      },
+      "evaluation_metrics": ["mAP@0.5", "state_accuracy", "recall", "precision"],
+      "export_formats": ["onnx", "tensorrt"],
+      "voltage_levels": ["UHV_1000kV_AC", "EHV_500kV", "HV_220kV", "HV_110kV", "MV_35kV"]
+    },
+
+    "transformer_inspection": {
+      "plugin_id": "transformer_inspection",
+      "legacy_alias": "transformer",
+      "display_name": "主变压器巡检",
+      "task_types": ["detection", "classification", "segmentation"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb",
+      "default_backbone": "yolov8s",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "oil_system": ["oil_leak", "oil_level_normal", "oil_level_low"],
+        "surface": ["rust_none", "rust_light", "rust_heavy"],
+        "bushing": ["bushing_normal", "bushing_cracked", "bushing_contaminated"],
+        "silica_gel": ["silica_blue", "silica_pink", "silica_white"],
+        "thermal": ["thermal_normal", "thermal_warning", "thermal_alarm"]
+      },
+      "evaluation_metrics": ["mAP@0.5", "mAP@0.5:0.95", "recall", "precision"],
+      "export_formats": ["onnx", "tensorrt"],
+      "voltage_levels": ["UHV_1000kV_AC", "UHV_800kV_DC", "EHV_500kV", "EHV_330kV", "HV_220kV", "HV_110kV"]
+    },
+
+    "animal_detection": {
+      "plugin_id": "animal_detection",
+      "legacy_alias": null,
+      "display_name": "动物入侵检测",
+      "task_types": ["detection", "classification"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb+thermal",
+      "default_backbone": "yolov8n",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "animal": ["mouse", "cat", "snake", "bird", "dog", "poultry", "insect", "other"]
+      },
+      "secondary_models": {
+        "species_classifier": {
+          "model_family": "efficientnet",
+          "task_type": "classification",
+          "label_schema": "single_label_cls"
+        },
+        "thermal_activity": {
+          "model_family": "cnn",
+          "task_type": "thermal_anomaly",
+          "label_schema": "binary_cls"
+        }
+      },
+      "evaluation_metrics": ["mAP@0.5", "recall", "precision", "species_accuracy"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["all"]
+    },
+
+    "bird_monitoring": {
+      "plugin_id": "bird_monitoring",
+      "legacy_alias": null,
+      "display_name": "鸟类监测",
+      "task_types": ["detection", "classification"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb",
+      "default_backbone": "yolov8n",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "bird": ["bird_perching", "bird_flying", "bird_nesting"],
+        "risk": ["safe", "warning", "danger"]
+      },
+      "evaluation_metrics": ["mAP@0.5", "recall", "precision", "risk_accuracy"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["EHV_500kV", "HV_220kV", "HV_110kV"]
+    },
+
+    "fire_detection": {
+      "plugin_id": "fire_detection",
+      "legacy_alias": null,
+      "display_name": "火灾检测",
+      "task_types": ["detection", "classification", "segmentation"],
+      "primary_task": "detection",
+      "model_family": "yolov8",
+      "input_modality": "rgb+thermal",
+      "default_backbone": "yolov8n",
+      "label_schema": "detection_bbox",
+      "class_groups": {
+        "fire": ["flame", "smoke"],
+        "level": ["smoldering", "small_fire", "medium_fire", "large_fire", "critical"]
+      },
+      "secondary_models": {
+        "fire_classifier": {
+          "model_family": "resnet18",
+          "task_type": "classification",
+          "label_schema": "single_label_cls"
+        },
+        "thermal_anomaly": {
+          "model_family": "cnn",
+          "task_type": "thermal_anomaly",
+          "label_schema": "binary_cls"
+        }
+      },
+      "evaluation_metrics": ["mAP@0.5", "recall", "precision", "false_alarm_rate"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["all"]
+    },
+
+    "meter_reading": {
+      "plugin_id": "meter_reading",
+      "legacy_alias": "meter",
+      "display_name": "表计读数识别",
+      "task_types": ["ocr", "detection"],
+      "primary_task": "ocr",
+      "model_family": "crnn",
+      "input_modality": "rgb",
+      "default_backbone": "resnet34_lstm",
+      "label_schema": "ocr_reading",
+      "class_groups": {
+        "meter_type": ["sf6_pressure", "oil_temperature", "oil_level", "ammeter", "voltmeter"],
+        "display_type": ["analog_dial", "digital_display", "pointer_gauge"],
+        "digit": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "dot", "minus"]
+      },
+      "secondary_models": {
+        "meter_detector": {
+          "model_family": "yolov8",
+          "task_type": "detection",
+          "label_schema": "detection_bbox"
+        },
+        "keypoint_detector": {
+          "model_family": "hrnet",
+          "task_type": "detection",
+          "label_schema": "keypoint"
+        }
+      },
+      "evaluation_metrics": ["reading_accuracy", "digit_accuracy", "mae", "rmse"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["all"]
+    },
+
+    "temperature_monitoring": {
+      "plugin_id": "temperature_monitoring",
+      "legacy_alias": null,
+      "display_name": "温度监测",
+      "task_types": ["thermal_anomaly", "classification"],
+      "primary_task": "thermal_anomaly",
+      "model_family": "cnn",
+      "input_modality": "thermal",
+      "default_backbone": "resnet18",
+      "label_schema": "thermal_anomaly",
+      "class_groups": {
+        "temperature_level": ["normal", "attention", "warning", "alarm", "critical"],
+        "anomaly_type": ["hotspot", "overheating", "temperature_gradient", "cold_spot"]
+      },
+      "secondary_models": {
+        "temperature_predictor": {
+          "model_family": "lstm",
+          "task_type": "regression",
+          "label_schema": "temperature_series"
+        }
+      },
+      "evaluation_metrics": ["anomaly_accuracy", "false_alarm_rate", "detection_latency_ms", "mae_celsius"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["all"],
+      "thermal_thresholds": {
+        "normal": {"max_celsius": 60},
+        "attention": {"max_celsius": 75},
+        "warning": {"max_celsius": 90},
+        "alarm": {"max_celsius": 105},
+        "critical": {"min_celsius": 105}
+      }
+    },
+
+    "thermal": {
+      "plugin_id": "thermal",
+      "legacy_alias": null,
+      "display_name": "热像分析(占位)",
+      "task_types": ["thermal_anomaly"],
+      "primary_task": "thermal_anomaly",
+      "model_family": "cnn",
+      "input_modality": "thermal",
+      "default_backbone": "resnet18",
+      "label_schema": "thermal_anomaly",
+      "class_groups": {
+        "anomaly_type": ["hotspot", "gradient_anomaly", "thermal_bridge"]
+      },
+      "evaluation_metrics": ["anomaly_accuracy", "false_alarm_rate"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["all"],
+      "status": "placeholder"
+    },
+
+    "hyperspectral_detection": {
+      "plugin_id": "hyperspectral_detection",
+      "legacy_alias": null,
+      "display_name": "高光谱检测",
+      "task_types": ["hyperspectral_classification", "hyperspectral_anomaly"],
+      "primary_task": "hyperspectral_classification",
+      "model_family": "spectral_cnn",
+      "input_modality": "hyperspectral",
+      "default_backbone": "spectral_resnet",
+      "label_schema": "hyperspectral_defect",
+      "spectral_config": {
+        "num_bands": 224,
+        "wavelength_range_nm": [400, 2500],
+        "pca_components": 30,
+        "spatial_patch_size": 11
+      },
+      "class_groups": {
+        "surface_defect": ["rust", "corrosion", "paint_peeling", "normal"],
+        "thermal_anomaly": ["localized_heating", "normal_thermal"],
+        "material_degradation": ["insulation_aging", "conductor_oxidation", "normal_material"]
+      },
+      "evaluation_metrics": ["overall_accuracy", "kappa", "per_class_f1", "anomaly_auc"],
+      "export_formats": ["onnx"],
+      "voltage_levels": ["EHV_500kV", "HV_220kV", "HV_110kV"]
+    },
+
+    "acoustic_monitoring": {
+      "plugin_id": "acoustic_monitoring",
+      "legacy_alias": null,
+      "display_name": "声学监测",
+      "task_types": ["acoustic_time_frequency_anomaly"],
+      "primary_task": "acoustic_time_frequency_anomaly",
+      "model_family": "dual_path_audio_transformer",
+      "input_modality": "audio_waveform+spectrogram",
+      "default_backbone": "audio_transformer_small",
+      "label_schema": "temporal_annotation",
+      "supported_paradigms": ["autoencoder", "temporal_cnn", "transformer_encoder", "hybrid_statistical_ml"],
+      "feature_views": ["raw_waveform", "mel_spectrogram", "log_mel"],
+      "class_groups": {
+        "anomaly_type": ["normal", "partial_discharge", "corona", "contact_noise", "bearing_fault", "mechanical_impact"]
+      },
+      "secondary_models": {
+        "ultrasonic_pd_detector": {
+          "model_family": "temporal_cnn",
+          "task_type": "acoustic_time_frequency_anomaly",
+          "label_schema": "temporal_annotation"
+        }
+      },
+      "model_roles": {
+        "audio_anomaly_transformer": {
+          "task_type": "acoustic_time_frequency_anomaly",
+          "required": true
+        },
+        "ultrasonic_pd_detector": {
+          "task_type": "acoustic_time_frequency_anomaly",
+          "required": false
+        }
+      },
+      "evaluation_metrics": ["auc_roc", "auc_pr", "f1", "false_alarm_rate", "latency_ms"],
+      "export_formats": ["onnx"],
+      "compatible_runtime": ["onnxruntime"],
+      "voltage_levels": ["all"]
+    },
+
+    "gas_detection": {
+      "plugin_id": "gas_detection",
+      "legacy_alias": null,
+      "display_name": "气体泄漏检测",
+      "task_types": ["multivariate_sensor_anomaly", "equipment_health_prediction", "health_index_calibration"],
+      "primary_task": "multivariate_sensor_anomaly",
+      "model_family": "timeseries_transformer",
+      "input_modality": "multivariate_timeseries",
+      "default_backbone": "lstm_gas_forecaster",
+      "label_schema": "temporal_annotation",
+      "supported_paradigms": ["autoencoder", "lstm", "gru", "temporal_cnn", "transformer_encoder", "hybrid_statistical_ml"],
+      "sensor_columns": ["SF6", "H2", "CO", "C2H2", "CH4", "C2H4", "C2H6", "temperature", "humidity", "pressure"],
+      "model_roles": {
+        "sf6_forecast": {
+          "task_type": "equipment_health_prediction",
+          "required": true
+        },
+        "multi_gas_forecast": {
+          "task_type": "equipment_health_prediction",
+          "required": false
+        },
+        "equipment_health_trend": {
+          "task_type": "multivariate_sensor_anomaly",
+          "required": false
+        }
+      },
+      "evaluation_metrics": ["health_mae", "health_rmse", "anomaly_auc", "failure_f1", "lead_time_hours"],
+      "export_formats": ["onnx"],
+      "compatible_runtime": ["onnxruntime"],
+      "voltage_levels": ["all"]
+    },
+
+    "device_monitoring": {
+      "plugin_id": "device_monitoring",
+      "legacy_alias": null,
+      "display_name": "设备状态监测",
+      "task_types": ["multivariate_sensor_anomaly", "equipment_health_prediction"],
+      "primary_task": "multivariate_sensor_anomaly",
+      "model_family": "multivariate_autoencoder",
+      "input_modality": "multivariate_timeseries",
+      "default_backbone": "stacked_autoencoder",
+      "label_schema": "temporal_annotation",
+      "supported_paradigms": ["autoencoder", "lstm", "gru", "temporal_cnn", "transformer_encoder", "hybrid_statistical_ml"],
+      "sensor_columns": ["cpu_temp", "cpu_usage", "memory_usage", "disk_usage", "network_quality", "uptime_hours", "error_count", "last_heartbeat"],
+      "output_heads": [
+        {"name": "health_index", "type": "regression", "range": "[0,100]"},
+        {"name": "anomaly_score", "type": "anomaly_score", "range": "[0,1]"},
+        {"name": "predicted_failure", "type": "classification", "horizon": "168h"}
+      ],
+      "model_roles": {
+        "device_anomaly_autoencoder": {
+          "task_type": "multivariate_sensor_anomaly",
+          "required": false
+        },
+        "failure_predictor": {
+          "task_type": "equipment_health_prediction",
+          "required": false
+        },
+        "health_calibrator": {
+          "task_type": "health_index_calibration",
+          "required": false
+        }
+      },
+      "evaluation_metrics": ["health_mae", "health_rmse", "anomaly_auc", "failure_f1", "failure_recall", "lead_time_hours"],
+      "export_formats": ["onnx"],
+      "compatible_runtime": ["onnxruntime"],
+      "voltage_levels": ["all"]
+    },
+
+    "action_event_monitoring": {
+      "plugin_id": "action_event_monitoring",
+      "legacy_alias": null,
+      "display_name": "二次设备动作事件监测",
+      "task_types": ["action_event_sequence_recognition"],
+      "primary_task": "action_event_sequence_recognition",
+      "model_family": "event_sequence_encoder",
+      "input_modality": "event_sequence",
+      "default_backbone": "transformer_encoder_small",
+      "label_schema": "action_event_sequence",
+      "supported_paradigms": ["lstm", "gru", "temporal_cnn", "transformer_encoder", "hybrid_statistical_ml"],
+      "event_types": ["soe_trip", "soe_close", "alarm_on", "alarm_off", "breaker_change", "protection_signal", "telemetry_gap"],
+      "evaluation_metrics": ["sequence_accuracy", "macro_f1", "event_recall", "edit_distance"],
+      "export_formats": ["onnx"],
+      "compatible_runtime": ["onnxruntime"],
+      "voltage_levels": ["all"]
+    },
+
+    "multimodal_fusion": {
+      "plugin_id": "multimodal_fusion",
+      "legacy_alias": null,
+      "display_name": "多模态融合诊断",
+      "task_types": ["multimodal_feature_fusion", "multimodal_decision_fusion"],
+      "primary_task": "multimodal_feature_fusion",
+      "model_family": "multimodal_attention_fusion",
+      "input_modality": "multimodal",
+      "default_backbone": "cross_modal_transformer",
+      "label_schema": "multimodal_sample",
+      "supported_modalities": ["visual", "thermal", "acoustic", "ultrasonic", "gas", "hyperspectral", "vibration"],
+      "plugin_dependencies": ["acoustic_monitoring", "gas_detection", "hyperspectral_detection"],
+      "plugin_dependency_map": {
+        "visual": "transformer_monitoring",
+        "thermal": "transformer_monitoring",
+        "acoustic": "acoustic_monitoring",
+        "ultrasonic": "acoustic_monitoring",
+        "gas": "gas_detection",
+        "hyperspectral": "hyperspectral_detection",
+        "vibration": null
+      },
+      "diagnostic_rules": [
+        {
+          "name": "变压器综合过热诊断",
+          "conditions": ["visual:overheating", "gas:dga_fault"],
+          "priority": "critical"
+        },
+        {
+          "name": "绝缘劣化诊断",
+          "conditions": ["acoustic:partial_discharge", "hyperspectral:insulation_aging"],
+          "priority": "alarm"
+        },
+        {
+          "name": "接触电阻升高",
+          "conditions": ["acoustic:poor_contact", "visual:overheating"],
+          "priority": "warning"
+        }
+      ],
+      "model_roles": {
+        "multimodal_fusion": {
+          "task_type": "multimodal_feature_fusion",
+          "required": false
+        },
+        "multimodal_feature_fusion": {
+          "task_type": "multimodal_feature_fusion",
+          "required": false
+        },
+        "multimodal_decision_fusion": {
+          "task_type": "multimodal_decision_fusion",
+          "required": false
+        }
+      },
+      "evaluation_metrics": [
+        "overall_accuracy",
+        "macro_f1",
+        "ece",
+        "modality_dropout_robustness",
+        "diagnosis_hit_rate",
+        "rule_consistency"
+      ],
+      "export_formats": ["onnx"],
+      "compatible_runtime": ["onnxruntime"],
+      "runtime_modes": ["rules_only", "model_only", "rule_model_hybrid"],
+      "voltage_levels": ["all"]
+    }
+  },
+
+  "task_types": {
+    "detection": {
+      "description": "目标检测 (bounding box)",
+      "label_format": "yolo_bbox",
+      "pipeline": "pipelines.training.detection_trainer",
+      "preprocessor": "pipelines.preprocessing.detection_preprocessor",
+      "applicable_plugins": ["busbar_inspection", "capacitor_inspection", "switch_inspection", "transformer_inspection", "animal_detection", "bird_monitoring", "fire_detection", "meter_reading"]
+    },
+    "segmentation": {
+      "description": "语义/实例分割 (pixel-level mask)",
+      "label_format": "png_index / png_color / rle / polygon",
+      "pipeline": "pipelines.training.segmentation_trainer",
+      "preprocessor": "pipelines.preprocessing.segmentation_preprocessor",
+      "applicable_plugins": ["busbar_inspection", "capacitor_inspection", "transformer_inspection", "fire_detection"]
+    },
+    "classification": {
+      "description": "图像分类 (single/multi label)",
+      "label_format": "image_folder",
+      "pipeline": "pipelines.training.classification_trainer",
+      "preprocessor": "pipelines.preprocessing.classification_preprocessor",
+      "applicable_plugins": ["capacitor_inspection", "switch_inspection", "transformer_inspection", "animal_detection", "bird_monitoring", "fire_detection"]
+    },
+    "ocr": {
+      "description": "OCR / 读数识别",
+      "label_format": "ocr_annotation",
+      "pipeline": "pipelines.training.ocr_trainer",
+      "preprocessor": "pipelines.preprocessing.ocr_preprocessor",
+      "applicable_plugins": ["meter_reading"]
+    },
+    "thermal_anomaly": {
+      "description": "热像异常检测",
+      "label_format": "thermal_annotation",
+      "pipeline": "pipelines.training.thermal_trainer",
+      "preprocessor": "pipelines.preprocessing.thermal_preprocessor",
+      "applicable_plugins": ["temperature_monitoring", "thermal", "fire_detection", "animal_detection"]
+    },
+    "hyperspectral_classification": {
+      "description": "高光谱分类",
+      "label_format": "hyperspectral_annotation",
+      "pipeline": "pipelines.training.hyperspectral_trainer",
+      "preprocessor": "pipelines.preprocessing.hyperspectral_preprocessor",
+      "applicable_plugins": ["hyperspectral_detection"]
+    },
+    "hyperspectral_anomaly": {
+      "description": "高光谱异常检测",
+      "label_format": "hyperspectral_anomaly_annotation",
+      "pipeline": "pipelines.training.hyperspectral_trainer",
+      "preprocessor": "pipelines.preprocessing.hyperspectral_preprocessor",
+      "applicable_plugins": ["hyperspectral_detection"]
+    },
+    "acoustic_time_frequency_anomaly": {
+      "description": "声学时频异常检测",
+      "label_format": "temporal_annotation",
+      "pipeline": "pipelines.training.temporal_trainer",
+      "preprocessor": "pipelines.preprocessing.temporal_preprocessor",
+      "applicable_plugins": ["acoustic_monitoring"]
+    },
+    "multivariate_sensor_anomaly": {
+      "description": "多变量数值时序异常检测",
+      "label_format": "temporal_annotation",
+      "pipeline": "pipelines.training.temporal_trainer",
+      "preprocessor": "pipelines.preprocessing.temporal_preprocessor",
+      "applicable_plugins": ["gas_detection", "device_monitoring"]
+    },
+    "equipment_health_prediction": {
+      "description": "设备健康预测与故障预测",
+      "label_format": "temporal_annotation",
+      "pipeline": "pipelines.training.temporal_trainer",
+      "preprocessor": "pipelines.preprocessing.temporal_preprocessor",
+      "applicable_plugins": ["gas_detection", "device_monitoring"]
+    },
+    "health_index_calibration": {
+      "description": "健康指数校准",
+      "label_format": "temporal_annotation",
+      "pipeline": "pipelines.training.temporal_trainer",
+      "preprocessor": "pipelines.preprocessing.temporal_preprocessor",
+      "applicable_plugins": ["device_monitoring"]
+    },
+    "action_event_sequence_recognition": {
+      "description": "动作事件序列识别",
+      "label_format": "action_event_sequence",
+      "pipeline": "pipelines.training.temporal_trainer",
+      "preprocessor": "pipelines.preprocessing.temporal_preprocessor",
+      "applicable_plugins": ["action_event_monitoring"]
+    },
+    "multimodal_feature_fusion": {
+      "description": "多模态特征级融合训练",
+      "label_format": "multimodal_sample",
+      "pipeline": "pipelines.training.multimodal_trainer",
+      "preprocessor": "pipelines.preprocessing.multimodal_preprocessor",
+      "applicable_plugins": ["multimodal_fusion"]
+    },
+    "multimodal_decision_fusion": {
+      "description": "多模态决策级融合训练",
+      "label_format": "multimodal_sample",
+      "pipeline": "pipelines.training.multimodal_trainer",
+      "preprocessor": "pipelines.preprocessing.multimodal_preprocessor",
+      "applicable_plugins": ["multimodal_fusion"]
+    }
+  },
+
+  "legacy_alias_map": {
+    "busbar": "busbar_inspection",
+    "capacitor": "capacitor_inspection",
+    "switch": "switch_inspection",
+    "transformer": "transformer_inspection",
+    "meter": "meter_reading"
+  }
+}

@@ -1,11 +1,74 @@
 {
-  "updated_at": "2026-02-16T10:45:29.982122",
+  "updated_at": "2026-04-15T14:08:05.137292",
   "records": [
+    {
+      "id": "upload_batch_20260415_140801_b1fd85b1",
+      "created_at": "2026-04-15T14:08:01.650942",
+      "voltage_level": "HV_220kV",
+      "voltage_level_raw": "HV_220kV",
+      "plugins": [
+        "busbar"
+      ],
+      "plugins_raw": [
+        "busbar_inspection"
+      ],
+      "file_count": 25,
+      "total_size": 10607458,
+      "status": "ready_for_training",
+      "data_path": "/Users/ronan/Desktop/DarkBreaker/training/datasets/incoming/upload_batch_20260415_140801_b1fd85b1",
+      "message": "标准化完成，可直接用于训练",
+      "image_count": 12,
+      "video_count": 0,
+      "audio_count": 0,
+      "label_count": 12
+    },
+    {
+      "id": "upload_20260415_093812_598cb780",
+      "created_at": "2026-04-15T09:38:12.733163",
+      "voltage_level": "HV_220kV",
+      "voltage_level_raw": "HV_220kV",
+      "plugins": [
+        "busbar"
+      ],
+      "plugins_raw": [
+        "busbar_inspection"
+      ],
+      "file_count": 16,
+      "total_size": 14009972,
+      "status": "completed",
+      "data_path": "/Users/ronan/Desktop/DarkBreaker/training/data/raw/HV_220kV/upload_20260415_093812_598cb780",
+      "message": "处理完成: train=11, val=3, test=2",
+      "image_count": 16,
+      "video_count": 0,
+      "audio_count": 0,
+      "label_count": 0
+    },
+    {
+      "id": "upload_20260216_104528_7c96ac61",
+      "created_at": "2026-02-16T10:45:29.260248",
+      "voltage_level": "HV_220kV",
+      "voltage_level_raw": "HV_220kV",
+      "plugins": [
+        "transformer"
+      ],
+      "plugins_raw": [
+        "transformer_inspection"
+      ],
+      "file_count": 2,
+      "total_size": 818088536,
+      "status": "completed",
+      "data_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/data/raw/HV_220kV/upload_20260216_104528_7c96ac61",
+      "message": "处理完成: train=593, val=170, test=85",
+      "image_count": 0,
+      "video_count": 0,
+      "audio_count": 0,
+      "label_count": 0
+    },
     {
       "id": "upload_20260204_140522_68729d4e",
       "created_at": "2026-02-04T14:05:22.792339",
       "voltage_level": "HV_220kV",
-      "voltage_level_raw": "220kv",
+      "voltage_level_raw": "HV_220kV",
       "plugins": [
         "transformer"
       ],
@@ -17,27 +80,6 @@
       "status": "completed",
       "data_path": "/test/path",
       "message": "",
-      "image_count": 0,
-      "video_count": 0,
-      "audio_count": 0,
-      "label_count": 0
-    },
-    {
-      "id": "upload_20260216_104528_7c96ac61",
-      "created_at": "2026-02-16T10:45:29.260248",
-      "voltage_level": "HV_220kV",
-      "voltage_level_raw": "220kv",
-      "plugins": [
-        "transformer"
-      ],
-      "plugins_raw": [
-        "transformer"
-      ],
-      "file_count": 2,
-      "total_size": 818088536,
-      "status": "completed",
-      "data_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/data/raw/HV_220kV/upload_20260216_104528_7c96ac61",
-      "message": "处理完成: train=593, val=170, test=85",
       "image_count": 0,
       "video_count": 0,
       "audio_count": 0,

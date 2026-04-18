@@ -61,15 +61,9 @@ if str(plugins_parent) not in sys.path:
 
 
 def main():
-    from darkbreaker_sdk.standalone import StandalonePluginRunner
-    from plugins.slam_mapping.plugin import Plugin
+    from plugins.slam_mapping.standalone.app import create_runner
 
-    plugin = Plugin.create_standalone()
-    runner = StandalonePluginRunner(
-        plugin,
-        plugin_templates_dir=PLUGIN_DIR / "standalone" / "templates",
-        plugin_static_dir=PLUGIN_DIR / "standalone" / "static",
-    )
+    runner = create_runner()
     runner.run(host="0.0.0.0", port=8084)
 
 

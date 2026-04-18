@@ -1,0 +1,90 @@
+{
+  "schema_version": "1.0",
+  "schema_ref": "docs/minimal_fixture_replay_schema.md",
+  "plugin_id": "bird_monitoring",
+  "asset_root": "plugins/bird_monitoring/tests/fixtures",
+  "collection_status": "planned_slots_only",
+  "samples": [
+    {
+      "sample_id": "bird_no_bird_001",
+      "asset_relpath": "plugins/bird_monitoring/tests/fixtures/normal/bird_no_bird_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "bird_monitoring",
+      "scenario_type": "normal",
+      "expected_runtime_mode": "simulation",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "no_bird"
+      ],
+      "expected_alarm_level": "none",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "待采集无遮挡、无鸟、背景稳定的基线样本。"
+    },
+    {
+      "sample_id": "bird_single_safe_001",
+      "asset_relpath": "plugins/bird_monitoring/tests/fixtures/normal/bird_single_safe_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "bird_monitoring",
+      "scenario_type": "normal",
+      "expected_runtime_mode": "real_dl",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "bird_safe"
+      ],
+      "expected_alarm_level": "none",
+      "collection_status": "planned_blocked_by_model",
+      "candidate_source_refs": [],
+      "notes": "待采集单鸟但安全距离充足的样本；simulation 不得生成该结果。"
+    },
+    {
+      "sample_id": "bird_unknown_review_001",
+      "asset_relpath": "plugins/bird_monitoring/tests/fixtures/anomaly/bird_unknown_review_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "bird_monitoring",
+      "scenario_type": "anomaly",
+      "expected_runtime_mode": "real_dl",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [
+        "unknown_bird"
+      ],
+      "expected_alarm_level": "warning",
+      "collection_status": "planned_blocked_by_model",
+      "candidate_source_refs": [],
+      "notes": "待采集物种不明确或数据库无法稳定匹配的鸟类样本；simulation 不得生成该结果。"
+    },
+    {
+      "sample_id": "bird_complex_background_001",
+      "asset_relpath": "plugins/bird_monitoring/tests/fixtures/boundary/bird_complex_background_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "bird_monitoring",
+      "scenario_type": "boundary",
+      "expected_runtime_mode": "real_dl",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [
+        "review_required"
+      ],
+      "expected_alarm_level": "warning",
+      "collection_status": "planned_blocked_by_model",
+      "candidate_source_refs": [],
+      "notes": "复杂背景、枝叶、绝缘子或构件干扰下的疑似鸟场景，不应强行硬判；simulation 不得生成该结果。"
+    },
+    {
+      "sample_id": "bird_quality_dark_001",
+      "asset_relpath": "plugins/bird_monitoring/tests/fixtures/quality_fail/bird_quality_dark_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "bird_monitoring",
+      "scenario_type": "quality_fail",
+      "expected_runtime_mode": "simulation",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [
+        "quality_failed"
+      ],
+      "expected_alarm_level": "warning",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "过暗、低清晰度或雨雾遮挡样本，目标是稳定暴露质量失败而不是沉默失败。"
+    }
+  ],
+  "candidate_sources": []
+}

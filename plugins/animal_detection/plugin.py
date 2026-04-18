@@ -42,6 +42,8 @@ from darkbreaker_sdk.schemas import (
 PLATFORM_AVAILABLE = True
 
 # === 核心模块导入 ===
+from platform_core.visual_output_protocol import build_visual_meta
+
 from plugins.animal_detection.core import (
     YOLOv8Detector,
     AnimalONNXEngine,
@@ -455,6 +457,30 @@ class AnimalDetectionPlugin:
                 # 更新证据trace_id
                 for ev in event.evidence:
                     ev.description += f" [trace={event.trace_id[:8]}]"
+
+                # === 统一视觉输出协议元数据 ===
+                visual_meta = build_visual_meta(
+                    plugin_name="animal_detection",
+                    task_type="detection",
+                    modality="animal",
+                    runtime_mode="traditional_fallback",
+                    algorithm_stage="baseline",
+                    quality_gate_status="pass",
+                    review_required=event.risk_level in ("high", "critical"),
+                    reason_codes=(
+                        [f"risk_level_{event.risk_level}"]
+                        if event.risk_level in ("high", "critical") else []
+                    ),
+                    evidence_hint="visual_frame",
+                    extra={
+                        "total_detections": len(detections),
+                        "deterrent_active": event.deterrent_active,
+                    },
+                )
+                if isinstance(event.value, dict):
+                    event.value["visual_meta"] = visual_meta
+                else:
+                    event.value = {"original": event.value, "visual_meta": visual_meta}
 
                 # === Step 5: 驱离评估 ===
                 if self._deterrent and self._deterrent.enabled and self._tracker:

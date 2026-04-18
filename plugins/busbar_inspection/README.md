@@ -7,31 +7,111 @@
 
 ---
 
+## 0. 冻结标签契约
+
+当前唯一标签契约源为 [label_contract.py](/Users/ronan/Desktop/DarkBreaker/plugins/busbar_inspection/label_contract.py)。
+本轮只声明当前 runtime supported baseline，不把缺失真实模型支撑的类别伪装成“已稳定支持”。
+
+<!-- LABEL_CONTRACT_START -->
+```yaml
+runtime_supported:
+  - pin_missing
+  - crack
+  - foreign_object
+  - quality_failed
+aliases:
+  loose_fitting: fitting_loose
+planned:
+  broken_part: blocked
+  fitting_loose: blocked
+```
+<!-- LABEL_CONTRACT_END -->
+
 ## 1. 功能概述
 
 ### 1.1 核心功能（必须交付可用）
 
 1) **远距小目标缺陷检测（4K大视场）**  
-- 典型缺陷：  
+- 当前 runtime supported 缺陷：  
   - `pin_missing`：销钉/开口销缺失（常见小目标）  
   - `crack`：绝缘子/金具裂纹（细长、低对比）  
-  - `loose_fitting`：金具松动/错位（结构变化）  
-  - `broken_part`：部件破损/缺失（结构性缺陷）  
 - 典型目标区域：绝缘子串端部销钉、连接点、耐张线夹、间隔棒、金具连接处。
 
 2) **异物悬挂检测**  
 - `foreign_object`：塑料袋、风筝线、鸟巢/树枝、漂浮物等。
 
-3) **多 ROI 并发推理（Batch > 1）**  
+3) **质量门禁三态决策**
+- `PASS`：进入正常检测主链。
+- `SOFT_FAIL`：不提前阻断，继续进入当前主链，但输出必须带 `quality_gate_status=soft_fail` 与 `review_status=review_required`。
+- `HARD_FAIL`：才允许直接阻断，并输出 `quality_failed`。
+- `quality_failed` 仅表示“质量门禁类输出”，不等于三态本身，但属于当前 runtime supported labels。
+
+4) **多 ROI 并发推理（Batch > 1）**  
 - 同一帧内多个部件 ROI 同时推理：  
   - 支持“ROI裁剪后拼 Batch”或“Tile（切片）后拼 Batch”的方式；  
   - 目标：单帧多部件处理效率稳定、吞吐可控。
 
-4) **环境干扰过滤 + 误报原因码（Reason Code）**  
+5) **环境干扰过滤 + 误报原因码（Reason Code）**  
 - 对“逆光/遮挡/模糊/雨雾/反光”等造成的疑似误报，必须输出 `reason_code`，便于平台决定：调焦、变焦、换角度、二次抓拍或人工复核。
 
-5) **建议变焦倍率输出（Zoom Suggestion）**  
+6) **建议变焦倍率输出（Zoom Suggestion）**  
 - 对于小目标检测不稳定/目标过小，需要输出 `suggested_zoom`（倍率或相对倍率）与 `suggested_action`，驱动平台执行“二次变焦/二次抓拍”。
+
+> `broken_part` 与 `fitting_loose`（兼容历史别名 `loose_fitting`）当前仅为 `blocked`，本轮不宣称稳定支持，也不附带线上精度承诺。
+
+### 1.1.1 当前运行模式与复核路径
+
+- `runtime_mode`
+  - `real_dl`：真实模型已加载并形成 ONNX session。
+  - `traditional_fallback`：未使用真实 DL，走传统回退链。
+  - `quality_blocked`：`HARD_FAIL` 被质量门禁直接阻断。
+  - `standalone_simulation`：standalone 仿真链路，仅用于演示/校准，不得冒充真实模型。
+- `quality_gate_status`
+  - `pass`
+  - `soft_fail`
+  - `hard_fail`
+- `review_status`
+  - `confirmed`
+  - `review_required`
+  - `blocked`
+
+当前 contract 要求：
+- `SOFT_FAIL + detection`：允许输出 `pin_missing/crack/foreign_object`，但必须显式 `review_required`。
+- `SOFT_FAIL + no detection`：允许输出 `quality_failed`，但 metadata 中必须保留 `quality_gate_status=soft_fail`，不得与 `HARD_FAIL` 混淆。
+- `HARD_FAIL`：输出 `quality_failed`，并保留 `failure_reason/reason_code/suggested_action/runtime_mode=quality_blocked`。
+- blocked 类（`broken_part`、`fitting_loose`）仍不得通过改名或映射混入当前 runtime supported labels。
+
+### 1.1.2 P3: 真实 ONNX 接入前置校验（preflight）
+
+- `real_dl` 只在以下条件同时满足时成立：
+  - `model_file_exists=true`
+  - `onnx_session_ready=true`
+  - `class_map_compatible=true`
+  - `output_structure_compatible=true`
+  - detector 实际允许进入 DL 主链（`_dl_initialized=true`）
+- `traditional_fallback` 的典型失败原因：
+  - `model_missing`
+  - `onnx_session_failed`
+  - `manifest_missing`
+  - `class_map_missing`
+  - `label_contract_mismatch`
+  - `output_shape_incompatible`
+- `healthcheck()` 当前会同步暴露：
+  - `dl_preflight_checked`
+  - `dl_preflight_passed`
+  - `dl_failure_reason`
+  - `dl_failure_details`
+  - `manifest_exists/class_map_exists/class_map_compatible`
+  - `input_size_validated/output_format_validated/output_structure_compatible`
+- 重要约束：
+  - `model file exists != real_dl ready`
+  - `session ready != precision improved`
+  - preflight 失败时必须保留 `traditional_fallback`，不得回到 simulation 伪 ready
+
+当前仓库内 busbar 候选 ONNX 资产已完成接入验证扫描，但未找到可直接接入当前 runtime contract 的生产候选：
+- 配置路径 `models/busbar_det.onnx` 当前不存在；
+- 仓库内其它母线候选资产缺少可验证的 manifest/class_map，且类别集合/输出结构与当前 `label_contract.py` 不兼容；
+- 因此默认运行模式仍应保持 `traditional_fallback`，直到出现兼容资产并通过 preflight。
 
 > 注意：本插件只“提出建议与证据”，PTZ/变焦/对焦动作由平台执行（插件不直接控制云台）。
 
@@ -64,10 +144,10 @@
 
 | ROI类型 | 说明 | 主要检测目标（label） | 备注 |
 |---|---|---|---|
-| `insulator_string` | 绝缘子串整体 | `crack`, `broken_part`, `foreign_object` | 可选：细分到端部区域 |
-| `hardware_fitting` | 金具/线夹/连接金具 | `pin_missing`, `loose_fitting`, `broken_part` | **销钉缺失**重点ROI |
-| `conductor_joint` | 导线连接点/接头 | `loose_fitting`, `foreign_object` | 温升由温度插件负责 |
-| `spacer_damper` | 间隔棒/防振锤 | `loose_fitting`, `broken_part` | 小目标，需变焦建议 |
+| `insulator_string` | 绝缘子串整体 | `crack`, `foreign_object` | `broken_part` 当前为 `blocked` |
+| `hardware_fitting` | 金具/线夹/连接金具 | `pin_missing` | `fitting_loose`/`loose_fitting` 当前为 `blocked` |
+| `conductor_joint` | 导线连接点/接头 | `foreign_object` | `fitting_loose` 当前为 `blocked` |
+| `spacer_damper` | 间隔棒/防振锤 | 当前无稳定 runtime 标签 | `fitting_loose` / `broken_part` 当前均为 `blocked` |
 | `foreign_object_zone` | 异物高发区域（走线附近） | `foreign_object` | 允许更大ROI |
 | `busbar_span` | 母线长跨（全局） | `foreign_object`（粗检） | 常用于先粗检再二次变焦 |
 
@@ -89,6 +169,9 @@
 - `reason_code`：误报/失败/策略原因（整数，详见 7.3）  
 - `extra.suggested_zoom`：建议变焦倍率（float）  
 - `extra.suggested_action`：建议动作（字符串枚举）  
+- `extra.runtime_mode`：真实运行模式（`real_dl/traditional_fallback/quality_blocked/standalone_simulation`）
+- `extra.quality_gate_status`：质量门禁三态（`pass/soft_fail/hard_fail`）
+- `extra.review_status`：结果确认状态（`confirmed/review_required/blocked`）
 - `extra.quality`：质量评估（如 `clarity_score/overexposed/backlight`）  
 - `extra.debug`：调试信息（tile数量、耗时等，生产可关闭）
 
@@ -254,6 +337,13 @@ B = Var(\nabla^2 I)
 - `reason_code = 201`（目标过小）  
 - 输出 `suggested_zoom`（见 4.4）
 
+### 4.3.5 Tri-state 执行规则（当前实现）
+
+- `PASS`：正常进入 `real_dl` 或 `traditional_fallback`。
+- `SOFT_FAIL`：继续检测，但 metadata 中必须保留完整 `quality` 指标、`reason_code`、`suggested_action`、`quality_gate_status=soft_fail`、`review_status=review_required`。
+- `HARD_FAIL`：直接阻断，输出 `quality_failed`，并固定 `runtime_mode=quality_blocked`。
+- standalone simulator 现在作为“质量门禁校准样本生成器”，其场景期望必须与真实 `check_quality_gate()` 结果一致，不能只做视觉演示。
+
 ---
 
 ### 4.4 建议变焦倍率（Zoom Suggestion）
@@ -282,9 +372,10 @@ z = clamp\left(\frac{target\_px}{\max(s\_{px}, \epsilon)}, z_{min}, z_{max}\righ
 
 ### 4.5 结果识别与告警策略（工程可用）
 
-- 当 `label in {pin_missing, crack, broken_part}` 且 `confidence >= alarm_thr_high`：`HIGH`  
+- 当 `label in {pin_missing, crack}` 且 `confidence >= alarm_thr_high`：`HIGH`  
 - 当 `foreign_object` 且 `confidence >= alarm_thr_mid`：`MEDIUM`  
-- 当 `confidence < alarm_thr_low` 或触发质量门禁：输出 `reason_code`，进入“待复核/二次抓拍”链路
+- 当触发质量门禁：输出 `quality_failed`，并附带 `reason_code` / `suggested_action` 进入“待复核/二次抓拍”链路
+- `broken_part` / `fitting_loose` 当前不在 runtime baseline 内，不参与现网告警策略
 
 ---
 
@@ -541,7 +632,7 @@ class BusbarInspectionPlugin:
         for r in results:
             label = r.get("label", "ok")
             conf = float(r.get("confidence", 0.0))
-            if label in ("pin_missing", "crack", "broken_part") and conf >= thr_hi:
+            if label in ("pin_missing", "crack") and conf >= thr_hi:
                 alarms.append({"alarm_id": f"alarm_{int(time.time())}", "severity": "HIGH",
                                "message": f"检测到{label}", "related_roi_id": r.get("roi_id"),
                                "timestamp": r.get("timestamp"), "evidence": r.get("evidence", {})})
@@ -590,12 +681,16 @@ zoom:
   zmax: 12.0
 
 labels:
-  - ok
-  - pin_missing
-  - crack
-  - loose_fitting
-  - broken_part
-  - foreign_object
+  runtime_supported:
+    - pin_missing
+    - crack
+    - foreign_object
+    - quality_failed
+  aliases:
+    loose_fitting: fitting_loose
+  planned:
+    broken_part: blocked
+    fitting_loose: blocked
 
 rules:
   alarm_thr_high: 0.75

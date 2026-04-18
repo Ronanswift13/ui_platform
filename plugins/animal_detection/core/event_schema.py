@@ -12,11 +12,23 @@ timestamp / type / location / value / confidence
 """
 
 from __future__ import annotations
+import math
 import uuid
 import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+
+
+def _sanitize_confidence(value: float) -> float:
+    """置信度消毒: NaN/Inf/负数/超1 → 安全区间 [0, 1] (QR-11)"""
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return 0.0
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return float(value)
 
 
 class AnimalClass(str, Enum):
@@ -147,10 +159,12 @@ class AnimalDetectionResult:
         d = {
             "detection_id": self.detection_id,
             "animal_class": self.animal_class,
-            "confidence": round(self.confidence, 4),
+            "confidence": round(_sanitize_confidence(self.confidence), 4),
             "track_id": self.track_id,
             "is_thermal_validated": self.is_thermal_validated,
-            "thermal_diff_c": round(self.thermal_diff_c, 2) if self.thermal_diff_c is not None else None,
+            "thermal_diff_c": (
+                round(self.thermal_diff_c, 2) if self.thermal_diff_c is not None else None
+            ),
             "stay_duration_s": round(self.stay_duration_s, 1),
         }
         if self.bbox:
@@ -236,8 +250,9 @@ def build_intrusion_event(
             value={"status": "clear", "count": 0},
         )
 
-    # 计算综合置信度 (取最高)
-    max_conf = max(d.confidence for d in detections)
+    # 计算综合置信度 (取最高, QR-11: 消毒后再取 max)
+    sanitized_confs = [_sanitize_confidence(d.confidence) for d in detections]
+    max_conf = max(sanitized_confs) if sanitized_confs else 0.0
 
     # 确定最高风险
     risk_levels = [ANIMAL_RISK_MAP.get(d.animal_class, RiskLevel.MEDIUM) for d in detections]

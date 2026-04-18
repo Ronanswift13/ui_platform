@@ -594,12 +594,19 @@ class DatasetDownloader:
         
         if not processed_dir.exists():
             return stats
+
+        dataset_root = processed_dir
+        data_yaml = processed_dir / "data.yaml"
+        if data_yaml.exists():
+            resolved = self._resolve_dataset_root_from_yaml(data_yaml, processed_dir)
+            if resolved is not None:
+                dataset_root = resolved
         
         # 统计图像
         image_exts = {'.jpg', '.jpeg', '.png', '.bmp'}
         
         for split in ["train", "val", "test"]:
-            images_dir = processed_dir / "images" / split
+            images_dir = dataset_root / "images" / split
             if images_dir.exists():
                 count = sum(1 for f in images_dir.iterdir() if f.suffix.lower() in image_exts)
                 stats[f"{split}_count"] = count
@@ -607,7 +614,7 @@ class DatasetDownloader:
         stats["total_count"] = stats["train_count"] + stats["val_count"] + stats["test_count"]
         
         # 检查标注
-        labels_dir = processed_dir / "labels" / "train"
+        labels_dir = dataset_root / "labels" / "train"
         if labels_dir.exists():
             stats["has_labels"] = any(labels_dir.iterdir())
         
@@ -623,6 +630,27 @@ class DatasetDownloader:
                 stats["status"] = "placeholder"
         
         return stats
+
+    def _resolve_dataset_root_from_yaml(self, yaml_path: Path, fallback_root: Path) -> Optional[Path]:
+        """从 data.yaml 中解析真实数据根目录"""
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as handle:
+                for raw_line in handle:
+                    line = raw_line.strip()
+                    if not line.startswith("path:"):
+                        continue
+                    path_value = line.split(":", 1)[1].strip().strip("'\"")
+                    if not path_value:
+                        return fallback_root
+                    candidate = Path(path_value)
+                    if not candidate.is_absolute():
+                        candidate = (yaml_path.parent / candidate).resolve()
+                    if candidate.exists():
+                        return candidate
+                    return fallback_root
+        except OSError:
+            return fallback_root
+        return fallback_root
 
 
 # =============================================================================

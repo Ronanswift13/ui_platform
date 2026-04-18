@@ -1,0 +1,66 @@
+# 动物入侵检测 - 训练配置模板
+plugin_id: animal_detection
+display_name: 动物入侵检测
+
+# 主模型: 目标检测
+model:
+  family: yolov8
+  backbone: yolov8n
+  pretrained: yolov8n.pt
+  input_modality: rgb+thermal
+  image_size: 640
+
+task:
+  primary: detection
+  label_schema: detection_bbox
+  classes:
+    animal:
+      - mouse
+      - cat
+      - snake
+      - bird
+      - dog
+      - poultry
+      - insect
+      - other
+
+# 辅助模型
+secondary_models:
+  species_classifier:
+    family: efficientnet
+    backbone: efficientnet_b0
+    task_type: classification
+    image_size: 224
+    classes: [mouse, cat, snake, bird, dog, poultry, insect, other]
+  thermal_activity:
+    family: cnn
+    backbone: resnet18
+    task_type: thermal_anomaly
+    image_size: 224
+    classes: [active, inactive]
+
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 3
+
+augmentation:
+  mosaic: 1.0
+  mixup: 0.2
+  copy_paste: 0.15
+  fliplr: 0.5
+  scale: 0.5
+
+evaluation:
+  metrics: [mAP@0.5, recall, precision, species_accuracy]
+  qualification:
+    mAP@0.5: 0.55
+    recall: 0.75
+
+export:
+  formats: [onnx]
+
+voltage_levels: [all]

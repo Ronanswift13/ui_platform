@@ -1,0 +1,41 @@
+# 热像分析 (占位态) - 训练配置模板
+plugin_id: thermal
+display_name: 热像分析
+status: placeholder  # 插件尚未完成治理
+
+model:
+  family: cnn
+  backbone: resnet18
+  input_modality: thermal
+  image_size: 224
+
+task:
+  primary: thermal_anomaly
+  label_schema: thermal_anomaly
+  classes:
+    anomaly_type:
+      - hotspot
+      - gradient_anomaly
+      - thermal_bridge
+
+training:
+  epochs: 80
+  batch_size: 32
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+
+augmentation:
+  temperature_jitter: 5.0
+  noise: 0.1
+  fliplr: 0.5
+
+evaluation:
+  metrics: [anomaly_accuracy, false_alarm_rate]
+  qualification:
+    anomaly_accuracy: 0.80
+
+export:
+  formats: [onnx]
+
+voltage_levels: [all]

@@ -1,0 +1,22 @@
+{
+  "fixture_version": "1.0",
+  "fixture_id": "meter_led_indicator_green_001",
+  "asset_kind": "mock_image_spec",
+  "meter_type": "led_indicator",
+  "image": {
+    "kind": "solid_bgr",
+    "shape": [64, 64, 3],
+    "bgr": [0, 255, 0],
+    "dtype": "uint8"
+  },
+  "expected": {
+    "reading_status": "success",
+    "review_status": "clear",
+    "value": 2.0,
+    "unit": "green",
+    "color_class": "green",
+    "runtime_mode": "traditional_fallback",
+    "failure_reason": ""
+  },
+  "notes": "Mock-only pilot fixture for replay plumbing; not a real field sample."
+}

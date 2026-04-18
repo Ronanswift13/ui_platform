@@ -300,6 +300,14 @@ class IndoorFencePlugin(BasePlugin):
         # 告警计数
         self._alert_count = 0
 
+        # 视频流服务
+        self._video_stream = None
+
+        # 仿真控制 (与生产路径隔离)
+        self._simulator = None
+        self._sim_renderer = None
+        self._active_scenario = None
+
         # 线程锁
         self._lock = threading.RLock()
 
@@ -464,6 +472,10 @@ class IndoorFencePlugin(BasePlugin):
             self._camera_adapter = CameraAdapter(camera_config)
             self._camera_adapter.connect()
 
+            # 仿真模式下自动挂载 Simulator + Renderer
+            if self._camera_adapter.is_simulated:
+                self._attach_simulator_to_camera(config)
+
         # 雷达适配器
         lidar_config = config.get("lidar", {})
         if lidar_config.get("enabled", True):
@@ -489,6 +501,115 @@ class IndoorFencePlugin(BasePlugin):
             )
             self._light_adapter = LightAdapter(light_cfg)
             self._light_adapter.connect()
+
+    def _attach_simulator_to_camera(self, config: Dict):
+        """为模拟模式的 CameraAdapter 挂载 Simulator + SimulationRenderer"""
+        try:
+            from plugins.indoor_fence.adapters.simulator import Simulator, SimulatorConfig
+            from plugins.indoor_fence.standalone.simulation_renderer import SimulationRenderer
+
+            sim_config = SimulatorConfig(
+                num_persons=config.get("simulation", {}).get("num_persons", 2),
+                scene_bounds=tuple(config.get("simulation", {}).get(
+                    "scene_bounds", [0.0, 0.0, 10.0, 6.0]
+                )),
+                speed_m_per_step=config.get("simulation", {}).get("speed", 0.08),
+            )
+            self._simulator = Simulator(sim_config)
+
+            bounds = sim_config.scene_bounds
+            yellow_y = config.get("zones", {}).get("yellow_line_y", 3.0)
+            raw_cabs = config.get("zones", {}).get("cabinets", [
+                {"label": "Cabinet A", "x_min": 1.0, "y_min": 4.0, "x_max": 3.0, "y_max": 5.5},
+                {"label": "Cabinet B", "x_min": 7.0, "y_min": 4.0, "x_max": 9.0, "y_max": 5.5},
+            ])
+            cabinets = self._convert_cabinets_to_tuples(raw_cabs)
+
+            resolution = tuple(config.get("camera", {}).get("resolution", [640, 480]))
+            self._sim_renderer = SimulationRenderer(
+                scene_bounds=bounds,
+                resolution=resolution,
+                yellow_line_y=yellow_y,
+                cabinets=cabinets,
+                scenario_name="default",
+            )
+
+            self._camera_adapter.set_simulator(self._simulator, self._sim_renderer)
+            logger.info("仿真器已自动挂载到 CameraAdapter")
+
+        except Exception as e:
+            logger.warning(f"仿真器挂载失败 (fallback 到随机检测): {e}")
+
+    @staticmethod
+    def _convert_cabinets_to_tuples(raw_cabs: List[Dict]) -> List[tuple]:
+        """将配置中的 dict 格式机柜转换为渲染器的 (cx, cy, w, h, name) 元组格式"""
+        result = []
+        for cab in raw_cabs:
+            x_min = cab.get("x_min", 0.0)
+            y_min = cab.get("y_min", 0.0)
+            x_max = cab.get("x_max", 1.0)
+            y_max = cab.get("y_max", 1.0)
+            cx = (x_min + x_max) / 2
+            cy = (y_min + y_max) / 2
+            w = x_max - x_min
+            h = y_max - y_min
+            name = cab.get("label", cab.get("name", "Cabinet"))
+            result.append((cx, cy, w, h, name))
+        return result
+
+    def _load_scenario(self, scenario_name: str) -> Dict[str, Any]:
+        """加载并激活指定场景"""
+        scenario_dir = self.plugin_dir / "configs" / "scenarios"
+        scenario_file = scenario_dir / f"{scenario_name}.json"
+
+        if not scenario_file.exists():
+            return {"error": f"场景不存在: {scenario_name}"}
+
+        try:
+            from plugins.indoor_fence.adapters.simulator import Simulator
+            from plugins.indoor_fence.standalone.simulation_renderer import SimulationRenderer
+
+            self._simulator = Simulator.from_scenario(str(scenario_file))
+
+            with open(scenario_file) as f:
+                scenario_data = json.load(f)
+
+            bounds = tuple(scenario_data.get("scene_bounds", [0.0, 0.0, 10.0, 6.0]))
+            yellow_y = scenario_data.get("yellow_line_y", 3.0)
+
+            config = self.get_runtime_config()
+            raw_cabs = config.get("zones", {}).get("cabinets", [
+                {"label": "Cabinet A", "x_min": 1.0, "y_min": 4.0, "x_max": 3.0, "y_max": 5.5},
+                {"label": "Cabinet B", "x_min": 7.0, "y_min": 4.0, "x_max": 9.0, "y_max": 5.5},
+            ])
+            cabinets = self._convert_cabinets_to_tuples(raw_cabs)
+
+            resolution = tuple(config.get("camera", {}).get("resolution", [640, 480]))
+            self._sim_renderer = SimulationRenderer(
+                scene_bounds=bounds,
+                resolution=resolution,
+                yellow_line_y=yellow_y,
+                cabinets=cabinets,
+                scenario_name=scenario_data.get("name", scenario_name),
+            )
+
+            if self._camera_adapter:
+                self._camera_adapter.set_simulator(self._simulator, self._sim_renderer)
+
+            self._active_scenario = scenario_name
+            logger.info(f"场景已加载: {scenario_name}")
+
+            return {
+                "status": "loaded",
+                "scenario": scenario_name,
+                "description": scenario_data.get("description", ""),
+                "num_persons": scenario_data.get("num_persons", 1),
+                "path_type": scenario_data.get("path_type", "random"),
+            }
+
+        except Exception as e:
+            logger.error(f"场景加载失败: {e}")
+            return {"error": str(e)}
 
     def infer(
         self,
@@ -1228,6 +1349,12 @@ class IndoorFencePlugin(BasePlugin):
             "config_revision": self._config_revision,
         }
 
+    def _ensure_video_stream(self):
+        """确保视频流服务已初始化"""
+        if self._video_stream is None:
+            from plugins.indoor_fence.standalone.video_stream import VideoStreamService
+            self._video_stream = VideoStreamService(self)
+
     def get_standalone_routes(self) -> list:
         """注册电子围栏专用 standalone API。"""
 
@@ -1272,6 +1399,139 @@ class IndoorFencePlugin(BasePlugin):
         async def _get_events(limit: int = 100):
             return self.get_recent_events(limit=limit)
 
+        # ---- 视频流路由 ----
+
+        async def _video_stream_feed():
+            """MJPEG 视频流端点"""
+            from starlette.responses import StreamingResponse
+            self._ensure_video_stream()
+            if not self._video_stream.is_running:
+                self._video_stream.start()
+            return StreamingResponse(
+                self._video_stream.generate_mjpeg(),
+                media_type="multipart/x-mixed-replace; boundary=frame",
+            )
+
+        async def _start_stream():
+            """启动视频流"""
+            self._ensure_video_stream()
+            self._video_stream.start()
+            return {"status": "streaming", "stats": self._video_stream.stats}
+
+        async def _stop_stream():
+            """停止视频流"""
+            if self._video_stream:
+                self._video_stream.stop()
+            return {"status": "stopped"}
+
+        async def _snapshot():
+            """获取单帧 JPEG 快照"""
+            from fastapi.responses import Response
+            self._ensure_video_stream()
+            if not self._video_stream.is_running:
+                self._video_stream.start()
+                import asyncio
+                await asyncio.sleep(0.5)  # 等待首帧
+            jpeg_bytes = self._video_stream.get_snapshot_jpeg()
+            if jpeg_bytes:
+                return Response(content=jpeg_bytes, media_type="image/jpeg")
+            return Response(content=b'', status_code=204)
+
+        async def _stream_stats():
+            """获取视频流状态"""
+            if self._video_stream:
+                return self._video_stream.stats
+            return {"running": False}
+
+        # ---- 仿真场景路由 ----
+
+        async def _list_scenarios():
+            """列出可用仿真场景"""
+            scenario_dir = self.plugin_dir / "configs" / "scenarios"
+            scenarios = []
+            if scenario_dir.is_dir():
+                for f in sorted(scenario_dir.glob("*.json")):
+                    try:
+                        with open(f) as fh:
+                            data = json.load(fh)
+                        scenarios.append({
+                            "id": f.stem,
+                            "name": data.get("name", f.stem),
+                            "description": data.get("description", ""),
+                            "num_persons": data.get("num_persons", 1),
+                            "path_type": data.get("path_type", "random"),
+                        })
+                    except Exception:
+                        scenarios.append({"id": f.stem, "name": f.stem, "description": "parse error"})
+            return {
+                "scenarios": scenarios,
+                "active": self._active_scenario,
+            }
+
+        async def _load_scenario_api(payload: Dict[str, Any]):
+            """加载并激活仿真场景"""
+            payload = payload or {}
+            scenario_id = payload.get("scenario", payload.get("id", ""))
+            if not scenario_id:
+                return {"error": "missing scenario id"}
+            return self._load_scenario(scenario_id)
+
+        async def _simulator_status():
+            """获取仿真器状态"""
+            if self._simulator is None:
+                return {"active": False}
+            return {
+                "active": True,
+                "scenario": self._active_scenario,
+                "step_count": self._simulator._step_count,
+                "num_persons": self._simulator.num_persons,
+                "renderer": self._sim_renderer is not None,
+            }
+
+        async def _get_tracking_data():
+            """获取实时跟踪数据（用于前端轨迹可视化）"""
+            import time
+            tracked_persons = self.get_tracked_persons() if hasattr(self, 'get_tracked_persons') else []
+
+            # 转换为前端需要的格式
+            persons = []
+            for p in tracked_persons:
+                person_data = {
+                    "id": p.get("person_id", p.get("id", 0)),
+                    "x": p.get("x", p.get("position", [0, 0, 0])[0] if isinstance(p.get("position"), (list, tuple)) else 0),
+                    "y": p.get("y", p.get("position", [0, 0, 0])[1] if isinstance(p.get("position"), (list, tuple)) else 0),
+                    "z": p.get("z", 0),
+                    "vx": p.get("vx", p.get("velocity", [0, 0, 0])[0] if isinstance(p.get("velocity"), (list, tuple)) else 0),
+                    "vy": p.get("vy", p.get("velocity", [0, 0, 0])[1] if isinstance(p.get("velocity"), (list, tuple)) else 0),
+                    "distance_to_fence": p.get("distance_to_line_m", p.get("distance_to_fence", 0)),
+                    "distance_level": p.get("distance_level", "safe"),
+                    "state": p.get("state", "normal"),
+                    "confidence": p.get("confidence", 0.9),
+                    "trajectory": p.get("trajectory", []),
+                    "prediction": p.get("prediction", []),
+                }
+                persons.append(person_data)
+
+            # 获取统计信息
+            stats = {
+                "active_persons": len(persons),
+                "total_alerts": getattr(self, '_total_alerts', 0),
+            }
+
+            # 获取告警
+            alerts = []
+            if hasattr(self, '_recent_alerts'):
+                alerts = list(self._recent_alerts)[-10:]
+
+            return {
+                "timestamp": time.time(),
+                "frame_count": getattr(self, '_frame_count', 0),
+                "fps": getattr(self, '_current_fps', 0),
+                "persons": persons,
+                "alerts": alerts,
+                "stats": stats,
+            }
+
         return [
             {
                 "path": "/api/indoor-fence/config",
@@ -1308,6 +1568,62 @@ class IndoorFencePlugin(BasePlugin):
                 "endpoint": _get_events,
                 "methods": ["GET"],
                 "summary": "获取最近事件",
+            },
+            # ---- 视频流端点 ----
+            {
+                "path": "/api/indoor-fence/stream",
+                "endpoint": _video_stream_feed,
+                "methods": ["GET"],
+                "summary": "MJPEG 视频流",
+            },
+            {
+                "path": "/api/indoor-fence/stream/start",
+                "endpoint": _start_stream,
+                "methods": ["POST"],
+                "summary": "启动视频流",
+            },
+            {
+                "path": "/api/indoor-fence/stream/stop",
+                "endpoint": _stop_stream,
+                "methods": ["POST"],
+                "summary": "停止视频流",
+            },
+            {
+                "path": "/api/indoor-fence/snapshot",
+                "endpoint": _snapshot,
+                "methods": ["GET"],
+                "summary": "获取单帧快照",
+            },
+            {
+                "path": "/api/indoor-fence/stream/stats",
+                "endpoint": _stream_stats,
+                "methods": ["GET"],
+                "summary": "获取视频流状态",
+            },
+            # ---- 仿真场景端点 ----
+            {
+                "path": "/api/indoor-fence/simulator/scenarios",
+                "endpoint": _list_scenarios,
+                "methods": ["GET"],
+                "summary": "列出仿真场景",
+            },
+            {
+                "path": "/api/indoor-fence/simulator/load",
+                "endpoint": _load_scenario_api,
+                "methods": ["POST"],
+                "summary": "加载仿真场景",
+            },
+            {
+                "path": "/api/indoor-fence/simulator/status",
+                "endpoint": _simulator_status,
+                "methods": ["GET"],
+                "summary": "仿真器状态",
+            },
+            {
+                "path": "/api/indoor-fence/tracking",
+                "endpoint": _get_tracking_data,
+                "methods": ["GET"],
+                "summary": "获取实时跟踪数据",
             },
         ]
 

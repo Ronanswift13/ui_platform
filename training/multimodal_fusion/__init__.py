@@ -1,0 +1,59 @@
+"""
+多模态融合训练模块
+"""
+
+from .data_contract import (
+    DiagnosticRulePackRef,
+    ModalityPathSpec,
+    MultimodalAlignedSample,
+    MultimodalDatasetContract,
+    normalize_multimodal_contract,
+    validate_multimodal_contract,
+    validate_multimodal_sample_record,
+)
+from .task_profiles import (
+    MULTIMODAL_DATASET_FAMILY,
+    MULTIMODAL_FUSION_STRATEGIES,
+    MULTIMODAL_MISSING_MODALITY_POLICIES,
+    MULTIMODAL_RUNTIME_MODES,
+    MULTIMODAL_SUPPORTED_MODALITIES,
+    MULTIMODAL_TASK_PROFILES,
+    MULTIMODAL_TASK_TYPES,
+    MULTIMODAL_TRAINING_PARADIGMS,
+    MULTIMODAL_UPLOAD_LAYOUTS,
+    FusionOutputHead,
+    MultimodalTaskProfile,
+    MultimodalUploadLayout,
+    PLUGIN_MODALITY_DEPENDENCY_MAP,
+    PLUGIN_MODEL_ROLES,
+    get_multimodal_task_profile,
+    get_multimodal_upload_layout,
+    is_multimodal_task,
+)
+
+__all__ = [
+    "DiagnosticRulePackRef",
+    "FusionOutputHead",
+    "ModalityPathSpec",
+    "MultimodalAlignedSample",
+    "MultimodalDatasetContract",
+    "MultimodalTaskProfile",
+    "MultimodalUploadLayout",
+    "MULTIMODAL_DATASET_FAMILY",
+    "MULTIMODAL_FUSION_STRATEGIES",
+    "MULTIMODAL_MISSING_MODALITY_POLICIES",
+    "MULTIMODAL_RUNTIME_MODES",
+    "MULTIMODAL_SUPPORTED_MODALITIES",
+    "MULTIMODAL_TASK_PROFILES",
+    "MULTIMODAL_TASK_TYPES",
+    "MULTIMODAL_TRAINING_PARADIGMS",
+    "MULTIMODAL_UPLOAD_LAYOUTS",
+    "PLUGIN_MODALITY_DEPENDENCY_MAP",
+    "PLUGIN_MODEL_ROLES",
+    "get_multimodal_task_profile",
+    "get_multimodal_upload_layout",
+    "is_multimodal_task",
+    "normalize_multimodal_contract",
+    "validate_multimodal_contract",
+    "validate_multimodal_sample_record",
+]

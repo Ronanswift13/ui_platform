@@ -39,6 +39,10 @@ class PersonState(str, Enum):
     CROSS_LINE = "cross_line"   # 越线 - 已越过黄线
     MISPLACED = "misplaced"     # 错位 - 在未授权区域
     HIGH_RISK = "high_risk"     # 高风险 - 危险区域
+    CLIMBING = "climbing"       # V3: 攀爬行为
+    PROLONGED_STAY = "prolonged_stay"  # V3: 长时间滞留
+    FALLEN = "fallen"           # V3: 跌倒
+    MULTI_PERSON = "multi_person"  # V3: 多人异常
     UNKNOWN = "unknown"         # 未知状态
 
 
@@ -123,18 +127,26 @@ class StateMachine:
         PersonState.NORMAL: 0,
         PersonState.ON_LINE: 1,
         PersonState.MISPLACED: 2,
-        PersonState.CROSS_LINE: 3,
-        PersonState.HIGH_RISK: 4,
+        PersonState.PROLONGED_STAY: 3,
+        PersonState.CROSS_LINE: 4,
+        PersonState.MULTI_PERSON: 4,
+        PersonState.CLIMBING: 5,
+        PersonState.HIGH_RISK: 5,
+        PersonState.FALLEN: 6,
         PersonState.UNKNOWN: 0,
     }
-    
+
     # 状态到告警级别映射
     STATE_TO_ALERT = {
         PersonState.NORMAL: AlertLevel.NORMAL,
         PersonState.ON_LINE: AlertLevel.WARNING,
         PersonState.MISPLACED: AlertLevel.ALARM,
+        PersonState.PROLONGED_STAY: AlertLevel.WARNING,
         PersonState.CROSS_LINE: AlertLevel.CRITICAL,
+        PersonState.MULTI_PERSON: AlertLevel.ALARM,
+        PersonState.CLIMBING: AlertLevel.CRITICAL,
         PersonState.HIGH_RISK: AlertLevel.CRITICAL,
+        PersonState.FALLEN: AlertLevel.CRITICAL,
         PersonState.UNKNOWN: AlertLevel.ATTENTION,
     }
     
@@ -256,24 +268,35 @@ class StateMachine:
         zone: Optional[ZoneDefinition],
         cabinet: Optional[CabinetDefinition]
     ) -> PersonState:
-        """根据区域和距离判断状态"""
-        
+        """根据区域和距离判断状态 (V3: behavior states have priority)"""
+
+        # V3: Behavior-based states (highest priority)
+        behavior = result.metadata.get("behavior")
+        if behavior == "fallen":
+            return PersonState.FALLEN
+        if behavior == "climbing":
+            return PersonState.CLIMBING
+        if behavior == "prolonged_stay":
+            return PersonState.PROLONGED_STAY
+        if behavior == "multi_person":
+            return PersonState.MULTI_PERSON
+
         # 危险区检查
         if zone and zone.zone_type == ZoneType.DANGER:
             return PersonState.HIGH_RISK
-        
+
         # 越线检查 (距离黄线为负表示已越过)
         if result.distance_to_yellow_line <= self.cross_line_threshold:
             return PersonState.CROSS_LINE
-        
+
         # 压线检查
         if result.distance_to_yellow_line <= self.on_line_threshold:
             return PersonState.ON_LINE
-        
+
         # 授权检查
         if cabinet and not result.is_authorized:
             return PersonState.MISPLACED
-        
+
         # 正常状态
         return PersonState.NORMAL
     
@@ -309,9 +332,13 @@ class StateMachine:
         messages = {
             PersonState.NORMAL: f"人员{result.person_id}状态正常",
             PersonState.ON_LINE: f"人员{result.person_id}接近黄线 (距离{result.distance_to_yellow_line:.2f}m)",
-            PersonState.CROSS_LINE: f"⚠️ 人员{result.person_id}越线! 请立即退回",
+            PersonState.CROSS_LINE: f"人员{result.person_id}越线! 请立即退回",
             PersonState.MISPLACED: f"人员{result.person_id}在未授权区域 (机柜{result.current_cabinet})",
-            PersonState.HIGH_RISK: f"🚨 人员{result.person_id}进入危险区域!",
+            PersonState.HIGH_RISK: f"人员{result.person_id}进入危险区域!",
+            PersonState.CLIMBING: f"人员{result.person_id}检测到攀爬行为!",
+            PersonState.FALLEN: f"人员{result.person_id}检测到跌倒!",
+            PersonState.PROLONGED_STAY: f"人员{result.person_id}长时间滞留",
+            PersonState.MULTI_PERSON: f"人员{result.person_id}区域多人异常",
             PersonState.UNKNOWN: f"人员{result.person_id}状态未知",
         }
         return messages.get(result.state, "")

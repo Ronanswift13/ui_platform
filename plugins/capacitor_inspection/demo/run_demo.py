@@ -39,9 +39,12 @@ def main():
     # Simulated inference
     print("\n[3] Running simulated inference...")
     from darkbreaker_sdk.interfaces import PluginContext
-    from darkbreaker_sdk.schemas import ROI, BoundingBox
+    from darkbreaker_sdk.schemas import BoundingBox, ROI, ROIType
 
-    frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    frame = np.full((480, 640, 3), 255, dtype=np.uint8)
+    frame[120:420, 100:150] = [20, 20, 20]
+    frame[110:420, 250:300] = [20, 20, 20]
+    frame[130:420, 400:450] = [20, 20, 20]
     context = PluginContext(
         task_id="demo-task",
         site_id="demo-site",
@@ -52,6 +55,7 @@ def main():
         id="roi-demo",
         name="capacitor_bank",
         component_id="capacitor-bank-01",
+        roi_type=ROIType.DEFECT,
         bbox=BoundingBox(x=0.1, y=0.1, width=0.8, height=0.8),
     )]
 

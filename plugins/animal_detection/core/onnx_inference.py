@@ -34,6 +34,7 @@ logger = logging.getLogger("animal_detection.onnx_inference")
 # 数据结构
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Detection:
     """单个检测结果."""

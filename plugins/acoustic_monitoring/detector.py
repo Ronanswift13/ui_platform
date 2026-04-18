@@ -298,6 +298,125 @@ class AudioFeatureExtractor:
             "hf_energy_profile": hf_energy_over_time.tolist(),
         }
 
+    def compute_spectral_kurtosis(self, audio: np.ndarray) -> Dict[str, Any]:
+        """计算谱峰度 — 每个频率 bin 跨帧的功率谱峰度
+
+        高谱峰度 → 该频率存在瞬态/脉冲能量 (PD 特征)
+        低谱峰度 → 该频率为稳态信号 (背景噪声)
+        """
+        spectrogram = self.compute_spectrogram(audio)  # (freq_bins, time_frames)
+        power_spec = spectrogram ** 2
+
+        n_frames = power_spec.shape[1]
+        if n_frames < 4:
+            return {"spectral_kurtosis_mean": 0.0, "spectral_kurtosis_max": 0.0,
+                    "spectral_kurtosis_profile": []}
+
+        # 每个频率 bin 的峰度
+        mean_power = np.mean(power_spec, axis=1, keepdims=True) + 1e-12
+        std_power = np.std(power_spec, axis=1, keepdims=True) + 1e-12
+        sk = np.mean(((power_spec - mean_power) / std_power) ** 4, axis=1) - 3.0
+
+        return {
+            "spectral_kurtosis_mean": float(np.mean(sk)),
+            "spectral_kurtosis_max": float(np.max(sk)),
+            "spectral_kurtosis_profile": sk.tolist(),
+        }
+
+    def compute_hjorth_parameters(self, audio: np.ndarray) -> Dict[str, float]:
+        """计算 Hjorth 参数 — 紧凑的时域特征描述
+
+        Activity: 信号方差 (信号强度)
+        Mobility: 一阶导数标准差 / 信号标准差 (主频率)
+        Complexity: 二阶导 mobility / 一阶导 mobility (频带宽度)
+        """
+        # Activity
+        activity = float(np.var(audio))
+
+        # 一阶差分
+        d1 = np.diff(audio)
+        d1_var = np.var(d1) + 1e-12
+
+        # 二阶差分
+        d2 = np.diff(d1)
+        d2_var = np.var(d2) + 1e-12
+
+        # Mobility
+        mobility = float(np.sqrt(d1_var / (activity + 1e-12)))
+
+        # Complexity
+        d1_mobility = np.sqrt(d2_var / d1_var)
+        complexity = float(d1_mobility / (mobility + 1e-12))
+
+        return {
+            "hjorth_activity": activity,
+            "hjorth_mobility": mobility,
+            "hjorth_complexity": complexity,
+        }
+
+    def compute_mfcc_deltas(self, audio: np.ndarray, n_mfcc: int = 13) -> np.ndarray:
+        """计算 MFCC 及其一阶、二阶差分 (39维特征矩阵)
+
+        用于时间动态捕捉, 供序列模型 (LSTM/Transformer) 使用。
+        返回: (39, T) 特征矩阵
+        """
+        mfcc = self.compute_mfcc(audio, n_mfcc)  # (n_mfcc, T)
+
+        # 一阶差分 (Δ)
+        if mfcc.shape[1] > 1:
+            delta = np.zeros_like(mfcc)
+            delta[:, 1:-1] = (mfcc[:, 2:] - mfcc[:, :-2]) / 2.0
+            delta[:, 0] = mfcc[:, 1] - mfcc[:, 0]
+            delta[:, -1] = mfcc[:, -1] - mfcc[:, -2]
+        else:
+            delta = np.zeros_like(mfcc)
+
+        # 二阶差分 (ΔΔ)
+        if delta.shape[1] > 1:
+            delta2 = np.zeros_like(delta)
+            delta2[:, 1:-1] = (delta[:, 2:] - delta[:, :-2]) / 2.0
+            delta2[:, 0] = delta[:, 1] - delta[:, 0]
+            delta2[:, -1] = delta[:, -1] - delta[:, -2]
+        else:
+            delta2 = np.zeros_like(delta)
+
+        # 堆叠: [MFCC; Δ; ΔΔ] → (39, T)
+        return np.vstack([mfcc, delta, delta2])
+
+    def compute_training_features(self, audio: np.ndarray) -> Dict[str, Any]:
+        """聚合所有高级特征为标准化训练输出
+
+        返回:
+        - mfcc_deltas: (39, T) — 序列模型输入
+        - mel_spectrogram: (n_mels, T) — CNN/ViT 输入
+        - global_features: dict — 全局统计特征
+        """
+        mfcc_deltas = self.compute_mfcc_deltas(audio)
+        mel_spec = self.compute_mel_spectrogram(audio)
+        spectral = self.compute_spectral_features(audio)
+        temporal = self.compute_temporal_features(audio)
+        hjorth = self.compute_hjorth_parameters(audio)
+
+        # 全局特征向量 (10维)
+        global_features = {
+            "spectral_centroid": spectral["spectral_centroid_mean"],
+            "spectral_bandwidth": spectral["spectral_bandwidth_mean"],
+            "spectral_rolloff": spectral["spectral_rolloff_mean"],
+            "spectral_flatness": spectral["spectral_flatness_mean"],
+            "zero_crossing_rate": temporal["zero_crossing_rate"],
+            "rms_energy": temporal["rms_energy"],
+            "crest_factor": temporal["crest_factor"],
+            "hjorth_activity": hjorth["hjorth_activity"],
+            "hjorth_mobility": hjorth["hjorth_mobility"],
+            "hjorth_complexity": hjorth["hjorth_complexity"],
+        }
+
+        return {
+            "mfcc_deltas": mfcc_deltas.tolist(),
+            "mel_spectrogram": mel_spec.tolist(),
+            "global_features": global_features,
+        }
+
 
 # =============================================================================
 # 传统声学检测器
@@ -381,12 +500,21 @@ class AcousticDetector:
                 max_score = score
                 anomaly_type = atype
         
+        # 训练特征导出 (配置门控, 默认关闭)
+        training_features = None
+        if self.config.export_training_features:
+            try:
+                training_features = self.feature_extractor.compute_training_features(audio)
+            except Exception as e:
+                logger.warning(f"训练特征导出失败: {e}")
+
         return {
             "anomaly_type": anomaly_type,
             "anomaly_score": max_score if anomaly_type != "normal" else 0.0,
             "confidence": max_score,
             "all_scores": anomaly_scores,
             "spectrogram": mel_spec,
+            "training_features": training_features,
             "features": {
                 "spectral": spectral_features,
                 "temporal": temporal_features,
@@ -410,15 +538,18 @@ class AcousticDetector:
         return audio.astype(np.float32)
     
     def _resample(self, audio: np.ndarray, orig_sr: int, target_sr: int) -> np.ndarray:
-        """抗混叠多相重采样"""
+        """抗混叠多相重采样 (自定义 Kaiser FIR 滤波器)"""
         if orig_sr == target_sr:
             return audio
         from math import gcd
-        from scipy.signal import resample_poly
+        from scipy.signal import resample_poly, firwin
         g = gcd(orig_sr, target_sr)
-        up = target_sr // g
-        down = orig_sr // g
-        return resample_poly(audio, up, down).astype(audio.dtype)
+        up, down = target_sr // g, orig_sr // g
+        # 自定义 FIR: Kaiser 窗, beta=8, ~80dB 阻带衰减
+        max_rate = max(orig_sr, target_sr)
+        cutoff = 0.5 * min(orig_sr, target_sr) / max_rate
+        fir = firwin(101, cutoff, window=('kaiser', 8.0))
+        return resample_poly(audio, up, down, window=fir).astype(audio.dtype)
     
     def _detect_partial_discharge(self, audio: np.ndarray, mel_spec: np.ndarray) -> float:
         """检测局部放电 (特征: 高频短脉冲)
@@ -427,20 +558,43 @@ class AcousticDetector:
         1. 高频能量占比显著高于背景噪声
         2. 存在明显的能量突变 (脉冲)
         两个条件必须同时满足才会给出高分。
+
+        注: 高频分析使用功率梅尔频谱 (非对数) 以正确计算能量比。
+        脉冲检测使用时域短窗分析, 因为梅尔帧 (128ms) 太粗,
+        无法捕捉微秒级 PD 脉冲。
         """
-        # 1. 高频能量占比
-        high_freq_bins = mel_spec.shape[0] * 2 // 3  # 上1/3频率
-        high_freq_energy = np.sum(mel_spec[high_freq_bins:])
-        total_energy = np.sum(mel_spec) + 1e-8
+        # 1. 高频能量占比 (使用功率梅尔频谱)
+        power_mel = np.exp(mel_spec)  # 撤销 log 变换
+        high_freq_bins = power_mel.shape[0] * 2 // 3  # 上1/3频率
+        high_freq_energy = np.sum(power_mel[high_freq_bins:])
+        total_energy = np.sum(power_mel) + 1e-8
         high_freq_ratio = high_freq_energy / total_energy
 
-        # 2. 脉冲检测 (短时能量突变)
-        frame_energies = np.sum(mel_spec, axis=0)
-        energy_diff = np.abs(np.diff(frame_energies))
+        # 2. 时域脉冲检测 (高通滤波 → 短窗能量突变)
+        # 先高通滤波去除工频背景 (50/100Hz), 仅保留 PD 脉冲成分
+        # 再用短窗分析检测能量突变
+        try:
+            from scipy.signal import butter, sosfiltfilt
+            nyq = self.config.sample_rate / 2.0
+            hp_cutoff = min(2000.0, nyq * 0.5) / nyq  # 2kHz 高通
+            if 0 < hp_cutoff < 1.0:
+                sos_hp = butter(4, hp_cutoff, btype='high', output='sos')
+                hf_audio = sosfiltfilt(sos_hp, audio)
+            else:
+                hf_audio = audio
+        except Exception:
+            hf_audio = audio
+
+        short_window = max(int(self.config.sample_rate * 0.002), 32)  # ~2ms 窗口
+        n_short_frames = max(len(hf_audio) // short_window, 1)
+        short_energies = np.array([
+            np.sum(hf_audio[i*short_window:(i+1)*short_window] ** 2)
+            for i in range(n_short_frames)
+        ])
+        energy_diff = np.abs(np.diff(short_energies))
         mean_diff = np.mean(energy_diff) + 1e-8
-        # 使用更严格的阈值以减少噪声引起的误报
         impulse_count = np.sum(energy_diff > mean_diff * self.config.pd_impulse_multiplier)
-        impulse_density = impulse_count / len(energy_diff)
+        impulse_density = impulse_count / max(len(energy_diff), 1)
 
         # 高频能量占比阈值，减少白噪声误报
         hf_score = min(high_freq_ratio / self.config.pd_high_freq_energy_ratio, 1.0)
@@ -448,6 +602,13 @@ class AcousticDetector:
 
         # 两个特征使用乘法融合，要求两者同时存在
         score = np.sqrt(hf_score * imp_score)
+
+        # 包络解调鉴别: 高采样率时区分 PD 与宽带机械噪声
+        if self.config.sample_rate > 48000 and score > 0.2:
+            env_result = self._envelope_demodulation_analysis(audio, self.config.sample_rate)
+            if env_result["envelope_kurtosis"] < self.config.pd_envelope_kurtosis_gate:
+                # 包络平滑 → 更可能是机械噪声而非 PD, 降低分数
+                score *= 0.5
 
         return float(np.clip(score, 0, 1))
 
@@ -499,13 +660,33 @@ class AcousticDetector:
         if kurtosis < self.config.bearing_kurtosis_gate:
             return 0.0
 
-        # 计算自相关函数
-        autocorr = np.correlate(audio, audio, mode='full')
+        # Hilbert 包络自相关: 先提取共振频段包络, 再分析周期性
+        sr = self.config.sample_rate
+        try:
+            from scipy.signal import butter, sosfiltfilt, hilbert
+            nyq = sr / 2.0
+            bp_low = self.config.bearing_bandpass_low / nyq
+            bp_high = min(self.config.bearing_bandpass_high, nyq * 0.95) / nyq
+
+            if 0 < bp_low < bp_high < 1.0:
+                sos = butter(4, [bp_low, bp_high], btype='band', output='sos')
+                filtered = sosfiltfilt(sos, audio)
+                analytic = hilbert(filtered)
+                envelope = np.abs(analytic)
+                envelope -= np.mean(envelope)
+            else:
+                # 带通范围无效时退回原始信号
+                envelope = audio - np.mean(audio)
+        except Exception:
+            envelope = audio - np.mean(audio)
+
+        # 对包络计算自相关
+        autocorr = np.correlate(envelope, envelope, mode='full')
         autocorr = autocorr[n-1:] / (autocorr[n-1] + 1e-8)
 
         # 寻找周期性峰值 (轴承故障频率范围)
-        min_lag = int(self.config.sample_rate / self.config.bearing_freq_max)
-        max_lag = int(self.config.sample_rate / self.config.bearing_freq_min)
+        min_lag = int(sr / self.config.bearing_freq_max)
+        max_lag = int(sr / self.config.bearing_freq_min)
 
         if max_lag < len(autocorr):
             search_range = autocorr[min_lag:max_lag]
@@ -574,6 +755,45 @@ class AcousticDetector:
         score = self.config.mechanical_cf_weight * cf_score + self.config.mechanical_energy_weight * energy_score
 
         return float(np.clip(score, 0, 1))
+
+    def _envelope_demodulation_analysis(self, audio: np.ndarray, sr: int) -> Dict[str, Any]:
+        """包络解调分析 — 区分 PD 脉冲与宽带机械噪声
+
+        PD 脉冲 → 尖锐包络 (kurtosis >> 3)
+        机械噪声 → 平滑包络 (kurtosis ≈ 3)
+        """
+        from scipy.signal import butter, sosfiltfilt, hilbert
+
+        nyq = sr / 2.0
+        low = self.config.pd_bandpass_low / nyq
+        high = min(self.config.pd_bandpass_high, nyq * 0.95) / nyq
+
+        # 安全检查: 带通范围必须有效
+        if low >= high or low >= 1.0 or high <= 0:
+            return {"envelope_kurtosis": 0.0, "envelope_peak_count": 0}
+
+        try:
+            sos = butter(4, [low, high], btype='band', output='sos')
+            filtered = sosfiltfilt(sos, audio)
+            analytic = hilbert(filtered)
+            envelope = np.abs(analytic)
+
+            # 包络峰度
+            env_mean = np.mean(envelope)
+            env_std = np.std(envelope) + 1e-8
+            envelope_kurtosis = float(np.mean(((envelope - env_mean) / env_std) ** 4))
+
+            # 包络峰值计数 (3σ 阈值)
+            threshold = env_mean + 3 * env_std
+            envelope_peak_count = int(np.sum(envelope > threshold))
+
+            return {
+                "envelope_kurtosis": envelope_kurtosis,
+                "envelope_peak_count": envelope_peak_count,
+            }
+        except Exception as e:
+            logger.warning(f"包络解调分析失败: {e}")
+            return {"envelope_kurtosis": 0.0, "envelope_peak_count": 0}
 
 
 # =============================================================================

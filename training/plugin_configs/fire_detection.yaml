@@ -1,0 +1,71 @@
+# 火灾检测 - 训练配置模板
+plugin_id: fire_detection
+display_name: 火灾检测
+
+# 主模型: 火焰/烟雾检测
+model:
+  family: yolov8
+  backbone: yolov8n
+  pretrained: yolov8n.pt
+  input_modality: rgb+thermal
+  image_size: 640
+
+task:
+  primary: detection
+  label_schema: detection_bbox
+  classes:
+    fire:
+      - flame
+      - smoke
+    level:
+      - smoldering
+      - small_fire
+      - medium_fire
+      - large_fire
+      - critical
+
+# 辅助模型
+secondary_models:
+  fire_classifier:
+    family: resnet18
+    task_type: classification
+    image_size: 224
+    classes: [smoldering, small_fire, medium_fire, large_fire, critical]
+  thermal_anomaly:
+    family: cnn
+    backbone: resnet18
+    task_type: thermal_anomaly
+    image_size: 224
+    classes: [normal, anomaly]
+
+training:
+  epochs: 120
+  batch_size: 16
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 3
+  # 火灾检测强调召回率
+  class_weights:
+    flame: 2.0
+    smoke: 1.5
+
+augmentation:
+  mosaic: 1.0
+  mixup: 0.15
+  fliplr: 0.5
+  hsv_h: 0.02
+  hsv_s: 0.8
+  hsv_v: 0.6
+
+evaluation:
+  metrics: [mAP@0.5, recall, precision, false_alarm_rate]
+  qualification:
+    mAP@0.5: 0.60
+    recall: 0.85
+    false_alarm_rate: 0.05  # 误报率 < 5%
+
+export:
+  formats: [onnx]
+
+voltage_levels: [all]

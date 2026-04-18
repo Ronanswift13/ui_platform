@@ -1,0 +1,26 @@
+{
+  "name": "standalone_busbar_e2e_1776233281",
+  "plugin_id": "busbar_inspection",
+  "task_type": "detection",
+  "version": "v1.0.0",
+  "num_images": 12,
+  "num_labels": 12,
+  "classes": [
+    "insulator_crack",
+    "insulator_dirty",
+    "fitting_loose",
+    "fitting_rust",
+    "wire_damage",
+    "foreign_object",
+    "bird",
+    "bird_nest"
+  ],
+  "format": "yolo",
+  "label_format": "txt",
+  "image_format": "jpg",
+  "input_modality": "rgb",
+  "voltage_level": "HV_220kV",
+  "description": "standalone e2e upload smoke test",
+  "author": "codex",
+  "source": "local_real_images"
+}

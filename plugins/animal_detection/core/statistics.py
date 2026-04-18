@@ -24,7 +24,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from .event_schema import AnimalClass, AnimalDetectionResult
+from .event_schema import AnimalDetectionResult
 
 logger = logging.getLogger(__name__)
 

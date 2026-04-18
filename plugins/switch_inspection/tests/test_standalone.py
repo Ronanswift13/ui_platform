@@ -47,5 +47,37 @@ class TestSwitchInspectionStandalone(unittest.TestCase):
         self.assertIsNotNone(runner)
 
 
+def test_standalone_template_exposes_simulation_controls():
+    template = (
+        Path(__file__).parent.parent
+        / "standalone"
+        / "templates"
+        / "switch_inspection.html"
+    ).read_text(encoding="utf-8")
+
+    for marker in (
+        "scenario-select",
+        "btn-play-simulation",
+        "btn-toggle-debug",
+        "btn-toggle-monitor",
+        "runtime-mode-badge",
+    ):
+        assert marker in template
+
+
+def test_standalone_template_declares_simulation_runtime_isolation():
+    template = (
+        Path(__file__).parent.parent
+        / "standalone"
+        / "templates"
+        / "switch_inspection.html"
+    ).read_text(encoding="utf-8")
+
+    assert "仿真演示引擎仅在浏览器端运行，不写入插件推理链路" in template
+    assert "currentModeFromSource" in template
+    assert "real_monitor" in template
+    assert "simulated" in template
+
+
 if __name__ == "__main__":
     unittest.main()

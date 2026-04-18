@@ -1,0 +1,625 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "darkbreaker-training-upload-manifest-v3",
+  "title": "DarkBreaker 训练数据上传 Manifest",
+  "description": "每个上传到训练系统的数据包根目录必须包含此格式的 manifest.json。兼容视觉与时序异常训练。",
+  "type": "object",
+
+  "required": ["name", "plugin_id", "task_type", "version"],
+
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "数据集名称"
+    },
+    "plugin_id": {
+      "type": "string",
+      "enum": [
+        "busbar_inspection",
+        "capacitor_inspection",
+        "switch_inspection",
+        "transformer_inspection",
+        "animal_detection",
+        "bird_monitoring",
+        "fire_detection",
+        "meter_reading",
+        "temperature_monitoring",
+        "thermal",
+        "hyperspectral_detection",
+        "acoustic_monitoring",
+        "gas_detection",
+        "device_monitoring",
+        "action_event_monitoring",
+        "multimodal_fusion"
+      ],
+      "description": "目标插件 ID"
+    },
+    "task_type": {
+      "type": "string",
+      "enum": [
+        "detection",
+        "segmentation",
+        "classification",
+        "ocr",
+        "thermal_anomaly",
+        "hyperspectral_classification",
+        "hyperspectral_anomaly",
+        "acoustic_time_frequency_anomaly",
+        "multivariate_sensor_anomaly",
+        "equipment_health_prediction",
+        "health_index_calibration",
+        "action_event_sequence_recognition",
+        "multimodal_feature_fusion",
+        "multimodal_decision_fusion"
+      ],
+      "description": "训练任务类型"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?$",
+      "description": "数据集版本"
+    },
+
+    "classes": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "类别名称列表；无监督异常检测可为空"
+    },
+    "class_aliases": {
+      "type": "object",
+      "additionalProperties": {"type": "string"},
+      "default": {}
+    },
+
+    "num_images": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "num_labels": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "num_samples": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "时序样本总数"
+    },
+
+    "pre_split": {
+      "type": "boolean",
+      "default": false
+    },
+    "split": {
+      "type": "object",
+      "properties": {
+        "train": {"type": "number", "minimum": 0, "maximum": 1},
+        "val": {"type": "number", "minimum": 0, "maximum": 1},
+        "test": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+
+    "format": {
+      "type": "string",
+      "enum": [
+        "yolo",
+        "coco",
+        "coco_seg",
+        "voc",
+        "image_folder",
+        "custom",
+        "wav_dir",
+        "flac_dir",
+        "npy_waveform",
+        "mel_npz",
+        "dual_audio_views",
+        "csv_series",
+        "parquet_series",
+        "jsonl_series",
+        "npz_series",
+        "jsonl_events",
+        "csv_events",
+        "parquet_events",
+        "multimodal_aligned",
+        "multimodal_sparse",
+        "jsonl_multimodal"
+      ],
+      "default": "custom"
+    },
+    "image_format": {
+      "type": "string",
+      "enum": ["jpg", "jpeg", "png", "bmp", "tif", "tiff", "raw"],
+      "default": "jpg"
+    },
+    "label_format": {
+      "type": "string",
+      "enum": ["txt", "json", "xml", "png", "csv", "jsonl", "parquet", "npz"],
+      "default": "txt"
+    },
+    "input_modality": {
+      "type": "string",
+      "enum": [
+        "rgb",
+        "thermal",
+        "hyperspectral",
+        "rgb+thermal",
+        "audio_waveform",
+        "audio_spectrogram",
+        "audio_waveform+spectrogram",
+        "multivariate_timeseries",
+        "event_sequence",
+        "multimodal"
+      ],
+      "default": "rgb"
+    },
+    "voltage_level": {
+      "type": "string"
+    },
+
+    "description": {"type": "string"},
+    "author": {"type": "string"},
+    "created_at": {"type": "string", "format": "date"},
+    "source": {"type": "string"},
+    "license": {"type": "string"},
+
+    "mask_format": {
+      "type": "string",
+      "enum": ["png_index", "png_color", "rle", "polygon"]
+    },
+    "mask_color_map": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "integer", "minimum": 0, "maximum": 255},
+        "minItems": 3,
+        "maxItems": 3
+      }
+    },
+    "ignore_index": {
+      "type": "integer",
+      "default": 255
+    },
+
+    "charset": {
+      "type": "string"
+    },
+    "max_reading_length": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 10
+    },
+
+    "temperature_unit": {
+      "type": "string",
+      "enum": ["celsius", "fahrenheit", "kelvin"],
+      "default": "celsius"
+    },
+    "thermal_bit_depth": {
+      "type": "integer",
+      "enum": [8, 14, 16],
+      "default": 16
+    },
+    "temperature_range": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+
+    "spectral_bands": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "wavelength_range": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "spectral_resolution": {
+      "type": "number"
+    },
+
+    "sample_rate_hz": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "window_size": {
+      "type": ["integer", "number"],
+      "exclusiveMinimum": 0
+    },
+    "stride": {
+      "type": ["integer", "number"],
+      "exclusiveMinimum": 0
+    },
+    "sequence_length": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "prediction_horizon": {
+      "type": ["integer", "number"],
+      "exclusiveMinimum": 0
+    },
+    "timestamp_field": {
+      "type": "string"
+    },
+    "timestamp_unit": {
+      "type": "string",
+      "enum": ["unix_s", "unix_ms", "iso8601"],
+      "default": "unix_ms"
+    },
+    "entity_id_field": {
+      "type": "string"
+    },
+    "sequence_id_field": {
+      "type": "string"
+    },
+    "feature_views": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "sensor_columns": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "event_types": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "temporal_schema": {
+      "type": "object",
+      "properties": {
+        "schema_version": {"type": "string"},
+        "timestamp_field": {"type": "string"},
+        "entity_id_field": {"type": "string"},
+        "sequence_id_field": {"type": "string"},
+        "metadata_fields": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "kind", "path", "format"],
+            "properties": {
+              "name": {"type": "string"},
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "waveform",
+                  "spectrogram",
+                  "timeseries",
+                  "event_sequence",
+                  "labels",
+                  "metadata"
+                ]
+              },
+              "path": {"type": "string"},
+              "format": {"type": "string"},
+              "channels": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "sensor_columns": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "sample_rate_hz": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "timestamp_field": {"type": "string"},
+              "value_field": {"type": "string"},
+              "description": {"type": "string"}
+            },
+            "additionalProperties": true
+          }
+        },
+        "feature_views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "source", "transform", "path"],
+            "properties": {
+              "name": {"type": "string"},
+              "source": {"type": "string"},
+              "transform": {"type": "string"},
+              "path": {"type": "string"},
+              "shape": {
+                "type": "array",
+                "items": {"type": "integer"}
+              },
+              "parameters": {
+                "type": "object"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "target_type"],
+            "properties": {
+              "name": {"type": "string"},
+              "target_type": {"type": "string"},
+              "path": {"type": "string"},
+              "horizon": {"type": "string"},
+              "classes": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "range_hint": {"type": "string"},
+              "description": {"type": "string"}
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "target_schema": {
+      "type": "object",
+      "properties": {
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": {"type": "string"},
+              "type": {"type": "string"},
+              "horizon": {"type": "string"},
+              "range": {"type": "string"},
+              "classes": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "supported_modalities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "visual",
+          "thermal",
+          "acoustic",
+          "ultrasonic",
+          "gas",
+          "hyperspectral",
+          "vibration"
+        ]
+      }
+    },
+    "required_modalities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "visual",
+          "thermal",
+          "acoustic",
+          "ultrasonic",
+          "gas",
+          "hyperspectral",
+          "vibration"
+        ]
+      }
+    },
+    "missing_modality_policy": {
+      "type": "string",
+      "enum": [
+        "allow_sparse",
+        "required_modalities_only",
+        "mask_and_gate",
+        "teacher_distillation_fallback"
+      ],
+      "default": "mask_and_gate"
+    },
+    "fusion_strategy": {
+      "type": "string",
+      "enum": ["feature_level", "decision_level", "hybrid"],
+      "default": "hybrid"
+    },
+    "alignment_tolerance_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 5000
+    },
+    "multimodal_schema": {
+      "type": "object",
+      "properties": {
+        "schema_version": {"type": "string"},
+        "supported_modalities": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "required_modalities": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "fusion_strategy": {"type": "string"},
+        "missing_modality_policy": {"type": "string"},
+        "alignment_tolerance_ms": {"type": "integer"},
+        "runtime_mode": {
+          "type": "string",
+          "enum": ["rules_only", "model_only", "rule_model_hybrid"]
+        },
+        "modality_specs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["modality", "path", "format"],
+            "properties": {
+              "modality": {
+                "type": "string",
+                "enum": [
+                  "visual",
+                  "thermal",
+                  "acoustic",
+                  "ultrasonic",
+                  "gas",
+                  "hyperspectral",
+                  "vibration"
+                ]
+              },
+              "path": {"type": "string"},
+              "format": {"type": "string"},
+              "is_required": {"type": "boolean"},
+              "feature_dim": {"type": "integer"},
+              "plugin_dependency": {"type": ["string", "null"]},
+              "notes": {"type": "string"}
+            },
+            "additionalProperties": true
+          }
+        },
+        "diagnosis_target_schema": {
+          "type": "object"
+        },
+        "diagnostic_rule_pack": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string"},
+            "version": {"type": "string"},
+            "source": {"type": "string"}
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "diagnosis_target_schema": {
+      "type": "object",
+      "properties": {
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": {"type": "string"},
+              "type": {"type": "string"},
+              "classes": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "diagnostic_rule_pack": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string"},
+        "version": {"type": "string"},
+        "source": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
+  },
+
+  "allOf": [
+    {
+      "if": {"properties": {"task_type": {"const": "segmentation"}}},
+      "then": {"required": ["mask_format", "classes"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "ocr"}}},
+      "then": {"required": ["charset", "classes"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "detection"}}},
+      "then": {"required": ["classes"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "classification"}}},
+      "then": {"required": ["classes"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "hyperspectral_classification"}}},
+      "then": {"required": ["spectral_bands", "classes"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "hyperspectral_anomaly"}}},
+      "then": {"required": ["spectral_bands", "classes"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "acoustic_time_frequency_anomaly"}}},
+      "then": {"required": ["sample_rate_hz", "window_size", "temporal_schema"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "multivariate_sensor_anomaly"}}},
+      "then": {"required": ["sequence_length", "sensor_columns", "temporal_schema"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "equipment_health_prediction"}}},
+      "then": {
+        "required": [
+          "sequence_length",
+          "prediction_horizon",
+          "sensor_columns",
+          "temporal_schema",
+          "target_schema"
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "health_index_calibration"}}},
+      "then": {
+        "required": [
+          "sequence_length",
+          "sensor_columns",
+          "temporal_schema",
+          "target_schema"
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "action_event_sequence_recognition"}}},
+      "then": {"required": ["event_types", "timestamp_field", "temporal_schema"]}
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "multimodal_feature_fusion"}}},
+      "then": {
+        "required": [
+          "supported_modalities",
+          "multimodal_schema",
+          "diagnosis_target_schema",
+          "missing_modality_policy",
+          "fusion_strategy"
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"task_type": {"const": "multimodal_decision_fusion"}}},
+      "then": {
+        "required": [
+          "supported_modalities",
+          "multimodal_schema",
+          "diagnosis_target_schema",
+          "diagnostic_rule_pack",
+          "missing_modality_policy",
+          "fusion_strategy"
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"mask_format": {"const": "png_color"}}},
+      "then": {"required": ["mask_color_map"]}
+    }
+  ],
+
+  "additionalProperties": true
+}

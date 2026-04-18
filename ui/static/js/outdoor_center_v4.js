@@ -199,8 +199,18 @@ function updateUI(data) {
     document.getElementById('detection-count').textContent = data.detections?.length || 0;
     document.getElementById('alarm-count').textContent = data.alarms?.length || 0;
     if (data.metrics) {
-        document.getElementById('latency-value').textContent = 
+        document.getElementById('latency-value').textContent =
             `${Math.round(data.metrics.processing_time_ms || 45)}ms`;
+    }
+    // 一致性校核面板: 仅开关模块显示
+    const csSection = document.getElementById('consistency-section');
+    if (csSection) {
+        if (OutdoorState.currentModule === 'switch' && data.consistency_results) {
+            csSection.style.display = '';
+            renderConsistencyResults(data.consistency_results);
+        } else {
+            csSection.style.display = 'none';
+        }
     }
 }
 
@@ -452,6 +462,88 @@ function showToast(message, type = 'info') {
     toast.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : 'info-circle'}"></i> ${message}`;
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2500);
+}
+
+// ==================== 一致性校核渲染 ====================
+
+const CONSISTENCY_STATUS_LABELS = {
+    consistent: '一致', inconsistent: '不一致',
+    insufficient: '数据不足', review_required: '待复核'
+};
+const STATE_LABELS = { open: '分闸', closed: '合闸', intermediate: '中间态', unknown: '未知' };
+const DEVICE_TYPE_LABELS = { breaker: '断路器', isolator: '隔离开关', grounding: '接地开关' };
+
+function renderConsistencyResults(results) {
+    const container = document.getElementById('consistency-list');
+    if (!container) return;
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center" style="padding:1rem;font-size:0.75rem">暂无一致性校核结果</div>';
+        return;
+    }
+    container.innerHTML = results.map(r => renderConsistencyCard(r)).join('');
+}
+
+function renderConsistencyCard(r) {
+    const statusLabel = CONSISTENCY_STATUS_LABELS[r.consistency_status] || r.consistency_status;
+    const stateLabel = STATE_LABELS[r.final_state] || r.final_state;
+    const stateClass = 'state-' + (r.final_state || 'unknown');
+    const deviceLabel = (DEVICE_TYPE_LABELS[r.device_type] || r.device_type) + ' ' + r.device_id;
+
+    let evidenceRows = '';
+    if (r.video_judgment) {
+        const vs = STATE_LABELS[r.video_judgment.state] || r.video_judgment.state;
+        evidenceRows += `<div class="consistency-row"><span class="consistency-label">视频识别</span><span class="consistency-val">${vs} (${Math.round(r.video_judgment.confidence*100)}%)</span></div>`;
+    }
+    if (r.sensor_reading) {
+        const ss = STATE_LABELS[r.sensor_reading.state] || r.sensor_reading.state || '无数据';
+        evidenceRows += `<div class="consistency-row"><span class="consistency-label">传感/遥信</span><span class="consistency-val">${ss} (${r.sensor_reading.source_protocol})</span></div>`;
+    }
+    if (r.action_event_ref) {
+        const ds = r.action_event_ref.data_status;
+        const dsLabel = ds === 'sufficient' ? '充分' : ds === 'partial' ? '部分' : '无记录';
+        let aeDetail = dsLabel;
+        if (r.action_event_ref.latest_action_type) {
+            aeDetail += ` / 最近: ${r.action_event_ref.latest_action_type}`;
+        }
+        evidenceRows += `<div class="consistency-row"><span class="consistency-label">动作事件</span><span class="consistency-val">${aeDetail}</span></div>`;
+    }
+
+    let conflictsHtml = '';
+    if (r.conflicts && r.conflicts.length > 0) {
+        conflictsHtml = r.conflicts.map(c =>
+            `<div class="conflict-item ${c.severity || ''}">${c.description}</div>`
+        ).join('');
+    }
+
+    let actionSummary = '';
+    if (r.action_event_ref && r.action_event_ref.data_status !== 'no_data') {
+        actionSummary = `<div class="action-event-summary">动作事件: ${r.action_event_ref.event_count}条记录 (${r.action_event_ref.source_detail})</div>`;
+    }
+
+    let reviewBtn = '';
+    if (r.review_required) {
+        reviewBtn = `<button class="btn-review-entry" onclick="showToast('人工复核入口: ${r.review_reason.replace(/'/g,"\\'")}', 'info')"><i class="bi bi-person-check"></i> 需人工复核</button>`;
+    }
+
+    return `
+    <div class="consistency-card">
+        <div class="consistency-card-header">
+            <span class="consistency-device">${deviceLabel}</span>
+            <span class="consistency-badge badge-${r.consistency_status}">${statusLabel}</span>
+        </div>
+        <div class="consistency-row">
+            <span class="consistency-label">最终状态</span>
+            <span class="consistency-val ${stateClass}">${stateLabel}</span>
+        </div>
+        <div class="consistency-row">
+            <span class="consistency-label">置信度</span>
+            <span class="consistency-val">${Math.round(r.confidence*100)}%</span>
+        </div>
+        ${evidenceRows}
+        ${conflictsHtml}
+        ${actionSummary}
+        ${reviewBtn}
+    </div>`;
 }
 
 // 全局导出

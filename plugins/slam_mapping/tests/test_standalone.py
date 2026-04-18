@@ -38,13 +38,58 @@ class TestSLAMMappingStandalone(unittest.TestCase):
         result = self.plugin.process_point_cloud(points)
         self.assertIsInstance(result, dict)
 
-    def test_runner_creates_app(self):
-        from darkbreaker_sdk.standalone import StandalonePluginRunner
-        runner = StandalonePluginRunner(
-            self.plugin,
-            plugin_templates_dir=Path(__file__).parent.parent / "standalone" / "templates",
-        )
-        self.assertIsNotNone(runner)
+
+def test_runner_creates_app():
+    from darkbreaker_sdk.standalone import StandalonePluginRunner
+    from plugins.slam_mapping.plugin import Plugin
+
+    plugin = Plugin.create_standalone()
+    runner = StandalonePluginRunner(
+        plugin,
+        plugin_templates_dir=Path(__file__).parent.parent / "standalone" / "templates",
+        plugin_static_dir=Path(__file__).parent.parent / "standalone" / "static",
+    )
+    assert runner is not None
+
+
+def test_create_runner_registers_simulation_routes():
+    from fastapi.testclient import TestClient
+    from plugins.slam_mapping.standalone.app import create_runner
+
+    runner = create_runner()
+    client = TestClient(runner.app)
+
+    scenarios_resp = client.get("/api/simulator/scenarios")
+    assert scenarios_resp.status_code == 200
+    scenarios = scenarios_resp.json()["scenarios"]
+    assert len(scenarios) >= 2
+
+    step_resp = client.post("/api/simulator/step")
+    assert step_resp.status_code == 200
+    step_payload = step_resp.json()
+    assert step_payload["success"] is True
+    assert step_payload["runtime"]["isolation"] == "standalone_isolated_plugin"
+    assert "sensor_points" in step_payload["point_cloud"]
+
+
+def test_template_declares_simulation_isolation_and_modes():
+    template = (
+        Path(__file__).parent.parent
+        / "standalone"
+        / "templates"
+        / "slam_mapping.html"
+    ).read_text(encoding="utf-8")
+
+    for marker in (
+        "mode-simulated",
+        "mode-real",
+        "scenario-select",
+        "btn-play-sim",
+        "btn-step-sim",
+        "独立仿真链路仅使用 standalone 内部实例推演",
+        "真实监测模式只读取插件当前状态",
+    ):
+        assert marker in template
 
 
 if __name__ == "__main__":

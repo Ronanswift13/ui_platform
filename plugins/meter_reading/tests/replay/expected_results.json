@@ -1,0 +1,330 @@
+{
+  "schema_version": "1.1",
+  "schema_ref": "docs/minimal_fixture_replay_schema.md",
+  "plugin_id": "meter_reading",
+  "asset_root": "plugins/meter_reading/tests/fixtures",
+  "collection_status": "partial_assets_available",
+  "expected_results_schema": {
+    "required_top_level_fields": [
+      "schema_version",
+      "schema_ref",
+      "plugin_id",
+      "asset_root",
+      "collection_status",
+      "expected_results_schema",
+      "samples",
+      "candidate_sources"
+    ],
+    "required_sample_fields": [
+      "sample_id",
+      "source_type",
+      "asset_kind",
+      "plugin_id",
+      "fixture_group",
+      "scenario_type",
+      "meter_type",
+      "expected_runtime_mode",
+      "expected_review_status",
+      "expected_primary_labels",
+      "expected_alarm_level",
+      "collection_status",
+      "expected_output_contract",
+      "notes"
+    ],
+    "required_output_metadata_fields": [
+      "meter_type",
+      "reading_status",
+      "pipeline_stage",
+      "fallback_level",
+      "timestamp_ms",
+      "runtime_mode",
+      "review_status",
+      "failure_reason"
+    ],
+    "optional_sample_fields": [
+      "asset_relpath",
+      "candidate_source_refs",
+      "expected_numeric_targets",
+      "expected_reason_codes",
+      "acceptance_blockers"
+    ]
+  },
+  "verified_scope": [
+    "output_structure_contract",
+    "expected_results_schema",
+    "mock_led_replay_runner"
+  ],
+  "experimental_scope": [
+    "analog_meter_reading",
+    "digital_ocr_reading",
+    "led_indicator_real_image_reading",
+    "perspective_correction",
+    "fallback_chain"
+  ],
+  "samples": [
+    {
+      "sample_id": "meter_analog_normal_001",
+      "source_type": "placeholder",
+      "asset_kind": "image",
+      "asset_relpath": "plugins/meter_reading/tests/fixtures/analog_normal/meter_analog_normal_001.jpg",
+      "plugin_id": "meter_reading",
+      "fixture_group": "analog_normal",
+      "scenario_type": "analog_normal",
+      "meter_type": "pressure_gauge",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "pressure_gauge_reading"
+      ],
+      "expected_alarm_level": "none",
+      "collection_status": "planned",
+      "expected_output_contract": {
+        "reading_status": "success",
+        "metadata_required": [
+          "meter_type",
+          "reading_status",
+          "pipeline_stage",
+          "fallback_level",
+          "timestamp_ms",
+          "runtime_mode",
+          "review_status",
+          "failure_reason",
+          "pointer_angle_deg",
+          "angle_range_deg",
+          "range_min",
+          "range_max"
+        ],
+        "numeric_targets_required_before_acceptance": true
+      },
+      "candidate_source_refs": [
+        "hv220_meter_training_images"
+      ],
+      "acceptance_blockers": [
+        "missing_real_image",
+        "missing_human_reading_label"
+      ],
+      "notes": "Planned clear analog sample; must add expected value/unit before it can count toward analog verification."
+    },
+    {
+      "sample_id": "meter_analog_boundary_001",
+      "source_type": "placeholder",
+      "asset_kind": "image",
+      "asset_relpath": "plugins/meter_reading/tests/fixtures/analog_boundary/meter_analog_boundary_001.jpg",
+      "plugin_id": "meter_reading",
+      "fixture_group": "analog_boundary",
+      "scenario_type": "analog_boundary",
+      "meter_type": "pressure_gauge",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "pressure_gauge_reading"
+      ],
+      "expected_alarm_level": "none",
+      "collection_status": "planned",
+      "expected_output_contract": {
+        "reading_status": "success",
+        "metadata_required": [
+          "meter_type",
+          "reading_status",
+          "pipeline_stage",
+          "fallback_level",
+          "timestamp_ms",
+          "runtime_mode",
+          "review_status",
+          "failure_reason",
+          "pointer_angle_deg",
+          "angle_range_deg",
+          "range_min",
+          "range_max"
+        ],
+        "numeric_targets_required_before_acceptance": true
+      },
+      "expected_numeric_targets": {
+        "pointer_angle_deg": "near_configured_angle_boundary",
+        "tolerance_requires_human_label": true
+      },
+      "acceptance_blockers": [
+        "missing_real_image",
+        "missing_boundary_label"
+      ],
+      "notes": "Boundary slot for readable analog samples near angle or range limits."
+    },
+    {
+      "sample_id": "meter_analog_quality_fail_001",
+      "source_type": "placeholder",
+      "asset_kind": "image",
+      "asset_relpath": "plugins/meter_reading/tests/fixtures/analog_quality_fail/meter_analog_quality_fail_001.jpg",
+      "plugin_id": "meter_reading",
+      "fixture_group": "analog_quality_fail",
+      "scenario_type": "analog_quality_fail",
+      "meter_type": "pressure_gauge",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [
+        "pressure_gauge_failed"
+      ],
+      "expected_alarm_level": "info",
+      "collection_status": "planned",
+      "expected_output_contract": {
+        "reading_status": "need_manual_review",
+        "metadata_required": [
+          "meter_type",
+          "reading_status",
+          "pipeline_stage",
+          "fallback_level",
+          "timestamp_ms",
+          "runtime_mode",
+          "review_status",
+          "failure_reason"
+        ],
+        "must_not_fabricate_value": true
+      },
+      "expected_reason_codes": [
+        "all_retries_exhausted",
+        "low_quality_or_pointer_missing"
+      ],
+      "acceptance_blockers": [
+        "missing_real_image",
+        "missing_quality_label"
+      ],
+      "notes": "Quality-fail analog slot; expected behavior is explainable review/failure, not a fake reading."
+    },
+    {
+      "sample_id": "meter_digital_display_001",
+      "source_type": "placeholder",
+      "asset_kind": "image",
+      "asset_relpath": "plugins/meter_reading/tests/fixtures/digital_display/meter_digital_display_001.jpg",
+      "plugin_id": "meter_reading",
+      "fixture_group": "digital_display",
+      "scenario_type": "digital_display",
+      "meter_type": "digital_display",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "digital_display_reading"
+      ],
+      "expected_alarm_level": "none",
+      "collection_status": "planned",
+      "expected_output_contract": {
+        "reading_status": "success",
+        "metadata_required": [
+          "meter_type",
+          "reading_status",
+          "pipeline_stage",
+          "fallback_level",
+          "timestamp_ms",
+          "runtime_mode",
+          "review_status",
+          "failure_reason",
+          "ocr_text_raw"
+        ],
+        "numeric_targets_required_before_acceptance": true
+      },
+      "candidate_source_refs": [
+        "ehv500_meter_sample_png"
+      ],
+      "acceptance_blockers": [
+        "missing_real_image",
+        "missing_human_text_label",
+        "traditional_ocr_currently_returns_empty"
+      ],
+      "notes": "Digital sample slot; current code has parser coverage but no labeled OCR replay fact source."
+    },
+    {
+      "sample_id": "meter_led_indicator_green_001",
+      "source_type": "mock",
+      "asset_kind": "mock_image_spec",
+      "asset_relpath": "plugins/meter_reading/tests/fixtures/led_indicator/meter_led_indicator_green_001.fixture.json",
+      "plugin_id": "meter_reading",
+      "fixture_group": "led_indicator",
+      "scenario_type": "led_indicator",
+      "meter_type": "led_indicator",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "led_indicator_reading"
+      ],
+      "expected_alarm_level": "none",
+      "collection_status": "present_labeled",
+      "expected_output_contract": {
+        "reading_status": "success",
+        "metadata_required": [
+          "meter_type",
+          "reading_status",
+          "pipeline_stage",
+          "fallback_level",
+          "timestamp_ms",
+          "runtime_mode",
+          "review_status",
+          "failure_reason",
+          "hsv_stats",
+          "color_class"
+        ]
+      },
+      "expected_numeric_targets": {
+        "value": 2.0,
+        "unit": "green",
+        "color_class": "green"
+      },
+      "notes": "Mock-only pilot asset to prove replay loading and output metadata checks. It does not verify real LED field performance."
+    },
+    {
+      "sample_id": "meter_glare_or_tilt_review_required_001",
+      "source_type": "placeholder",
+      "asset_kind": "image",
+      "asset_relpath": "plugins/meter_reading/tests/fixtures/glare_or_tilt_review_required/meter_glare_or_tilt_review_required_001.jpg",
+      "plugin_id": "meter_reading",
+      "fixture_group": "glare_or_tilt_review_required",
+      "scenario_type": "glare_or_tilt_review_required",
+      "meter_type": "pressure_gauge",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [
+        "pressure_gauge_reading"
+      ],
+      "expected_alarm_level": "info",
+      "collection_status": "planned",
+      "expected_output_contract": {
+        "reading_status": "need_manual_review",
+        "metadata_required": [
+          "meter_type",
+          "reading_status",
+          "pipeline_stage",
+          "fallback_level",
+          "timestamp_ms",
+          "runtime_mode",
+          "review_status",
+          "failure_reason",
+          "tilt_deg"
+        ],
+        "must_not_fabricate_value": true
+      },
+      "expected_reason_codes": [
+        "tilt_exceeded",
+        "hsv_not_separable",
+        "color_ambiguous"
+      ],
+      "acceptance_blockers": [
+        "missing_real_image",
+        "missing_tilt_or_glare_label"
+      ],
+      "notes": "Perspective/glare review slot; this keeps perspective correction experimental until real labeled samples exist."
+    }
+  ],
+  "candidate_sources": [
+    {
+      "candidate_id": "hv220_meter_training_images",
+      "source_type": "real",
+      "asset_relpath": "training/data/processed/HV_220kV/meter/images",
+      "label_status": "untriaged",
+      "notes": "Meter training images exist in the repository, but labels are not mapped to plugin-level readings."
+    },
+    {
+      "candidate_id": "ehv500_meter_sample_png",
+      "source_type": "real",
+      "asset_relpath": "training/data/processed/EHV_500kV/meter/images/test/samples.png",
+      "label_status": "untriaged",
+      "notes": "Single sample mosaic exists and needs manual crop/label work before becoming a replay fixture."
+    }
+  ]
+}

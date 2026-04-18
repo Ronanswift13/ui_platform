@@ -17,6 +17,7 @@ V3.0更新:
 """
 
 from __future__ import annotations
+import logging
 from typing import Any, Optional, List, Dict
 from dataclasses import dataclass, field
 from enum import Enum
@@ -38,6 +39,9 @@ except ImportError:
     YOLOv8ViTDetector = None
     YOLOv8ViTConfig = None
     DetectionTask = None
+
+
+logger = logging.getLogger(__name__)
 
 
 class SwitchType(Enum):
@@ -84,6 +88,43 @@ class ClarityResult:
     reshoot_suggestion: Optional[Dict] = None
 
 
+@dataclass
+class RecognitionEvidenceSummary:
+    """供 plugin.py 消费的证据摘要。"""
+    ocr_text: str = ""
+    ocr_confidence: float = 0.0
+    red_ratio: float = 0.0
+    green_ratio: float = 0.0
+    angle_deg: Optional[float] = None
+    clarity_score: Optional[float] = None
+
+
+@dataclass
+class SwitchRecognitionResult:
+    """开关识别标准结果。"""
+    state: str
+    confidence: float
+    reason_code: Optional[int] = None
+    evidence: RecognitionEvidenceSummary = field(default_factory=RecognitionEvidenceSummary)
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class GaugeReadingResult:
+    """SF6 表计读数标准结果。"""
+    value: Optional[float] = None
+    confidence: float = 0.0
+    unit: str = ""
+    reason_code: Optional[int] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class GaugeReaderState:
+    """表计读数能力开关。"""
+    enabled: bool = False
+
+
 class SwitchDetectorEnhanced:
     """
     开关间隔增强检测器
@@ -119,8 +160,10 @@ class SwitchDetectorEnhanced:
 
         # 配置参数
         self.state_config = config.get("state_recognition", {})
-        self.clarity_config = config.get("clarity_evaluation", {})
+        self.clarity_config = config.get("clarity_evaluation") or config.get("image_quality", {})
         self.logic_config = config.get("logic_validation", {})
+        gauge_config = config.get("gauge_reading", {})
+        self.gauge_reader = GaugeReaderState(enabled=bool(gauge_config.get("enabled", False)))
 
         # 融合权重
         weights = self.state_config.get("fusion_weights", {})
@@ -149,19 +192,19 @@ class SwitchDetectorEnhanced:
                 self._init_yolov8_vit()
             return True
         except Exception as e:
-            print(f"[SwitchDetector] 初始化失败: {e}")
+            logger.warning("Switch detector initialize failed: %s", e)
             return False
 
     def _init_yolov8_vit(self) -> bool:
         """初始化YOLOv8-ViT检测器 (V3.0)"""
         if not DL_AVAILABLE:
-            print("[SwitchDetector] YOLOv8-ViT模块不可用")
+            logger.info("YOLOv8-ViT module unavailable; fallback chain remains active")
             return False
 
         try:
             model_path = self.config.get("yolov8_model_path", None)
-            device = self.config.get("device", "cpu")
-            conf_threshold = self.state_config.get("confidence_threshold", 0.5)
+            device = self.config.get("model", {}).get("device", self.config.get("device", "cpu"))
+            conf_threshold = self.config.get("inference", {}).get("confidence_threshold", 0.5)
 
             config = YOLOv8ViTConfig(
                 model_path=model_path,
@@ -178,11 +221,11 @@ class SwitchDetectorEnhanced:
             self._yolov8_vit_detector.load()
             self._dl_initialized = True
 
-            print(f"[SwitchDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            logger.info("YOLOv8-ViT detector initialized")
             return True
 
         except Exception as e:
-            print(f"[SwitchDetector] YOLOv8-ViT初始化失败: {e}")
+            logger.warning("YOLOv8-ViT init failed: %s", e)
             self._dl_initialized = False
             return False
     
@@ -271,7 +314,7 @@ class SwitchDetectorEnhanced:
                         )
 
         except Exception as e:
-            print(f"[SwitchDetector] YOLOv8-ViT识别失败: {e}")
+            logger.debug("YOLOv8-ViT recognition failed: %s", e)
 
         return None
 
@@ -337,7 +380,7 @@ class SwitchDetectorEnhanced:
                     metadata={"model_id": model_id},
                 )
         except Exception as e:
-            print(f"[SwitchDetector] DL识别失败: {e}")
+            logger.debug("Deep learning recognition failed: %s", e)
         
         return None
     
@@ -354,8 +397,8 @@ class SwitchDetectorEnhanced:
                 if result.detections:
                     text = result.detections[0].get("text", "")
                     return self._parse_ocr_result(text)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("OCR model inference failed: %s", e)
         
         # 回退: 使用传统OCR预处理
         return self._ocr_traditional(image)
@@ -404,20 +447,23 @@ class SwitchDetectorEnhanced:
         if cv2 is None:
             return None
         
-        config = self.state_config.get("color_hints", {})
+        config = self.state_config.get("color_hints") or self.state_config.get("color_hint", {})
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        
+
         # 绿色(合位)
-        green_lower = np.array(config.get("green_lower", [35, 100, 100]))
-        green_upper = np.array(config.get("green_upper", [85, 255, 255]))
+        green_range = config.get("hsv_green", [[35, 100, 100], [85, 255, 255]])
+        green_lower = np.array(config.get("green_lower", green_range[0]))
+        green_upper = np.array(config.get("green_upper", green_range[1]))
         green_mask = cv2.inRange(hsv, green_lower, green_upper)
         green_ratio = float(np.sum(green_mask > 0) / green_mask.size)
         
         # 红色(分位)
-        red_lower1 = np.array(config.get("red_lower1", [0, 100, 100]))
-        red_upper1 = np.array(config.get("red_upper1", [10, 255, 255]))
-        red_lower2 = np.array(config.get("red_lower2", [160, 100, 100]))
-        red_upper2 = np.array(config.get("red_upper2", [180, 255, 255]))
+        red_range1 = config.get("hsv_red1", [[0, 100, 100], [10, 255, 255]])
+        red_range2 = config.get("hsv_red2", [[160, 100, 100], [180, 255, 255]])
+        red_lower1 = np.array(config.get("red_lower1", red_range1[0]))
+        red_upper1 = np.array(config.get("red_upper1", red_range1[1]))
+        red_lower2 = np.array(config.get("red_lower2", red_range2[0]))
+        red_upper2 = np.array(config.get("red_upper2", red_range2[1]))
         
         red_mask1 = cv2.inRange(hsv, red_lower1, red_upper1)
         red_mask2 = cv2.inRange(hsv, red_lower2, red_upper2)
@@ -475,12 +521,15 @@ class SwitchDetectorEnhanced:
         avg_angle = float(np.mean(angles))
         
         # 与参考角度比较
-        ref = self.ANGLE_REFERENCES.get(switch_type, self.ANGLE_REFERENCES[SwitchType.BREAKER])
+        ref = self._angle_reference_for(switch_type)
         
         diff_open = abs(avg_angle - ref["open"])
         diff_closed = abs(avg_angle - ref["closed"])
         
-        angle_threshold = self.state_config.get("angle_threshold", 20)
+        angle_threshold = self.state_config.get(
+            "angle_threshold",
+            self.state_config.get("angle_sigma_deg", 20),
+        )
         
         if diff_open < diff_closed and diff_open < angle_threshold:
             state = SwitchState.OPEN
@@ -544,35 +593,38 @@ class SwitchDetectorEnhanced:
     
     def _fuse_with_engine(self, evidences: List[StateEvidence]) -> Dict:
         """使用融合引擎"""
-        from darkbreaker_sdk.schemas import Evidence, EvidenceType
-        
         assert self._fusion_engine is not None
         fusion_evidences = []
         for ev in evidences:
-            etype = {
-                "ocr": EvidenceType.OCR_TEXT,
-                "color": EvidenceType.COLOR_DETECTION,
-                "angle": EvidenceType.ANGLE_DETECTION,
-                "deep_learning": EvidenceType.DEEP_LEARNING,
-            }.get(ev.source, EvidenceType.RULE_BASED)
-            
-            fusion_evidences.append(Evidence(
-                evidence_id=f"{ev.source}_{id(ev)}",
-                evidence_type=etype,
-                source=ev.source,
-                value=ev.state.value,
-                confidence=ev.confidence,
-                weight=self.weights.get(ev.source, 1.0),
-            ))
-        
+            fusion_evidences.append(
+                {
+                    "evidence_id": f"{ev.source}_{id(ev)}",
+                    "evidence_type": ev.source,
+                    "source": ev.source,
+                    "value": ev.state.value,
+                    "confidence": ev.confidence,
+                    "weight": self.weights.get(ev.source, 1.0),
+                }
+            )
+
         result = self._fusion_engine.fuse(fusion_evidences)
+        state = getattr(result, "final_value", None)
+        confidence = getattr(result, "final_confidence", None)
+        fusion_method = getattr(result, "fusion_method", None)
+        conflict_detected = getattr(result, "conflict_detected", None)
+        if isinstance(result, dict):
+            state = state or result.get("final_value")
+            confidence = confidence if confidence is not None else result.get("final_confidence")
+            fusion_method = fusion_method or result.get("fusion_method")
+            if conflict_detected is None:
+                conflict_detected = result.get("conflict_detected")
         
         return {
-            "state": result.final_value,
-            "confidence": result.final_confidence,
+            "state": state,
+            "confidence": confidence,
             "evidences": [self._evidence_to_dict(e) for e in evidences],
-            "fusion_method": result.fusion_method,
-            "conflict_detected": result.conflict_detected,
+            "fusion_method": fusion_method,
+            "conflict_detected": conflict_detected,
         }
     
     def _evidence_to_dict(self, ev: StateEvidence) -> Dict:
@@ -581,8 +633,140 @@ class SwitchDetectorEnhanced:
             "source": ev.source,
             "state": ev.state.value,
             "confidence": ev.confidence,
+            "raw_value": ev.raw_value,
             "metadata": ev.metadata,
         }
+
+    def _switch_type_from_value(self, device_type: str | SwitchType) -> SwitchType:
+        """兼容 plugin.py 传入的字符串设备类型。"""
+        if isinstance(device_type, SwitchType):
+            return device_type
+        try:
+            return SwitchType(str(device_type))
+        except ValueError:
+            return SwitchType.BREAKER
+
+    def _angle_reference_for(self, switch_type: SwitchType) -> Dict[str, float]:
+        """优先读取配置中的角度标定，缺失时回退到内置基线。"""
+        config_refs = self.state_config.get("angle_reference", {})
+        ref = config_refs.get(switch_type.value)
+        if ref:
+            return {
+                "open": ref.get("open_deg", self.ANGLE_REFERENCES[switch_type]["open"]),
+                "closed": ref.get("closed_deg", self.ANGLE_REFERENCES[switch_type]["closed"]),
+            }
+        return self.ANGLE_REFERENCES.get(switch_type, self.ANGLE_REFERENCES[SwitchType.BREAKER])
+
+    def _summarize_evidence(
+        self,
+        evidences: List[Dict[str, Any]],
+        clarity_score: Optional[float] = None,
+    ) -> RecognitionEvidenceSummary:
+        """把融合输出转成 plugin.py 可直接回填的证据摘要。"""
+        summary = RecognitionEvidenceSummary(clarity_score=clarity_score)
+        for item in evidences:
+            metadata = item.get("metadata", {}) or {}
+            source = item.get("source")
+            if source == "ocr":
+                summary.ocr_text = str(item.get("raw_value", "") or metadata.get("text", ""))
+                summary.ocr_confidence = float(item.get("confidence", 0.0))
+            elif source == "color":
+                summary.red_ratio = float(metadata.get("red_ratio", 0.0))
+                summary.green_ratio = float(metadata.get("green_ratio", 0.0))
+            elif source == "angle":
+                summary.angle_deg = metadata.get("avg_angle")
+        return summary
+
+    def _normalize_switch_result(
+        self,
+        result: Dict[str, Any],
+        clarity_score: Optional[float] = None,
+    ) -> SwitchRecognitionResult:
+        """把识别字典转换成稳定的结果对象。"""
+        evidences = result.get("evidences", [])
+        return SwitchRecognitionResult(
+            state=str(result.get("state", SwitchState.UNKNOWN.value)),
+            confidence=float(result.get("confidence", 0.0)),
+            reason_code=result.get("reason_code"),
+            evidence=self._summarize_evidence(evidences, clarity_score=clarity_score),
+            extra={
+                "scores": result.get("scores", {}),
+                "fusion_method": result.get("fusion_method"),
+                "conflict_detected": result.get("conflict_detected"),
+                "evidences": evidences,
+            },
+        )
+
+    def recognize_indicator_state(
+        self,
+        image: np.ndarray,
+        device_type: str | SwitchType,
+        clarity_score: Optional[float] = None,
+    ) -> SwitchRecognitionResult:
+        """plugin.py 的指示牌识别适配层。"""
+        switch_type = self._switch_type_from_value(device_type)
+        result = self.recognize_switch_state(image, switch_type=switch_type, use_fusion=True)
+        return self._normalize_switch_result(result, clarity_score=clarity_score)
+
+    def recognize_linkage_state(
+        self,
+        image: np.ndarray,
+        device_type: str | SwitchType,
+        clarity_score: Optional[float] = None,
+    ) -> SwitchRecognitionResult:
+        """plugin.py 的连杆识别适配层。"""
+        switch_type = self._switch_type_from_value(device_type)
+        result = self.recognize_switch_state(image, switch_type=switch_type, use_fusion=True)
+        return self._normalize_switch_result(result, clarity_score=clarity_score)
+
+    def validate_interlock(self, bay_states: Dict[str, str]) -> List[Dict[str, Any]]:
+        """根据配置规则输出最小五防告警列表。"""
+        if not self.logic_config.get("enabled", True):
+            return []
+
+        states = {
+            "breaker": bay_states.get("breaker", "unknown"),
+            "isolator": bay_states.get("isolator", "unknown"),
+            "grounding": bay_states.get("grounding", "unknown"),
+        }
+        alarms: List[Dict[str, Any]] = []
+        for rule in self.logic_config.get("rules", []):
+            condition = rule.get("condition", "")
+            severity = rule.get("severity", "warning")
+            matched = False
+            if condition == "isolator_open_before_grounding":
+                matched = states["grounding"] == "closed" and states["isolator"] != "open"
+            elif condition == "grounding_open_before_isolator":
+                matched = states["isolator"] == "closed" and states["grounding"] != "open"
+            elif condition == "breaker_closed_while_isolator_open":
+                matched = states["breaker"] == "closed" and states["isolator"] == "open"
+
+            if matched:
+                alarms.append(
+                    {
+                        "severity": severity,
+                        "rule_name": rule.get("name", condition),
+                        "rule_id": condition,
+                        "states": states.copy(),
+                        "message": rule.get("name", condition),
+                        "reason_code": 2001 if severity == "error" else 2002,
+                    }
+                )
+        return alarms
+
+    def read_gauge(self, image: np.ndarray) -> GaugeReadingResult:
+        """plugin.py 的表计读数适配层。"""
+        if not self.gauge_reader.enabled:
+            return GaugeReadingResult()
+
+        result = self.read_sf6_gauge(image)
+        return GaugeReadingResult(
+            value=result.get("value"),
+            confidence=float(result.get("confidence", 0.0)),
+            unit=str(result.get("unit", "")),
+            reason_code=1004 if result.get("value") is None else None,
+            extra=result.get("metadata", {}) or {},
+        )
     
     # ==================== 逻辑校验 ====================
     
@@ -739,7 +923,7 @@ class SwitchDetectorEnhanced:
         if cv2 is None:
             return {"value": None, "confidence": 0}
         
-        config = self.config.get("sf6_gauge", {})
+        config = self.config.get("gauge_reading", {}).get("pointer", {})
         
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         h, w = gray.shape

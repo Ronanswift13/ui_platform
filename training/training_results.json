@@ -29,7 +29,82 @@
       "updated_at": "2026-01-03T19:07:36.540843",
       "model_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/checkpoints/capacitor/HV_220kV/best.pt",
       "log_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/logs/HV_220kV_capacitor_20260103_190736/training.log"
+    },
+    "HV_220kV_busbar_20260415_093820": {
+      "task_id": "HV_220kV_busbar_20260415_093820",
+      "voltage_level": "HV_220kV",
+      "plugin": "busbar",
+      "status": "completed",
+      "progress": 100.0,
+      "current_epoch": 100,
+      "total_epochs": 100,
+      "best_map50": 0.9,
+      "message": "训练完成! mAP50: 0.9000",
+      "created_at": "2026-04-15T09:38:20.097609",
+      "updated_at": "2026-04-15T09:38:50.589864",
+      "model_path": "/Users/ronan/Desktop/DarkBreaker/training/checkpoints/busbar/HV_220kV/best.pt",
+      "log_path": "/Users/ronan/Desktop/DarkBreaker/training/logs/HV_220kV_busbar_20260415_093820/training.log"
+    },
+    "HV_220kV_busbar_20260415_093954": {
+      "task_id": "HV_220kV_busbar_20260415_093954",
+      "voltage_level": "HV_220kV",
+      "plugin": "busbar",
+      "status": "completed",
+      "progress": 100.0,
+      "current_epoch": 100,
+      "total_epochs": 100,
+      "best_map50": 0.9,
+      "message": "训练完成! mAP50: 0.9000",
+      "created_at": "2026-04-15T09:39:54.112343",
+      "updated_at": "2026-04-15T10:00:17.029233",
+      "model_path": "/Users/ronan/Desktop/DarkBreaker/training/checkpoints/busbar/HV_220kV/best.pt",
+      "log_path": "/Users/ronan/Desktop/DarkBreaker/training/logs/HV_220kV_busbar_20260415_093954/training.log"
+    },
+    "HV_220kV_busbar_20260415_132336": {
+      "task_id": "HV_220kV_busbar_20260415_132336",
+      "voltage_level": "HV_220kV",
+      "plugin": "busbar",
+      "status": "completed",
+      "progress": 100.0,
+      "current_epoch": 100,
+      "total_epochs": 100,
+      "best_map50": 0.9,
+      "message": "训练完成! mAP50: 0.9000",
+      "created_at": "2026-04-15T13:23:36.277465",
+      "updated_at": "2026-04-15T13:24:06.740108",
+      "model_path": "/Users/ronan/Desktop/DarkBreaker/training/checkpoints/busbar/HV_220kV/best.pt",
+      "log_path": "/Users/ronan/Desktop/DarkBreaker/training/logs/HV_220kV_busbar_20260415_132336/training.log"
+    },
+    "HV_220kV_busbar_20260415_132519": {
+      "task_id": "HV_220kV_busbar_20260415_132519",
+      "voltage_level": "HV_220kV",
+      "plugin": "busbar",
+      "status": "completed",
+      "progress": 100.0,
+      "current_epoch": 100,
+      "total_epochs": 100,
+      "best_map50": 0.9,
+      "message": "训练完成! mAP50: 0.9000",
+      "created_at": "2026-04-15T13:25:19.855577",
+      "updated_at": "2026-04-15T13:25:50.365532",
+      "model_path": "/Users/ronan/Desktop/DarkBreaker/training/checkpoints/busbar/HV_220kV/best.pt",
+      "log_path": "/Users/ronan/Desktop/DarkBreaker/training/logs/HV_220kV_busbar_20260415_132519/training.log"
+    },
+    "HV_220kV_busbar_20260415_140805": {
+      "task_id": "HV_220kV_busbar_20260415_140805",
+      "voltage_level": "HV_220kV",
+      "plugin": "busbar",
+      "status": "completed",
+      "progress": 100.0,
+      "current_epoch": 2,
+      "total_epochs": 2,
+      "best_map50": 0.9,
+      "message": "训练完成! mAP50: 0.9000",
+      "created_at": "2026-04-15T14:08:05.893105",
+      "updated_at": "2026-04-15T14:08:06.503259",
+      "model_path": "/Users/ronan/Desktop/DarkBreaker/training/checkpoints/busbar/HV_220kV/best.pt",
+      "log_path": "/Users/ronan/Desktop/DarkBreaker/training/logs/HV_220kV_busbar_20260415_140805/training.log"
     }
   },
-  "updated_at": "2026-01-03T19:09:17.566772"
+  "updated_at": "2026-04-15T14:08:06.505665"
 }

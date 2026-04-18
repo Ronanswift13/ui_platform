@@ -17,10 +17,10 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
-from .event_schema import AnimalClass, RiskLevel, ANIMAL_RISK_MAP
+from .event_schema import AnimalClass
 from .tracker import AnimalTrack
 
 logger = logging.getLogger(__name__)

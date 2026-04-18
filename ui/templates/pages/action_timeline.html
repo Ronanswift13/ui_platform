@@ -1,0 +1,1345 @@
+{% extends "base.html" %}
+
+{% block title %}动作时间线与关联分析 - 输变电监测平台{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============ 动作时间线页面样式 ============ */
+.action-page {
+    padding: 1rem;
+    background: var(--panel-bg, #0d1117);
+    min-height: calc(100vh - 60px);
+    color: #e6e6e6;
+}
+
+/* 筛选栏 */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+}
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.filter-group label {
+    font-size: 0.75rem;
+    color: #888;
+}
+.filter-group select,
+.filter-group input {
+    background: #1a1a2e;
+    border: 1px solid #2d3748;
+    color: #fff;
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+}
+.filter-group select:focus,
+.filter-group input:focus {
+    border-color: #00d4ff;
+    outline: none;
+}
+.btn-query {
+    background: #00d4ff;
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 0.4rem 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-query:hover { background: #33ddff; }
+.btn-analyze {
+    background: #10b981;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.4rem 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-analyze:hover { background: #34d399; }
+.btn-analyze:disabled { background: #555; cursor: not-allowed; }
+
+/* 主体布局 */
+.main-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+@media (min-width: 1400px) {
+    .main-layout { grid-template-columns: 3fr 2fr; }
+}
+
+/* 面板 */
+.panel {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #2d3748;
+    background: rgba(0,0,0,0.2);
+}
+.panel-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.panel-title i { color: #00d4ff; }
+.panel-body {
+    padding: 1rem;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* 时间线 */
+.timeline-list {
+    position: relative;
+    padding-left: 1.5rem;
+}
+.timeline-list::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, #00d4ff 0%, rgba(0,212,255,0.1) 100%);
+}
+.tl-item {
+    position: relative;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+.tl-item:hover { transform: translateX(4px); }
+.tl-item::before {
+    content: '';
+    position: absolute;
+    left: -1.35rem;
+    top: 0.6rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #00d4ff;
+    border: 2px solid #0d1117;
+    z-index: 1;
+}
+.tl-item.severity-warning::before { background: #f59e0b; }
+.tl-item.severity-alarm::before { background: #ef4444; }
+.tl-item.severity-critical::before { background: #ff0040; box-shadow: 0 0 8px rgba(255,0,64,0.5); }
+
+.tl-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+.tl-card:hover {
+    border-color: rgba(0,212,255,0.3);
+    background: rgba(255,255,255,0.05);
+}
+.tl-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+}
+.tl-action-type {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(0,212,255,0.15);
+    color: #00d4ff;
+}
+.tl-action-type.protection { background: rgba(239,68,68,0.15); color: #ef4444; }
+.tl-action-type.breaker { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.tl-action-type.recloser { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+.tl-action-type.control { background: rgba(236,72,153,0.15); color: #ec4899; }
+.tl-action-type.mechanism { background: rgba(251,146,60,0.15); color: #fb923c; }
+
+.tl-time { font-size: 0.75rem; color: #666; font-family: monospace; }
+.tl-desc { font-size: 0.85rem; color: #ccc; margin-bottom: 0.3rem; }
+.tl-meta { display: flex; gap: 1rem; font-size: 0.75rem; color: #666; flex-wrap: wrap; }
+.tl-meta span i { margin-right: 0.2rem; }
+
+/* 范围/根因面板 */
+.result-section {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    border: 1px solid #2d3748;
+}
+.result-section h6 {
+    color: #00d4ff;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+.result-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    font-size: 0.82rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.result-label { color: #888; }
+.result-value { color: #fff; font-weight: 500; }
+.result-value.high { color: #ef4444; }
+.result-value.medium { color: #f59e0b; }
+.result-value.low { color: #10b981; }
+
+/* 概率条 */
+.prob-bar-container { margin: 0.3rem 0; }
+.prob-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #aaa;
+    margin-bottom: 0.15rem;
+}
+.prob-bar {
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.prob-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s;
+}
+.prob-bar-fill.primary { background: linear-gradient(90deg, #ef4444, #f87171); }
+.prob-bar-fill.secondary { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.prob-bar-fill.control { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.prob-bar-fill.signal { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+.prob-bar-fill.external { background: linear-gradient(90deg, #6b7280, #9ca3af); }
+
+/* 证据链节点 */
+.evidence-node {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+    border-left: 3px solid #00d4ff;
+    font-size: 0.82rem;
+}
+.evidence-node.protection { border-left-color: #ef4444; }
+.evidence-node.breaker { border-left-color: #f59e0b; }
+.evidence-node.recloser { border-left-color: #8b5cf6; }
+.evidence-node.control_loop { border-left-color: #ec4899; }
+.evidence-node.mechanism { border-left-color: #fb923c; }
+.evidence-node.primary_evidence { border-left-color: #10b981; }
+.evidence-node.secondary_health { border-left-color: #a78bfa; }
+.evidence-node.manual_review { border-left-color: #f472b6; }
+.evidence-node.soe { border-left-color: #06b6d4; }
+.evidence-node.signal_change { border-left-color: #3b82f6; }
+
+.ev-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    background: rgba(0,212,255,0.15);
+    color: #00d4ff;
+    flex-shrink: 0;
+}
+.ev-content { flex: 1; }
+.ev-desc { color: #ccc; }
+.ev-meta { color: #666; font-size: 0.72rem; margin-top: 0.15rem; }
+
+/* 状态横幅 */
+.sufficiency-banner {
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.sufficiency-banner.sufficient { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: #34d399; }
+.sufficiency-banner.partial { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #fbbf24; }
+.sufficiency-banner.insufficient { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+.sufficiency-banner.unknown { background: rgba(107,114,128,0.12); border: 1px solid rgba(107,114,128,0.3); color: #9ca3af; }
+.sufficiency-banner.below-threshold { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); color: #a78bfa; }
+.sufficiency-banner.pending-review { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #fbbf24; }
+
+/* 数据不足专用状态(区别于空状态) */
+.data-insufficient-hint {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #f59e0b;
+    background: rgba(245,158,11,0.05);
+    border: 1px dashed rgba(245,158,11,0.3);
+    border-radius: 6px;
+}
+.data-insufficient-hint i { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+.data-insufficient-hint .sub { font-size: 0.78rem; color: #888; margin-top: 0.3rem; }
+
+/* 折叠列表 */
+.collapsible-list { font-size: 0.8rem; color: #aaa; padding-left: 0.75rem; }
+.collapsible-list li { padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.collapsible-toggle {
+    cursor: pointer; color: #00d4ff; font-size: 0.78rem;
+    background: none; border: none; padding: 0; margin-top: 0.3rem;
+}
+.collapsible-toggle:hover { text-decoration: underline; }
+
+/* 空状态 */
+.empty-hint {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #555;
+}
+.empty-hint i { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; }
+
+/* 错误状态 */
+.error-hint {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #f87171;
+    background: rgba(239,68,68,0.05);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 6px;
+    display: none;
+}
+.error-hint i { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+
+/* 统计卡片 */
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.stat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 0.75rem;
+    text-align: center;
+}
+.stat-value { font-size: 1.6rem; font-weight: 700; color: #00d4ff; }
+.stat-label { font-size: 0.72rem; color: #666; }
+
+/* 设备列表表格 */
+.scope-table { width: 100%; font-size: 0.78rem; }
+.scope-table td { padding: 0.2rem 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.scope-table td:first-child { color: #888; width: 35%; }
+.scope-table td:last-child { color: #fff; }
+
+/* 候选事件卡片 */
+.candidate-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.candidate-card:hover { border-color: rgba(0,212,255,0.4); background: rgba(255,255,255,0.05); }
+.candidate-card.selected { border-color: #00d4ff; background: rgba(0,212,255,0.08); }
+.candidate-card.severity-critical { border-left: 3px solid #ff0040; }
+.candidate-card.severity-alarm { border-left: 3px solid #ef4444; }
+.candidate-card.severity-warning { border-left: 3px solid #f59e0b; }
+.candidate-card.severity-info { border-left: 3px solid #00d4ff; }
+.candidate-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+.candidate-type { font-size: 0.8rem; font-weight: 600; }
+.candidate-badges { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.candidate-badges .badge { font-size: 0.68rem; padding: 0.1rem 0.4rem; border-radius: 3px; }
+.badge-review { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.badge-review.confirmed { background: rgba(16,185,129,0.15); color: #34d399; }
+.badge-review.rejected { background: rgba(239,68,68,0.15); color: #f87171; }
+.badge-review.false_positive { background: rgba(139,92,246,0.15); color: #a78bfa; }
+.badge-review.handled { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge-review.field_check { background: rgba(251,146,60,0.15); color: #fb923c; }
+.badge-review.required { background: rgba(239,68,68,0.2); color: #f87171; }
+.candidate-detail { font-size: 0.78rem; color: #999; margin-top: 0.2rem; }
+.candidate-confidence { font-size: 0.75rem; font-family: monospace; }
+
+/* 复核按钮 */
+.btn-review {
+    border: none; border-radius: 4px; padding: 0.3rem 0.6rem; font-size: 0.78rem;
+    font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+}
+.btn-review:hover { opacity: 0.85; }
+.btn-review.confirmed { background: #10b981; color: #fff; }
+.btn-review.rejected { background: #ef4444; color: #fff; }
+.btn-review.false_positive { background: #8b5cf6; color: #fff; }
+.btn-review.handled { background: #3b82f6; color: #fff; }
+.btn-review.field_check { background: #f59e0b; color: #000; }
+
+/* 序列完整性标签 */
+.seq-tag { font-size: 0.7rem; padding: 0.1rem 0.35rem; border-radius: 3px; }
+.seq-tag.complete { background: rgba(16,185,129,0.15); color: #34d399; }
+.seq-tag.partial { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.seq-tag.incomplete { background: rgba(239,68,68,0.15); color: #f87171; }
+.seq-tag.unknown { background: rgba(107,114,128,0.15); color: #9ca3af; }
+
+/* loading */
+.loading-mask {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+.loading-mask.active { display: flex; }
+.spinner { width: 32px; height: 32px; border: 3px solid #333; border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="action-page">
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>厂站</label>
+            <select id="filter-station"><option value="">全部</option></select>
+        </div>
+        <div class="filter-group">
+            <label>间隔</label>
+            <select id="filter-bay"><option value="">全部</option></select>
+        </div>
+        <div class="filter-group">
+            <label>设备</label>
+            <input type="text" id="filter-device" placeholder="设备ID">
+        </div>
+        <div class="filter-group">
+            <label>告警组名</label>
+            <select id="filter-signal-group">
+                <option value="">全部</option>
+                <option value="protection">保护动作</option>
+                <option value="breaker">断路器</option>
+                <option value="recloser">重合闸</option>
+                <option value="control_loop">控制回路</option>
+                <option value="mechanism">操作机构</option>
+                <option value="backup_auto">备自投</option>
+                <option value="dc_system">直流系统</option>
+                <option value="soe">SOE</option>
+                <option value="telemetry">遥信</option>
+                <option value="alarm">告知/告警</option>
+                <option value="abnormal">异常</option>
+                <option value="power_quality">电能质量</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>开始时间</label>
+            <input type="datetime-local" id="filter-start">
+        </div>
+        <div class="filter-group">
+            <label>结束时间</label>
+            <input type="datetime-local" id="filter-end">
+        </div>
+        <div class="filter-group">
+            <label>追踪链ID</label>
+            <input type="text" id="filter-trace" placeholder="trace_id" style="width: 180px;">
+        </div>
+        <button class="btn-query" onclick="ActionTimeline.query()"><i class="bi bi-search"></i> 查询</button>
+        <button class="btn-analyze" id="btn-analyze" onclick="ActionTimeline.triggerAnalysis()"><i class="bi bi-cpu"></i> 触发分析</button>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-bar">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">动作事件</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-traces">0</div>
+            <div class="stat-label">追踪链</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-trip">0</div>
+            <div class="stat-label">跳闸范围</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-rootcause">0</div>
+            <div class="stat-label">根因分析</div>
+        </div>
+    </div>
+
+    <!-- 候选事件清单 -->
+    <div class="panel" style="margin-bottom: 1rem;">
+        <div class="panel-header">
+            <div class="panel-title"><i class="bi bi-list-check"></i> 候选事件清单</div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <select id="filter-review-status" style="background: #1a1a2e; border: 1px solid #2d3748; color: #fff; border-radius: 4px; padding: 0.2rem 0.5rem; font-size: 0.78rem;">
+                    <option value="">全部状态</option>
+                    <option value="pending">待复核</option>
+                    <option value="required">需复核</option>
+                    <option value="confirmed">已确认</option>
+                    <option value="rejected">已驳回</option>
+                    <option value="false_positive">误报</option>
+                    <option value="handled">已处置</option>
+                    <option value="field_check">需现场</option>
+                </select>
+                <span class="badge bg-warning text-dark" id="candidate-count-badge">0</span>
+            </div>
+        </div>
+        <div class="panel-body" id="candidate-body" style="max-height: 350px;">
+            <div class="empty-hint" id="candidate-empty" style="padding: 1.5rem;">
+                <i class="bi bi-clipboard-check"></i>
+                <div>触发分析后生成候选事件</div>
+                <div style="font-size: 0.78rem; color: #666; margin-top: 0.3rem;">候选事件将动作序列聚合为值班人员可直接操作的事件清单</div>
+            </div>
+            <div id="candidate-list" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 主体 -->
+    <div class="main-layout">
+        <!-- 左侧: 动作序列时间线 -->
+        <div class="panel" style="position: relative;">
+            <div class="panel-header">
+                <div class="panel-title"><i class="bi bi-clock-history"></i> 动作序列时间线</div>
+                <span class="badge bg-info" id="event-count-badge">0</span>
+            </div>
+            <div class="panel-body" id="timeline-body">
+                <div class="empty-hint" id="timeline-empty">
+                    <i class="bi bi-inbox"></i>
+                    <div>暂无动作事件</div>
+                    <div style="font-size: 0.8rem; margin-top: 0.5rem;">请通过筛选条件查询，或等待实时事件推送</div>
+                </div>
+                <div class="error-hint" id="timeline-error">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>查询失败</div>
+                    <div id="timeline-error-msg" style="font-size: 0.8rem; margin-top: 0.3rem;"></div>
+                </div>
+                <div class="data-insufficient-hint" id="timeline-insufficient" style="display: none;">
+                    <i class="bi bi-database-exclamation"></i>
+                    <div>数据不足</div>
+                    <div class="sub" id="timeline-insufficient-msg">当前查询范围内事件数量过少，不足以支撑动作链分析，建议扩大时间范围或补充数据源</div>
+                </div>
+                <div class="timeline-list" id="timeline-list" style="display: none;"></div>
+            </div>
+            <div class="loading-mask" id="timeline-loading"><div class="spinner"></div></div>
+        </div>
+
+        <!-- 右侧: 范围判定 + 根因分析 + 证据链 + 人工复核 -->
+        <div>
+            <!-- 人工复核操作面板 -->
+            <div class="panel" style="margin-bottom: 1rem;" id="review-panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="bi bi-person-check"></i> 人工复核</div>
+                </div>
+                <div class="panel-body" id="review-body">
+                    <div class="empty-hint" id="review-empty" style="padding: 1rem;">
+                        <i class="bi bi-hand-index"></i>
+                        <div style="font-size: 0.85rem;">选择候选事件后进行复核操作</div>
+                    </div>
+                    <div id="review-content" style="display: none;">
+                        <div class="result-section">
+                            <h6>当前事件: <span id="review-event-id" style="font-family: monospace; color: #00d4ff;"></span></h6>
+                            <div id="review-current-status" style="font-size: 0.82rem; margin-bottom: 0.5rem;"></div>
+                            <div id="review-boundary-note" style="font-size: 0.78rem; color: #f59e0b; margin-bottom: 0.75rem; padding: 0.5rem; background: rgba(245,158,11,0.08); border-radius: 4px; border-left: 3px solid #f59e0b;"></div>
+                        </div>
+                        <div class="result-section">
+                            <h6>复核操作</h6>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                                <button class="btn-review confirmed" onclick="ActionTimeline.submitReview('confirmed')"><i class="bi bi-check-circle"></i> 确认</button>
+                                <button class="btn-review rejected" onclick="ActionTimeline.submitReview('rejected')"><i class="bi bi-x-circle"></i> 驳回</button>
+                                <button class="btn-review false_positive" onclick="ActionTimeline.submitReview('false_positive')"><i class="bi bi-flag"></i> 误报</button>
+                                <button class="btn-review handled" onclick="ActionTimeline.submitReview('handled')"><i class="bi bi-check2-all"></i> 已处置</button>
+                                <button class="btn-review field_check" onclick="ActionTimeline.submitReview('field_check')"><i class="bi bi-geo-alt"></i> 需现场</button>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="review-comment-input" placeholder="复核备注..." style="flex: 1; background: #1a1a2e; border: 1px solid #2d3748; color: #fff; border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.82rem;">
+                                <button class="btn-query" onclick="ActionTimeline.addComment()" style="padding: 0.4rem 0.75rem;">追加备注</button>
+                            </div>
+                            <div id="review-history" style="margin-top: 0.5rem; font-size: 0.75rem; color: #666;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 跳闸范围判定 -->
+            <div class="panel" style="margin-bottom: 1rem;">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="bi bi-diagram-2"></i> 跳闸范围判定</div>
+                </div>
+                <div class="panel-body" id="scope-body">
+                    <div class="empty-hint" id="scope-empty" style="padding: 1.5rem;">
+                        <i class="bi bi-signpost-split"></i>
+                        <div>选择事件或触发分析查看范围判定</div>
+                    </div>
+                    <div id="scope-content" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- 根因分析 -->
+            <div class="panel" style="margin-bottom: 1rem;">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="bi bi-search"></i> 根因分析结果</div>
+                </div>
+                <div class="panel-body" id="rootcause-body" style="max-height: 800px;">
+                    <div class="empty-hint" id="rootcause-empty" style="padding: 1.5rem;">
+                        <i class="bi bi-question-circle"></i>
+                        <div>触发分析后显示根因结果</div>
+                    </div>
+                    <div class="error-hint" id="rootcause-error">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <div>分析失败</div>
+                        <div id="rootcause-error-msg" style="font-size: 0.8rem; margin-top: 0.3rem;"></div>
+                    </div>
+                    <div id="rootcause-content" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- 证据链 -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="bi bi-link-45deg"></i> 证据链</div>
+                </div>
+                <div class="panel-body" id="evidence-body">
+                    <div class="empty-hint" id="evidence-empty" style="padding: 1.5rem;">
+                        <i class="bi bi-diagram-3"></i>
+                        <div>分析完成后展示证据链</div>
+                    </div>
+                    <div id="evidence-content" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 动作时间线前端控制器
+ * 支持: 查询/分析/跳闸范围/根因结果/证据链/错误状态/数据不足状态
+ */
+const ActionTimeline = (function() {
+    const API_BASE = '/api';
+    let currentEvents = [];
+    let currentTraceId = '';
+
+    // === 动作类型样式映射(贴合业务语言) ===
+    const ACTION_TYPE_STYLES = {
+        'protection_start':   { cls: 'protection', label: '保护启动', icon: 'bi-shield-exclamation' },
+        'protection_trip':    { cls: 'protection', label: '保护出口', icon: 'bi-shield-x' },
+        'bus_diff_trip':      { cls: 'protection', label: '母差动作', icon: 'bi-shield-x' },
+        'breaker_fail_start': { cls: 'protection', label: '失灵启动', icon: 'bi-shield-exclamation' },
+        'breaker_fail_trip':  { cls: 'protection', label: '失灵跳闸', icon: 'bi-shield-x' },
+        'breaker_open':       { cls: 'breaker', label: '断路器分闸', icon: 'bi-toggle-off' },
+        'breaker_close':      { cls: 'breaker', label: '断路器合闸', icon: 'bi-toggle-on' },
+        'trip_open':          { cls: 'breaker', label: '分闸(停电)', icon: 'bi-power' },
+        'disconnect_open':    { cls: 'breaker', label: '台闸(停电)', icon: 'bi-plug' },
+        'recloser_charge':    { cls: 'recloser', label: '重合闸充电', icon: 'bi-battery-charging' },
+        'recloser_action':    { cls: 'recloser', label: '重合闸动作', icon: 'bi-arrow-repeat' },
+        'recloser_success':   { cls: 'recloser', label: '重合闸成功', icon: 'bi-check-circle' },
+        'recloser_fail':      { cls: 'recloser', label: '重合闸失败', icon: 'bi-x-circle' },
+        'control_loop_break': { cls: 'control', label: '控制回路断线', icon: 'bi-slash-circle' },
+        'spring_not_charged': { cls: 'mechanism', label: '弹簧未储能', icon: 'bi-exclamation-triangle' },
+        'backup_auto_switch': { cls: 'recloser', label: '备自投动作', icon: 'bi-arrow-left-right' },
+        'backup_auto_charge': { cls: 'recloser', label: '备自投充电', icon: 'bi-battery-charging' },
+        'backup_auto_lock':   { cls: 'control', label: '备自投闭锁', icon: 'bi-lock' },
+        'dc_ground':          { cls: 'control', label: '直流接地', icon: 'bi-exclamation-diamond' },
+        'dc_loss':            { cls: 'control', label: '直流消失', icon: 'bi-x-diamond' },
+        'plate_in':           { cls: '', label: '压板投入', icon: 'bi-check-square' },
+        'plate_out':          { cls: '', label: '压板退出', icon: 'bi-square' },
+        'signal_change':      { cls: '', label: '遥信变位', icon: 'bi-arrow-left-right' },
+        'soe_event':          { cls: '', label: 'SOE事件', icon: 'bi-list-ol' },
+        'alarm_signal':       { cls: '', label: '告知信号', icon: 'bi-bell' },
+        'abnormal_signal':    { cls: 'control', label: '异常信号', icon: 'bi-exclamation-diamond' },
+        'switch_action':      { cls: 'breaker', label: '开关动作', icon: 'bi-toggles' },
+    };
+
+    const CAT_LABELS = {
+        'primary_equipment_fault': '一次设备故障',
+        'secondary_equipment_fault': '二次设备故障',
+        'control_loop_issue': '控制回路/机构问题',
+        'signal_anomaly': '信号异常/监测点异常',
+        'external_cause': '外部原因',
+        'unknown': '根因未明确',
+    };
+
+    const CHAIN_LABELS = {
+        'normal_trip': '正常跳闸链',
+        'recloser_fail': '重合闸失败链',
+        'refuse_action': '拒动链',
+        'false_action': '误动链',
+        'control_loop_abnormal': '控制回路异常链',
+        'mechanism_abnormal': '机构异常链',
+        'signal_jitter': '信号抖动链',
+    };
+
+    const SUFFICIENCY_LABELS = {
+        'sufficient': { text: '证据充分', icon: 'bi-check-circle-fill', cls: 'sufficient' },
+        'partial':    { text: '证据部分缺失，建议补充后复核', icon: 'bi-exclamation-triangle-fill', cls: 'partial' },
+        'insufficient': { text: '证据严重不足，结论仅供参考', icon: 'bi-x-circle-fill', cls: 'insufficient' },
+        'unknown':    { text: '证据充分性未评估', icon: 'bi-question-circle-fill', cls: 'unknown' },
+    };
+
+    function getActionStyle(type) {
+        return ACTION_TYPE_STYLES[type] || { cls: '', label: type || '未知', icon: 'bi-circle' };
+    }
+
+    // =================================================================
+    // 查询
+    // =================================================================
+    async function query() {
+        const params = new URLSearchParams();
+        const v = (id) => document.getElementById(id)?.value || '';
+
+        if (v('filter-trace')) {
+            params.set('trace_id', v('filter-trace'));
+            return queryTimeline(params);
+        }
+        if (v('filter-station')) params.set('station_id', v('filter-station'));
+        if (v('filter-bay')) params.set('bay_id', v('filter-bay'));
+        if (v('filter-device')) params.set('device_id', v('filter-device'));
+        if (v('filter-signal-group')) params.set('signal_group', v('filter-signal-group'));
+        if (v('filter-start')) params.set('start_time', new Date(v('filter-start')).toISOString());
+        if (v('filter-end')) params.set('end_time', new Date(v('filter-end')).toISOString());
+
+        return queryTimeline(params);
+    }
+
+    async function queryTimeline(params) {
+        showLoading(true);
+        hideError('timeline');
+        try {
+            const resp = await fetch(`${API_BASE}/timeline?${params.toString()}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+            const json = await resp.json();
+            if (json.success && json.data) {
+                renderTimeline(json.data);
+            } else {
+                showError('timeline', json.message || '服务返回异常');
+            }
+        } catch(e) {
+            showError('timeline', e.message || '网络请求失败');
+        }
+        showLoading(false);
+    }
+
+    // =================================================================
+    // 渲染时间线
+    // =================================================================
+    function renderTimeline(data) {
+        currentEvents = data.events || [];
+        const summary = data.summary || {};
+        const tripScopes = data.trip_scopes || {};
+        const rootCauses = data.root_causes || {};
+
+        // 统计
+        document.getElementById('stat-total').textContent = summary.total_events || 0;
+        document.getElementById('stat-traces').textContent = summary.trace_count || 0;
+        document.getElementById('stat-trip').textContent = Object.keys(tripScopes).length;
+        document.getElementById('stat-rootcause').textContent = Object.keys(rootCauses).length;
+        document.getElementById('event-count-badge').textContent = currentEvents.length;
+
+        // 时间线
+        const listEl = document.getElementById('timeline-list');
+        const emptyEl = document.getElementById('timeline-empty');
+
+        const insuffEl = document.getElementById('timeline-insufficient');
+
+        if (currentEvents.length === 0) {
+            listEl.style.display = 'none';
+            emptyEl.style.display = 'block';
+            insuffEl.style.display = 'none';
+            resetRightPanels();
+            return;
+        }
+
+        // 数据不足判定: 有事件但少于3条，不足以支撑分析
+        if (currentEvents.length > 0 && currentEvents.length < 3 && Object.keys(tripScopes).length === 0 && Object.keys(rootCauses).length === 0) {
+            insuffEl.style.display = 'block';
+        } else {
+            insuffEl.style.display = 'none';
+        }
+
+        emptyEl.style.display = 'none';
+        listEl.style.display = 'block';
+        listEl.innerHTML = currentEvents.map(ev => renderTimelineItem(ev)).join('');
+
+        // 范围和根因(取第一个trace)
+        const firstTrace = currentEvents[0]?.trace_id;
+        if (firstTrace) {
+            currentTraceId = firstTrace;
+            if (tripScopes[firstTrace]) renderTripScope(tripScopes[firstTrace]);
+            if (rootCauses[firstTrace]) renderRootCause(rootCauses[firstTrace]);
+        }
+
+        // 候选事件
+        const candidateEvents = data.candidate_events || {};
+        const allCandidates = [];
+        for (const tid of Object.keys(candidateEvents)) {
+            const cands = candidateEvents[tid];
+            if (Array.isArray(cands)) allCandidates.push(...cands);
+        }
+        if (allCandidates.length > 0) {
+            renderCandidateList(allCandidates);
+        }
+    }
+
+    function renderTimelineItem(ev) {
+        const style = getActionStyle(ev.action_type);
+        // 精确时间: 保留毫秒(SOE事件需要)
+        const ts = ev.source_ts ? formatTimestamp(ev.source_ts) : '-';
+        const sevClass = ev.severity_hint ? `severity-${ev.severity_hint}` : '';
+
+        return `
+        <div class="tl-item ${sevClass}" onclick="ActionTimeline.selectEvent('${ev.trace_id}')">
+            <div class="tl-card">
+                <div class="tl-header">
+                    <span class="tl-action-type ${style.cls}"><i class="bi ${style.icon}"></i> ${style.label}</span>
+                    <span class="tl-time">${ts}</span>
+                </div>
+                <div class="tl-desc">${escHtml(ev.action_desc || ev.signal_name || '-')}</div>
+                <div class="tl-meta">
+                    <span><i class="bi bi-building"></i>${escHtml(ev.station_name || ev.station_id || '-')}</span>
+                    <span><i class="bi bi-layers"></i>${escHtml(ev.bay_name || ev.bay_id || '-')}</span>
+                    <span><i class="bi bi-broadcast"></i>${ev.signal_group || '-'}</span>
+                    <span><i class="bi bi-hdd-network"></i>${ev.source_system || '-'}</span>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // =================================================================
+    // 跳闸范围渲染(完整业务字段)
+    // =================================================================
+    function renderTripScope(scope) {
+        const el = document.getElementById('scope-content');
+        const empty = document.getElementById('scope-empty');
+        empty.style.display = 'none';
+        el.style.display = 'block';
+
+        const realTrip = scope.is_real_trip;
+        const badge = realTrip
+            ? '<span class="badge bg-danger">真正跳闸</span>'
+            : '<span class="badge bg-warning text-dark">动作异常(未形成跳闸)</span>';
+
+        // 保护动作列表
+        const protActed = (scope.protection_acted || []).map(p =>
+            `<tr><td>${escHtml(p.device_name || p.device_id || '-')}</td><td>${escHtml(p.protection_type || '-')}</td><td>${formatTimestamp(p.action_time)}</td></tr>`
+        ).join('');
+
+        // 跳开断路器列表
+        const tripBrk = (scope.trip_breakers || []).map(b =>
+            `<tr><td>${escHtml(b.device_name || b.device_id || '-')}</td><td>${escHtml(b.bay_id || '-')}</td><td>${formatTimestamp(b.trip_time)}</td></tr>`
+        ).join('');
+
+        // 停电范围
+        const outage = (scope.outage_scope || []).map(o =>
+            `<tr><td>${escHtml(o.bay_name || o.bay_id || '-')}</td><td>${escHtml(o.voltage_level || '-')}</td><td>${escHtml(o.outage_type || '-')}</td></tr>`
+        ).join('');
+
+        el.innerHTML = `
+            <div class="result-section">
+                <h6>判定结果 ${badge}</h6>
+                <div class="result-row"><span class="result-label">故障线路</span><span class="result-value">${escHtml(scope.fault_line || '-')}</span></div>
+                <div class="result-row"><span class="result-label">电压等级</span><span class="result-value">${escHtml(scope.voltage_level || '-')}</span></div>
+                <div class="result-row"><span class="result-label">故障类型</span><span class="result-value">${escHtml(scope.fault_type || '-')}</span></div>
+                <div class="result-row"><span class="result-label">故障相别</span><span class="result-value">${escHtml(scope.fault_phase || '-')}</span></div>
+                <div class="result-row"><span class="result-label">故障电流</span><span class="result-value">${scope.fault_current != null ? scope.fault_current + ' kA' : '-'}</span></div>
+                <div class="result-row"><span class="result-label">录波情况</span><span class="result-value">${escHtml(scope.wave_record_status || '-')}</span></div>
+                <div class="result-row"><span class="result-label">重合闸投入</span><span class="result-value">${scope.recloser_enabled == null ? '-' : (scope.recloser_enabled ? '是' : '否')}</span></div>
+                <div class="result-row"><span class="result-label">重合闸成功</span><span class="result-value ${scope.recloser_success === false ? 'high' : ''}">${scope.recloser_success == null ? '-' : (scope.recloser_success ? '成功' : '失败')}</span></div>
+                <div class="result-row"><span class="result-label">置信度</span><span class="result-value">${(scope.confidence * 100).toFixed(0)}%</span></div>
+            </div>
+
+            ${protActed ? `<div class="result-section">
+                <h6>保护动作装置</h6>
+                <table class="scope-table"><tbody>${protActed}</tbody></table>
+            </div>` : ''}
+
+            ${tripBrk ? `<div class="result-section">
+                <h6>跳开断路器</h6>
+                <table class="scope-table"><tbody>${tripBrk}</tbody></table>
+            </div>` : ''}
+
+            ${outage ? `<div class="result-section">
+                <h6>停电/失压范围</h6>
+                <table class="scope-table"><tbody>${outage}</tbody></table>
+            </div>` : ''}
+
+            <div class="result-section">
+                <h6>一次设备检修范围</h6>
+                ${renderScopeDevices(scope.primary_scope, ['device_name', 'device_type', 'bay_name'])}
+            </div>
+            <div class="result-section">
+                <h6>二次设备检修范围</h6>
+                ${renderScopeDevices(scope.secondary_scope, ['device_name', 'device_type', 'cabinet_id'])}
+            </div>`;
+    }
+
+    function renderScopeDevices(devices, fields) {
+        if (!devices || devices.length === 0) return '<div style="font-size:0.8rem;color:#555;">无</div>';
+        return devices.map(d => {
+            const parts = fields.map(f => escHtml(d[f] || '-'));
+            return `<div class="result-row"><span class="result-label">${parts[1]}</span><span class="result-value">${parts[0]}${parts[2] ? ' (' + parts[2] + ')' : ''}</span></div>`;
+        }).join('');
+    }
+
+    // =================================================================
+    // 根因分析渲染(含门禁/反证/缺口/复核项/下一步)
+    // =================================================================
+    function renderRootCause(rc) {
+        const el = document.getElementById('rootcause-content');
+        const empty = document.getElementById('rootcause-empty');
+        const err = document.getElementById('rootcause-error');
+        empty.style.display = 'none';
+        err.style.display = 'none';
+        el.style.display = 'block';
+
+        const pp = rc.primary_equipment_fault_probability || 0;
+        const sp = rc.secondary_equipment_fault_probability || 0;
+        const cp = rc.control_loop_fault_probability || 0;
+        const sigp = rc.signal_anomaly_probability || 0;
+        const ep = rc.external_cause_probability || 0;
+
+        // 证据充分性横幅
+        const suf = SUFFICIENCY_LABELS[rc.evidence_sufficiency] || SUFFICIENCY_LABELS['unknown'];
+        let banners = `<div class="sufficiency-banner ${suf.cls}"><i class="bi ${suf.icon}"></i> ${suf.text}</div>`;
+
+        // 根因结论未达门限(置信度低于 0.6 视为未达门限)
+        const CONFIDENCE_THRESHOLD = 0.6;
+        if (rc.confidence < CONFIDENCE_THRESHOLD) {
+            banners += `<div class="sufficiency-banner below-threshold"><i class="bi bi-speedometer"></i> 根因结论置信度 ${(rc.confidence * 100).toFixed(1)}% 未达判定门限(${(CONFIDENCE_THRESHOLD * 100)}%)，当前结果仅供参考</div>`;
+        }
+
+        // 人工复核待确认
+        const pendingReviewCount = (rc.manual_review_items || []).length;
+        if (pendingReviewCount > 0) {
+            const hasConfirmedReview = (rc.evidence_chain || []).some(n => n.node_type === 'manual_review' && n.review_status === 'confirmed');
+            if (!hasConfirmedReview) {
+                banners += `<div class="sufficiency-banner pending-review"><i class="bi bi-person-exclamation"></i> ${pendingReviewCount} 项人工复核待确认，请值班人员核实后确认结论</div>`;
+            }
+        }
+
+        // 概率条
+        const probBars = [
+            { label: '一次设备故障', val: pp, cls: 'primary' },
+            { label: '二次设备故障', val: sp, cls: 'secondary' },
+            { label: '控制回路/机构', val: cp, cls: 'control' },
+            { label: '信号异常', val: sigp, cls: 'signal' },
+            { label: '外部原因', val: ep, cls: 'external' },
+        ].map(b => `
+            <div class="prob-bar-container">
+                <div class="prob-bar-label"><span>${b.label}</span><span>${(b.val*100).toFixed(1)}%</span></div>
+                <div class="prob-bar"><div class="prob-bar-fill ${b.cls}" style="width: ${b.val*100}%"></div></div>
+            </div>`).join('');
+
+        // 反证/缺口/复核项/下一步
+        const counterHtml = renderCollapsibleList('反证说明', rc.counter_evidence, 'bi-shield-minus');
+        const gapsHtml = renderCollapsibleList('证据缺口', rc.evidence_gaps, 'bi-exclamation-circle');
+        const reviewHtml = renderCollapsibleList('人工复核项', rc.manual_review_items, 'bi-person-check');
+        const nextHtml = renderCollapsibleList('推荐下一步动作', rc.next_actions, 'bi-arrow-right-circle');
+        const recsHtml = renderCollapsibleList('处置建议', rc.recommendations, 'bi-lightbulb');
+
+        el.innerHTML = `
+            ${banners}
+            <div class="result-section">
+                <h6>根因判定: ${CAT_LABELS[rc.root_cause_category] || rc.root_cause_category}</h6>
+                <div style="font-size: 0.82rem; color: #ccc; margin-bottom: 0.5rem;">${escHtml(rc.root_cause_reason || '-')}</div>
+                <div style="font-size: 0.78rem; color: #888; margin-bottom: 0.75rem;">
+                    动作链类型: ${CHAIN_LABELS[rc.chain_type] || rc.chain_type || '-'}
+                    &nbsp;|&nbsp; 置信度: ${(rc.confidence * 100).toFixed(1)}%
+                </div>
+                ${probBars}
+            </div>
+            ${gapsHtml}
+            ${counterHtml}
+            ${reviewHtml}
+            ${nextHtml}
+            ${recsHtml}`;
+
+        // 证据链
+        renderEvidenceChain(rc.evidence_chain || []);
+    }
+
+    function renderCollapsibleList(title, items, icon) {
+        if (!items || items.length === 0) return '';
+        const id = 'cl-' + title.replace(/[^a-z]/gi, '');
+        return `
+            <div class="result-section">
+                <h6><i class="bi ${icon}" style="margin-right:0.3rem;"></i>${title} (${items.length})</h6>
+                <ul class="collapsible-list" id="${id}">
+                    ${items.map(item => `<li>${escHtml(item)}</li>`).join('')}
+                </ul>
+            </div>`;
+    }
+
+    // =================================================================
+    // 证据链渲染(动作事件域: SOE/遥信/保护/断路器/一次/二次/人工复核)
+    // =================================================================
+    function renderEvidenceChain(chain) {
+        const el = document.getElementById('evidence-content');
+        const empty = document.getElementById('evidence-empty');
+        if (!chain || !chain.length) {
+            el.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        empty.style.display = 'none';
+        el.style.display = 'block';
+
+        const nodeConfig = {
+            'protection':       { icon: 'bi-shield-exclamation', label: '保护动作' },
+            'breaker':          { icon: 'bi-toggles', label: '断路器动作' },
+            'recloser':         { icon: 'bi-arrow-repeat', label: '重合闸' },
+            'control_loop':     { icon: 'bi-slash-circle', label: '控制回路' },
+            'mechanism':        { icon: 'bi-gear', label: '操作机构' },
+            'primary_evidence': { icon: 'bi-lightning-charge', label: '一次设备证据' },
+            'secondary_health': { icon: 'bi-heart-pulse', label: '二次设备健康' },
+            'manual_review':    { icon: 'bi-person-check', label: '人工复核结论' },
+            'soe':              { icon: 'bi-list-ol', label: 'SOE' },
+            'signal_change':    { icon: 'bi-arrow-left-right', label: '遥信变位' },
+        };
+
+        el.innerHTML = chain.map(n => {
+            const cfg = nodeConfig[n.node_type] || { icon: 'bi-circle', label: n.node_type || '未知' };
+            const conf = n.confidence ? `${(n.confidence*100).toFixed(0)}%` : '';
+            const ts = n.timestamp ? formatTimestamp(n.timestamp) : '';
+            const dataInfo = n.data ? renderNodeDataBrief(n.data) : '';
+            return `
+            <div class="evidence-node ${n.node_type}">
+                <div class="ev-icon"><i class="bi ${cfg.icon}"></i></div>
+                <div class="ev-content">
+                    <div class="ev-desc"><strong>${cfg.label}</strong> ${escHtml(n.description || '-')}</div>
+                    <div class="ev-meta">
+                        ${n.source ? '来源: ' + escHtml(n.source) : ''}
+                        ${ts ? ' | ' + ts : ''}
+                        ${conf ? ' | 置信度 ' + conf : ''}
+                        ${dataInfo}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderNodeDataBrief(data) {
+        if (!data) return '';
+        const parts = [];
+        if (data.bay_id) parts.push('间隔:' + data.bay_id);
+        if (data.signal_group) parts.push('组:' + data.signal_group);
+        return parts.length ? ' | ' + parts.join(' ') : '';
+    }
+
+    // =================================================================
+    // 触发分析(升级为候选事件生成)
+    // =================================================================
+    async function triggerAnalysis() {
+        const traceId = document.getElementById('filter-trace')?.value || currentTraceId;
+        if (!traceId) {
+            showError('rootcause', '请先查询事件或输入追踪链ID');
+            return;
+        }
+        const btn = document.getElementById('btn-analyze');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 分析中...';
+        showLoading(true);
+        hideError('rootcause');
+
+        try {
+            // 使用候选事件生成接口(含动作链+根因+候选事件聚合)
+            const resp = await fetch(`${API_BASE}/candidate-events/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trace_id: traceId })
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+            const json = await resp.json();
+            if (json.success && json.data) {
+                const candidate = json.data;
+                // 渲染候选事件
+                renderCandidateList([candidate]);
+                // 渲染根因
+                if (candidate.root_cause_result) {
+                    renderRootCause(candidate.root_cause_result);
+                }
+                // 渲染跳闸范围
+                if (candidate.trip_scope) {
+                    renderTripScope(candidate.trip_scope);
+                }
+                // 自动选中候选事件进入复核面板
+                selectCandidate(candidate);
+            } else {
+                showError('rootcause', json.message || '分析服务返回异常');
+            }
+        } catch(e) {
+            showError('rootcause', e.message || '网络请求失败，请检查服务状态');
+        }
+        showLoading(false);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cpu"></i> 触发分析';
+    }
+
+    function selectEvent(traceId) {
+        document.getElementById('filter-trace').value = traceId;
+        currentTraceId = traceId;
+        query();
+    }
+
+    // =================================================================
+    // 候选事件清单
+    // =================================================================
+    let currentCandidates = [];
+    let selectedCandidateId = '';
+
+    function renderCandidateList(candidates) {
+        currentCandidates = candidates || [];
+        const listEl = document.getElementById('candidate-list');
+        const emptyEl = document.getElementById('candidate-empty');
+        document.getElementById('candidate-count-badge').textContent = currentCandidates.length;
+
+        if (!currentCandidates.length) {
+            listEl.style.display = 'none';
+            emptyEl.style.display = 'block';
+            return;
+        }
+        emptyEl.style.display = 'none';
+        listEl.style.display = 'block';
+
+        // 按复核状态过滤
+        const statusFilter = document.getElementById('filter-review-status')?.value || '';
+        let filtered = currentCandidates;
+        if (statusFilter) {
+            filtered = filtered.filter(c => c.manual_review_status === statusFilter);
+        }
+
+        listEl.innerHTML = filtered.map(c => renderCandidateCard(c)).join('');
+    }
+
+    const EVENT_TYPE_LABELS = {
+        'normal_trip': '正常跳闸', 'recloser_fail': '重合闸失败', 'refuse_action': '拒动',
+        'false_action': '误动', 'control_loop_abnormal': '控制回路异常',
+        'mechanism_abnormal': '机构异常', 'signal_jitter': '信号抖动', 'unknown': '待分析',
+    };
+    const REVIEW_STATUS_LABELS = {
+        'pending': '待复核', 'required': '需复核', 'confirmed': '已确认',
+        'rejected': '已驳回', 'false_positive': '误报', 'handled': '已处置', 'field_check': '需现场',
+    };
+    const SEQ_LABELS = {
+        'complete': '序列完整', 'partial': '部分缺失', 'incomplete': '不完整', 'unknown': '未知',
+    };
+
+    function renderCandidateCard(c) {
+        const typeLabel = EVENT_TYPE_LABELS[c.event_type] || c.event_type;
+        const sevClass = `severity-${c.severity || 'info'}`;
+        const reviewLabel = REVIEW_STATUS_LABELS[c.manual_review_status] || c.manual_review_status;
+        const seqLabel = SEQ_LABELS[c.sequence_completeness] || '';
+        const selectedClass = c.event_id === selectedCandidateId ? 'selected' : '';
+        const confPct = (c.confidence * 100).toFixed(0);
+
+        let anomalyBadges = '';
+        if (c.has_refuse_action) anomalyBadges += '<span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;">拒动</span>';
+        if (c.has_false_action) anomalyBadges += '<span class="badge" style="background:rgba(245,158,11,0.15);color:#fbbf24;">误动</span>';
+        if (c.has_jitter) anomalyBadges += '<span class="badge" style="background:rgba(139,92,246,0.15);color:#a78bfa;">抖动</span>';
+        if (c.has_repeated_action) anomalyBadges += '<span class="badge" style="background:rgba(251,146,60,0.15);color:#fb923c;">重复</span>';
+        if (c.has_abnormal_sequence) anomalyBadges += '<span class="badge" style="background:rgba(236,72,153,0.15);color:#ec4899;">顺序异常</span>';
+
+        return `
+        <div class="candidate-card ${sevClass} ${selectedClass}" onclick="ActionTimeline.selectCandidateById('${c.event_id}')">
+            <div class="candidate-header">
+                <span class="candidate-type" style="color: ${c.severity === 'critical' ? '#ff0040' : c.severity === 'alarm' ? '#ef4444' : '#00d4ff'};">${typeLabel}</span>
+                <div class="candidate-badges">
+                    <span class="badge badge-review ${c.manual_review_status}">${reviewLabel}</span>
+                    ${c.sequence_completeness ? '<span class="seq-tag ' + c.sequence_completeness + '">' + seqLabel + '</span>' : ''}
+                    ${anomalyBadges}
+                </div>
+            </div>
+            <div style="font-size: 0.82rem; color: #ccc; margin-bottom: 0.2rem;">${escHtml(c.inference_basis || '-')}</div>
+            <div class="candidate-detail">
+                <span><i class="bi bi-building"></i> ${escHtml(c.station_name || c.station_id || '-')}</span>
+                <span style="margin-left: 0.75rem;"><i class="bi bi-layers"></i> ${escHtml(c.bay_name || c.bay_id || '-')}</span>
+                <span style="margin-left: 0.75rem;" class="candidate-confidence">置信度 ${confPct}%</span>
+                <span style="margin-left: 0.75rem;">${c.start_time ? formatTimestamp(c.start_time) : '-'}</span>
+            </div>
+        </div>`;
+    }
+
+    function selectCandidateById(eventId) {
+        const c = currentCandidates.find(x => x.event_id === eventId);
+        if (c) selectCandidate(c);
+    }
+
+    function selectCandidate(c) {
+        selectedCandidateId = c.event_id;
+        // 高亮选中
+        document.querySelectorAll('.candidate-card').forEach(el => el.classList.remove('selected'));
+        const cards = document.querySelectorAll('.candidate-card');
+        cards.forEach(el => { if (el.onclick?.toString().includes(c.event_id)) el.classList.add('selected'); });
+        // 重新渲染以更新选中态
+        renderCandidateList(currentCandidates);
+
+        // 显示复核面板
+        const reviewContent = document.getElementById('review-content');
+        const reviewEmpty = document.getElementById('review-empty');
+        reviewEmpty.style.display = 'none';
+        reviewContent.style.display = 'block';
+
+        document.getElementById('review-event-id').textContent = c.event_id;
+        const statusLabel = REVIEW_STATUS_LABELS[c.manual_review_status] || c.manual_review_status;
+        document.getElementById('review-current-status').innerHTML =
+            `当前状态: <span class="badge badge-review ${c.manual_review_status}">${statusLabel}</span>` +
+            (c.reviewed_by ? ` | 复核人: ${escHtml(c.reviewed_by)}` : '') +
+            (c.reviewed_at ? ` | ${formatTimestamp(c.reviewed_at)}` : '');
+        document.getElementById('review-boundary-note').textContent = c.boundary_note || '';
+        document.getElementById('review-history').textContent = c.review_comment || '';
+
+        // 渲染根因
+        if (c.root_cause_result) renderRootCause(c.root_cause_result);
+        if (c.trip_scope) renderTripScope(c.trip_scope);
+        // 渲染证据
+        if (c.evidence && c.evidence.length) renderEvidenceChain(c.evidence);
+    }
+
+    // =================================================================
+    // 人工复核操作
+    // =================================================================
+    async function submitReview(status) {
+        if (!selectedCandidateId) return;
+        const comment = document.getElementById('review-comment-input')?.value || '';
+        try {
+            const resp = await fetch(`${API_BASE}/candidate-events/review`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: selectedCandidateId,
+                    status: status,
+                    comment: comment,
+                    reviewed_by: 'operator',
+                })
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const json = await resp.json();
+            if (json.success && json.data) {
+                // 更新本地数据
+                const idx = currentCandidates.findIndex(c => c.event_id === selectedCandidateId);
+                if (idx >= 0) currentCandidates[idx] = json.data;
+                renderCandidateList(currentCandidates);
+                selectCandidate(json.data);
+                document.getElementById('review-comment-input').value = '';
+            }
+        } catch(e) {
+            showError('rootcause', '复核操作失败: ' + e.message);
+        }
+    }
+
+    async function addComment() {
+        if (!selectedCandidateId) return;
+        const comment = document.getElementById('review-comment-input')?.value;
+        if (!comment) return;
+        try {
+            const resp = await fetch(`${API_BASE}/candidate-events/comment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: selectedCandidateId,
+                    comment: comment,
+                    reviewed_by: 'operator',
+                })
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const json = await resp.json();
+            if (json.success) {
+                document.getElementById('review-history').textContent = json.data?.comment || '';
+                document.getElementById('review-comment-input').value = '';
+            }
+        } catch(e) {
+            showError('rootcause', '备注追加失败: ' + e.message);
+        }
+    }
+
+    // =================================================================
+    // 状态管理
+    // =================================================================
+    function showLoading(show) {
+        document.getElementById('timeline-loading').classList.toggle('active', show);
+    }
+
+    function showError(panel, msg) {
+        const el = document.getElementById(panel + '-error');
+        const msgEl = document.getElementById(panel + '-error-msg');
+        if (el) { el.style.display = 'block'; }
+        if (msgEl) { msgEl.textContent = msg; }
+        // 隐藏 empty
+        const emptyEl = document.getElementById(panel + '-empty');
+        if (emptyEl) emptyEl.style.display = 'none';
+        // 隐藏 insufficient
+        const insuffEl = document.getElementById(panel + '-insufficient');
+        if (insuffEl) insuffEl.style.display = 'none';
+        // 隐藏 content
+        const contentEl = document.getElementById(panel.replace('timeline', 'timeline') + '-content')
+                       || document.getElementById(panel === 'timeline' ? 'timeline-list' : panel + '-content');
+        if (contentEl) contentEl.style.display = 'none';
+    }
+
+    function hideError(panel) {
+        const el = document.getElementById(panel + '-error');
+        if (el) el.style.display = 'none';
+    }
+
+    function resetRightPanels() {
+        ['scope', 'rootcause', 'evidence'].forEach(p => {
+            const content = document.getElementById(p + '-content');
+            const empty = document.getElementById(p + '-empty');
+            if (content) content.style.display = 'none';
+            if (empty) empty.style.display = 'block';
+        });
+    }
+
+    // =================================================================
+    // 工具函数
+    // =================================================================
+    function formatTimestamp(ts) {
+        if (!ts) return '-';
+        try {
+            const d = new Date(ts);
+            if (isNaN(d.getTime())) return ts;
+            const pad2 = n => String(n).padStart(2, '0');
+            const pad3 = n => String(n).padStart(3, '0');
+            return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}.${pad3(d.getMilliseconds())}`;
+        } catch(e) { return ts; }
+    }
+
+    function escHtml(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // 复核状态过滤联动
+    document.getElementById('filter-review-status')?.addEventListener('change', () => {
+        renderCandidateList(currentCandidates);
+    });
+
+    return { query, triggerAnalysis, selectEvent, selectCandidateById, submitReview, addComment };
+})();
+</script>
+{% endblock %}

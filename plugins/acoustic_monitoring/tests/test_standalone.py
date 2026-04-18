@@ -11,6 +11,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 import numpy as np
+from fastapi.testclient import TestClient
 
 
 class TestAcousticMonitoringStandalone(unittest.TestCase):
@@ -42,8 +43,9 @@ class TestAcousticMonitoringStandalone(unittest.TestCase):
         """Test processing normal audio data."""
         sample_rate = 16000
         duration = 2.0
-        t = np.linspace(0, duration, int(sample_rate * duration))
-        audio = (np.sin(2 * np.pi * 50 * t) + 0.1 * np.random.randn(len(t))).astype(np.float32)
+        rng = np.random.default_rng(20260417)
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        audio = (np.sin(2 * np.pi * 50 * t) + 0.1 * rng.standard_normal(len(t))).astype(np.float32)
 
         result = self.plugin.process({
             "audio": audio,
@@ -83,6 +85,23 @@ class TestAcousticMonitoringStandalone(unittest.TestCase):
         self.assertTrue(plugin._is_initialized)
         plugin.shutdown()
         self.assertFalse(plugin._is_initialized)
+
+    def test_standalone_smoke_route_accepts_simulated_sample(self):
+        """Standalone smoke route should submit a simulated sample."""
+        from darkbreaker_sdk.standalone import StandalonePluginRunner
+
+        runner = StandalonePluginRunner(
+            self.plugin,
+            plugin_templates_dir=Path(__file__).parent.parent / "standalone" / "templates",
+            plugin_static_dir=Path(__file__).parent.parent / "standalone" / "static",
+        )
+        client = TestClient(runner.app)
+
+        response = client.post("/api/acoustic/smoke", json={"device_id": "acoustic_smoke"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["metadata"]["modality"], "acoustic")
 
 
 if __name__ == "__main__":

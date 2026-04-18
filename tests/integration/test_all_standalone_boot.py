@@ -1,5 +1,5 @@
 """
-Verify ALL 16 plugins boot standalone with working endpoints.
+Verify ALL 17 plugins boot standalone with working endpoints.
 
 Tests that each plugin can:
 1. Import and create_standalone()
@@ -33,6 +33,7 @@ PLUGIN_CONFIGS = [
     ("bird_monitoring", 8092),
     ("acoustic_monitoring", 8093),
     ("gas_detection", 8094),
+    ("action_event_monitoring", 8097),
     ("hyperspectral_detection", 8095),
     ("multimodal_fusion", 8096),
 ]

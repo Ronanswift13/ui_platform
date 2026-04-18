@@ -1,0 +1,62 @@
+[
+  {
+    "device_id": "edge_replay_01",
+    "device_name": "Field Edge Node A",
+    "device_type": "edge_computing_node",
+    "status": "online",
+    "metrics": {
+      "cpu_temp": 43,
+      "cpu_usage": 36,
+      "memory_usage": 42,
+      "network_quality": 96,
+      "error_count": 0,
+      "last_heartbeat_offset_sec": 2,
+      "uptime_hours": 1280
+    }
+  },
+  {
+    "device_id": "edge_replay_01",
+    "device_name": "Field Edge Node A",
+    "device_type": "edge_computing_node",
+    "status": "online",
+    "metrics": {
+      "cpu_temp": 58,
+      "cpu_usage": 64,
+      "memory_usage": 63,
+      "network_quality": 82,
+      "error_count": 2,
+      "last_heartbeat_offset_sec": 8,
+      "uptime_hours": 1281
+    }
+  },
+  {
+    "device_id": "edge_replay_01",
+    "device_name": "Field Edge Node A",
+    "device_type": "edge_computing_node",
+    "status": "online",
+    "metrics": {
+      "cpu_temp": 73,
+      "cpu_usage": 76,
+      "memory_usage": 87,
+      "network_quality": 66,
+      "error_count": 7,
+      "last_heartbeat_offset_sec": 35,
+      "uptime_hours": 1282
+    }
+  },
+  {
+    "device_id": "edge_replay_01",
+    "device_name": "Field Edge Node A",
+    "device_type": "edge_computing_node",
+    "status": "online",
+    "metrics": {
+      "cpu_temp": 86,
+      "cpu_usage": 92,
+      "memory_usage": 93,
+      "network_quality": 42,
+      "error_count": 18,
+      "last_heartbeat_offset_sec": 210,
+      "uptime_hours": 1283
+    }
+  }
+]

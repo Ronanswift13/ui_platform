@@ -28,7 +28,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
@@ -70,11 +70,11 @@ class StandalonePluginRunner:
     def __init__(
         self,
         plugin: BasePlugin,
-        title: str | None = None,
+        title: Optional[str] = None,
         host: str = "0.0.0.0",
         port: int = 8000,
-        plugin_templates_dir: str | Path | None = None,
-        plugin_static_dir: str | Path | None = None,
+        plugin_templates_dir: Optional[Union[str, Path]] = None,
+        plugin_static_dir: Optional[Union[str, Path]] = None,
     ) -> None:
         self.plugin = plugin
         self.title = title or f"{self._safe_get_name(plugin)} - Standalone"
@@ -86,7 +86,7 @@ class StandalonePluginRunner:
         self._init_services()
 
         # Detection statistics
-        self._stats: dict[str, Any] = {
+        self._stats: Dict[str, Any] = {
             "total_frames": 0,
             "total_detections": 0,
             "total_alarms": 0,
@@ -95,13 +95,13 @@ class StandalonePluginRunner:
             "last_detection_time": None,
             "fps": 0.0,
         }
-        self._fps_timestamps: list[float] = []
+        self._fps_timestamps: List[float] = []
 
         # WebSocket connections
-        self._ws_clients: list[WebSocket] = []
+        self._ws_clients: List[WebSocket] = []
 
         # Template directories - plugin-specific first, SDK defaults as fallback
-        template_dirs: list[str] = []
+        template_dirs: List[str] = []
         if plugin_templates_dir:
             template_dirs.append(str(plugin_templates_dir))
         template_dirs.append(str(TEMPLATES_DIR))
@@ -226,7 +226,7 @@ class StandalonePluginRunner:
             return self.plugin.PLUGIN_VERSION
         return "1.0.0"
 
-    def _get_template_context(self, request: Request) -> dict[str, Any]:
+    def _get_template_context(self, request: Request) -> Dict[str, Any]:
         """Build common template context with platform info."""
         plugin_id = self._get_plugin_id()
         manifest = getattr(self.plugin, 'manifest', None)
@@ -267,7 +267,7 @@ class StandalonePluginRunner:
             return self.templates.TemplateResponse("plugin_dashboard.html", context)
 
     @staticmethod
-    def _normalize_health(health: Any) -> dict[str, Any]:
+    def _normalize_health(health: Any) -> Dict[str, Any]:
         """Normalize a healthcheck result to a consistent dict format.
 
         Handles both HealthStatus objects and plain dicts returned by plugins.
@@ -304,7 +304,7 @@ class StandalonePluginRunner:
             health_data = {"healthy": True, "message": str(e), "last_check": None, "details": {}}
 
         # Get plugin-specific status data
-        plugin_status: dict[str, Any] = {}
+        plugin_status: Dict[str, Any] = {}
         try:
             if hasattr(self.plugin, 'get_status'):
                 result = self.plugin.get_status()
@@ -517,7 +517,7 @@ class StandalonePluginRunner:
             if websocket in self._ws_clients:
                 self._ws_clients.remove(websocket)
 
-    async def _broadcast(self, data: dict[str, Any]) -> None:
+    async def _broadcast(self, data: Dict[str, Any]) -> None:
         """Broadcast data to all connected WebSocket clients."""
         disconnected = []
         for ws in self._ws_clients:
@@ -628,7 +628,7 @@ class StandalonePluginRunner:
         )
         return JSONResponse({"status": "loaded" if success else "error", "model_id": model_id})
 
-    async def _get_alarms(self, level: str | None = None) -> JSONResponse:
+    async def _get_alarms(self, level: Optional[str] = None) -> JSONResponse:
         """Return active alarms."""
         return JSONResponse({
             "alarms": self.alarm_manager.get_active_alarms(level=level),
@@ -651,7 +651,7 @@ class StandalonePluginRunner:
 
     # ==================== Server Entry Point ====================
 
-    def run(self, host: str | None = None, port: int | None = None) -> None:
+    def run(self, host: Optional[str] = None, port: Optional[int] = None) -> None:
         """Start the standalone server.
 
         Args:

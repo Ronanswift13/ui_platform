@@ -1,0 +1,47 @@
+{
+    "id": "thermal",
+    "name": "热成像分析插件",
+    "version": "1.0.0",
+    "description": "热成像异常检测 - 热点识别、温度梯度分析、趋势预测",
+    "author": "Substation AI Team",
+    "category": "outdoor",
+    "entrypoint": "plugin.py",
+    "plugin_class": "ThermalPlugin",
+    "capabilities": [
+        "thermal_analysis",
+        "hotspot_detection",
+        "temperature_trend_analysis"
+    ],
+    "verified_capabilities": [],
+    "experimental_capabilities": [
+        "thermal_analysis",
+        "hotspot_detection"
+    ],
+    "blocked_capabilities": [
+        "real_dl_onnx_inference"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "device_types": [
+        "transformer",
+        "busbar",
+        "switch",
+        "cable_joint",
+        "capacitor"
+    ],
+    "dependencies": [
+        "numpy"
+    ],
+    "min_platform_version": "1.0.0",
+    "config_schema": {
+        "type": "object",
+        "properties": {
+            "model": {"type": "object"},
+            "thresholds": {"type": "object"},
+            "trend": {"type": "object"}
+        }
+    }
+}

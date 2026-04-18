@@ -1,0 +1,57 @@
+# 开关间隔检测 - 训练配置模板
+plugin_id: switch_inspection
+legacy_alias: switch
+display_name: 开关间隔检测
+
+model:
+  family: yolov8
+  backbone: yolov8n
+  pretrained: yolov8n.pt
+  input_modality: rgb
+  image_size: 640
+
+task:
+  primary: detection
+  secondary: classification
+  label_schema: detection_bbox
+  classes:
+    breaker_state:
+      - breaker_open
+      - breaker_closed
+      - breaker_intermediate
+    isolator_state:
+      - isolator_open
+      - isolator_closed
+    grounding_state:
+      - grounding_on
+      - grounding_off
+    indicator:
+      - indicator_red
+      - indicator_green
+      - indicator_off
+
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 3
+
+augmentation:
+  mosaic: 1.0
+  mixup: 0.1
+  fliplr: 0.5
+  # 开关状态对旋转敏感
+  degrees: 5.0
+
+evaluation:
+  metrics: [mAP@0.5, state_accuracy, recall, precision]
+  qualification:
+    mAP@0.5: 0.60
+    state_accuracy: 0.90
+
+export:
+  formats: [onnx, tensorrt]
+
+voltage_levels: [UHV_1000kV_AC, EHV_500kV, HV_220kV, HV_110kV, MV_35kV]

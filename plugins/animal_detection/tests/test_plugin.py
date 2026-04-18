@@ -23,7 +23,8 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock  # noqa: F401
+
 
 import numpy as np
 import pytest
@@ -34,12 +35,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 from plugins.animal_detection.core.event_schema import (
     AnimalClass, EventType, RiskLevel, ANIMAL_RISK_MAP, SUGGESTION_MAP,
     BoundingBox, AnimalDetectionResult, AnimalEvent, build_intrusion_event,
-    EvidenceItem, WorldPosition,
+    WorldPosition,
 )
 from plugins.animal_detection.core.tracker import AnimalTracker, AnimalTrack
 from plugins.animal_detection.core.thermal_validator import ThermalValidator
 from plugins.animal_detection.core.deterrent import (
-    DeterrentController, DeterrentResult, DeterrentAction, DETERRENT_STRATEGY,
+    DeterrentController, DeterrentResult, DETERRENT_STRATEGY,
 )
 from plugins.animal_detection.core.statistics import StatisticsCollector
 
@@ -55,8 +56,10 @@ class TestEventSchema:
         """事件必须包含统一契约核心字段"""
         event = AnimalEvent()
         d = event.to_dict()
-        required = ["timestamp", "type", "location", "value", "confidence",
-                     "evidence", "suggestion", "trace_id"]
+        required = [
+            "timestamp", "type", "location", "value", "confidence",
+            "evidence", "suggestion", "trace_id",
+        ]
         for field in required:
             assert field in d, f"缺少必要字段: {field}"
 
@@ -98,7 +101,8 @@ class TestEventSchema:
         assert event.total_detections == 2
         assert event.risk_level == RiskLevel.CRITICAL  # 蛇是CRITICAL
         assert event.confidence == 0.9  # 取最高
-        assert "蛇" in event.suggestion or "snake" in event.suggestion.lower() or "短路" in event.suggestion
+        suggestion = event.suggestion.lower()
+        assert "蛇" in event.suggestion or "snake" in suggestion or "短路" in event.suggestion
 
     def test_build_empty_event(self):
         """无检测时应返回清除事件"""
@@ -347,7 +351,7 @@ class TestDeterrentController:
 
         controller.evaluate_and_trigger([track])
         controller.evaluate_and_trigger([track])
-        actions = controller.evaluate_and_trigger([track])  # 第3次应升级
+        controller.evaluate_and_trigger([track])  # 第3次应升级
 
         escalated = [a for a in controller.get_recent_actions()
                      if a["result"] == DeterrentResult.ESCALATED]

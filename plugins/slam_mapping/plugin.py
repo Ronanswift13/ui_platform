@@ -1250,16 +1250,37 @@ class SLAMMappingPlugin(PluginStatusMixin):
         """实现BasePlugin抽象方法 - 健康检查"""
         return HealthStatus(healthy=True, message="OK")
 
+    def get_standalone_routes(self) -> List[Any]:
+        """
+        StandalonePluginRunner 路由扩展占位。
+
+        仿真接口只在 standalone/app.py 与 run_standalone.py 中注册，
+        这里返回空列表，避免 runner 在独立模式下因为缺少该方法而报错。
+        """
+        return []
+
     def get_status(self) -> Dict[str, Any]:
         """获取插件状态"""
+        subsidence = {}
+        for point_id, point in self.subsidence_monitor.monitoring_points.items():
+            subsidence[point_id] = {
+                'location': {'x': point.location[0], 'y': point.location[1]},
+                'initial_height': point.initial_height,
+                'current_height': point.current_height,
+                'subsidence_mm': self.subsidence_monitor.get_subsidence(point_id),
+            }
+
         return {
             'name': self.name,
             'version': self.version,
+            'initialized': self._is_initialized,
             'frame_count': self.frame_count,
             'current_pose': {
                 'x': self.current_pose.x,
                 'y': self.current_pose.y,
                 'z': self.current_pose.z,
+                'roll': self.current_pose.roll,
+                'pitch': self.current_pose.pitch,
                 'yaw': self.current_pose.yaw
             },
             'pose_history_length': len(self.pose_history),
@@ -1267,7 +1288,9 @@ class SLAMMappingPlugin(PluginStatusMixin):
             'subsidence_points': len(self.subsidence_monitor.monitoring_points),
             'map_resolution': self.occupancy_map.resolution,
             'map_size': self.occupancy_map.size,
-            'dl_enabled': self.dl_enabled
+            'dl_enabled': self.dl_enabled,
+            'devices': self.device_locations,
+            'subsidence': subsidence,
         }
 
 

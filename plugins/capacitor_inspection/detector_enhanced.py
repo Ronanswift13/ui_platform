@@ -24,6 +24,7 @@ V3.5更新 (室外监测迭代):
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 import hashlib
 import time
@@ -77,6 +78,9 @@ except ImportError:
     OBBConfig = None
     OBBDetectionTask = None
     OrientedBox = None
+
+
+logger = logging.getLogger(__name__)
 
 
 class CapacitorDefectType(Enum):
@@ -305,12 +309,23 @@ class CapacitorDetectorEnhanced:
         self._initialized = False
 
         # 配置参数
-        self._confidence_threshold = config.get("confidence_threshold", 0.55)
-        self._nms_threshold = config.get("nms_threshold", 0.4)
-        self._use_deep_learning = config.get("use_deep_learning", True)
+        inference_config = config.get("inference", {})
+        model_config = config.get("model", {})
+        self._confidence_threshold = inference_config.get(
+            "confidence_threshold",
+            config.get("confidence_threshold", 0.55),
+        )
+        self._nms_threshold = inference_config.get(
+            "nms_threshold",
+            config.get("nms_threshold", 0.4),
+        )
+        self._use_deep_learning = config.get(
+            "use_deep_learning",
+            model_config.get("use_deep_learning", True),
+        )
 
         # 倾斜检测
-        tilt_config = config.get("tilt_detection", {})
+        tilt_config = config.get("structural_integrity", {}).get("tilt_detection", {})
         self._tilt_warning = tilt_config.get("warning_angle", self.DEFAULT_TILT_WARNING)
         self._tilt_error = tilt_config.get("max_tilt_angle", self.DEFAULT_TILT_ERROR)
 
@@ -370,18 +385,18 @@ class CapacitorDetectorEnhanced:
                     try:
                         self._model_registry.load(model_id)
                     except Exception as e:
-                        print(f"[CapacitorDetector] 模型 {model_id} 加载失败: {e}")
+                        logger.warning("[CapacitorDetector] 模型 %s 加载失败: %s", model_id, e)
 
             self._initialized = True
             return True
         except Exception as e:
-            print(f"[CapacitorDetector] 初始化失败: {e}")
+            logger.exception("[CapacitorDetector] 初始化失败")
             return False
 
     def _init_thermal_registration(self) -> bool:
         """初始化红外-可见光配准模块 (V3.5)"""
         if not THERMAL_REGISTRATION_AVAILABLE or ThermalVisibleRegistration is None:
-            print("[CapacitorDetector] 红外配准模块不可用")
+            logger.info("[CapacitorDetector] 红外配准模块不可用")
             return False
 
         try:
@@ -405,21 +420,22 @@ class CapacitorDetectorEnhanced:
                 fusion_config=fusion_config
             )
 
-            print("[CapacitorDetector] 红外-可见光配准模块初始化成功 (V3.5)")
+            logger.info("[CapacitorDetector] 红外-可见光配准模块初始化成功 (V3.5)")
             return True
 
         except Exception as e:
-            print(f"[CapacitorDetector] 红外配准初始化失败: {e}")
+            logger.warning("[CapacitorDetector] 红外配准初始化失败: %s", e)
             return False
 
     def _init_obb_detector(self) -> bool:
         """初始化YOLOv8-OBB旋转框检测器 (V3.5)"""
         if not OBB_AVAILABLE or YOLOv8OBBDetector is None:
-            print("[CapacitorDetector] YOLOv8-OBB模块不可用")
+            logger.info("[CapacitorDetector] YOLOv8-OBB模块不可用")
             return False
 
         try:
             obb_config = self.config.get("obb_detection", {})
+            model_config = self.config.get("model", {})
 
             config = OBBConfig(
                 model_path=obb_config.get("model_path"),
@@ -428,28 +444,29 @@ class CapacitorDetectorEnhanced:
                 nms_threshold=self._nms_threshold,
                 tilt_warning_threshold=self._tilt_warning,
                 tilt_critical_threshold=self._tilt_error,
-                device=self.config.get("device", "cpu")
+                device=model_config.get("device", self.config.get("device", "cpu"))
             )
 
             self._obb_detector = YOLOv8OBBDetector(config)
             self._obb_detector.load()
 
-            print("[CapacitorDetector] YOLOv8-OBB旋转框检测器初始化成功 (V3.5)")
+            logger.info("[CapacitorDetector] YOLOv8-OBB旋转框检测器初始化成功 (V3.5)")
             return True
 
         except Exception as e:
-            print(f"[CapacitorDetector] OBB检测器初始化失败: {e}")
+            logger.warning("[CapacitorDetector] OBB检测器初始化失败: %s", e)
             return False
 
     def _init_yolov8_vit(self) -> bool:
         """初始化YOLOv8-ViT检测器 (V3.0)"""
         if not DL_AVAILABLE:
-            print("[CapacitorDetector] YOLOv8-ViT模块不可用")
+            logger.info("[CapacitorDetector] YOLOv8-ViT模块不可用")
             return False
 
         try:
-            model_path = self.config.get("yolov8_model_path", None)
-            device = self.config.get("device", "cpu")
+            model_config = self.config.get("model", {})
+            model_path = model_config.get("path", self.config.get("yolov8_model_path"))
+            device = model_config.get("device", self.config.get("device", "cpu"))
 
             config = YOLOv8ViTConfig(
                 model_path=model_path,
@@ -466,11 +483,11 @@ class CapacitorDetectorEnhanced:
             self._yolov8_vit_detector.load()
             self._dl_initialized = True
 
-            print(f"[CapacitorDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            logger.info("[CapacitorDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
             return True
 
         except Exception as e:
-            print(f"[CapacitorDetector] YOLOv8-ViT初始化失败: {e}")
+            logger.warning("[CapacitorDetector] YOLOv8-ViT初始化失败: %s", e)
             self._dl_initialized = False
             return False
     
@@ -554,7 +571,7 @@ class CapacitorDetectorEnhanced:
                     return units
 
             except Exception as e:
-                print(f"[CapacitorDetector] YOLOv8-ViT检测失败: {e}")
+                logger.warning("[CapacitorDetector] YOLOv8-ViT检测失败: %s", e)
 
         # 兼容旧版：使用model_registry
         if self._use_deep_learning and self._model_registry:
@@ -573,7 +590,7 @@ class CapacitorDetectorEnhanced:
 
                 return units
             except Exception as e:
-                print(f"[CapacitorDetector] model_registry检测失败: {e}")
+                logger.warning("[CapacitorDetector] model_registry检测失败: %s", e)
 
         # 回退到传统方法
         return self._detect_units_traditional(image)
@@ -845,7 +862,7 @@ class CapacitorDetectorEnhanced:
                 
                 return detections
             except Exception as e:
-                print(f"[CapacitorDetector] 入侵检测失败: {e}")
+                logger.warning("[CapacitorDetector] 入侵检测失败: %s", e)
         
         # 回退到传统方法(运动检测)
         return self._detect_intrusion_traditional(image)
@@ -1085,7 +1102,7 @@ class CapacitorDetectorEnhanced:
                     )
 
             except Exception as e:
-                print(f"[CapacitorDetector] 热融合检测失败: {e}")
+                logger.warning("[CapacitorDetector] 热融合检测失败: %s", e)
                 # 回退到单独检测
                 result["structural_defects"] = self.detect_structural_defects(visible_image)
         else:
@@ -1139,7 +1156,7 @@ class CapacitorDetectorEnhanced:
                     })
 
             except Exception as e:
-                print(f"[CapacitorDetector] OBB检测失败: {e}")
+                logger.warning("[CapacitorDetector] OBB检测失败: %s", e)
                 # 回退到普通检测
                 units = self._detect_capacitor_units(image)
                 for unit in units:

@@ -18,6 +18,38 @@
         "deterrent_control",
         "intrusion_statistics"
     ],
+    "verified_capabilities": [
+        "animal_detection",
+        "intrusion_statistics"
+    ],
+    "experimental_capabilities": [
+        "species_classification",
+        "behavior_tracking",
+        "deterrent_control"
+    ],
+    "blocked_capabilities": [
+        "thermal_fusion_detection",
+        "real_dl_onnx_inference"
+    ],
+    "required_fixtures": [
+        "rat_visible_sample.jpg",
+        "snake_visible_sample.jpg",
+        "thermal_animal_sample.jpg",
+        "animal_yolov8n.onnx"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "ONNX 模型文件不存在，推理降级为空检测",
+        "热成像融合依赖 thermal_animal_cnn.onnx，当前不可用",
+        "species_classifier (EfficientNet) 为可选模型，不存在",
+        "驱离控制代码存在但依赖外部硬件接口",
+        "test fixtures 使用 factory 模式生成合成数据，非真实图像",
+        "regression 仅有 precision_baseline 骨架，无真实基线数据"
+    ],
 
     "device_types": [
         "visible_camera",

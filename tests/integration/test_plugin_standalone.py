@@ -14,7 +14,8 @@ PLUGINS = [
     "temperature_monitoring", "device_monitoring", "transformer_inspection",
     "switch_inspection", "busbar_inspection", "capacitor_inspection",
     "meter_reading", "bird_monitoring", "acoustic_monitoring",
-    "gas_detection", "hyperspectral_detection", "multimodal_fusion",
+    "gas_detection", "action_event_monitoring", "hyperspectral_detection",
+    "multimodal_fusion",
 ]
 
 

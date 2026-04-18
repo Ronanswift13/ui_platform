@@ -21,6 +21,18 @@
             "model_path": "models/fusion/multimodal_fusion.onnx",
             "description": "多模态融合深度学习模型",
             "required": false
+        },
+        {
+            "model_id": "multimodal_feature_fusion",
+            "model_path": "models/fusion/multimodal_feature_fusion.onnx",
+            "description": "多模态特征级融合模型",
+            "required": false
+        },
+        {
+            "model_id": "multimodal_decision_fusion",
+            "model_path": "models/fusion/multimodal_decision_fusion.onnx",
+            "description": "多模态决策级融合模型",
+            "required": false
         }
     ],
     
@@ -61,6 +73,14 @@
             "plugin_dependency": null
         }
     ],
+
+    "input_modalities": [
+        "visual",
+        "thermal",
+        "acoustic",
+        "gas",
+        "hyperspectral"
+    ],
     
     "input_schema": {
         "type": "object",
@@ -84,6 +104,10 @@
             "modality_results": {
                 "type": "object",
                 "description": "预处理的模态结果"
+            },
+            "plugin_outputs": {
+                "type": "array",
+                "description": "统一 PluginOutput 或等价字典列表，每项包含 modality/plugin_id/task_id/timestamp/results/alarms/metadata"
             }
         },
         "required": ["device_id"]
@@ -97,14 +121,26 @@
             "timestamp": {"type": "number"},
             "overall_status": {
                 "type": "string",
-                "enum": ["normal", "attention", "warning", "alarm", "critical"]
+                "enum": ["normal", "attention", "warning", "alarm", "abnormal", "critical", "unknown"]
             },
             "confidence": {"type": "number"},
             "detections": {"type": "array"},
             "modality_contributions": {"type": "object"},
             "diagnostic_report": {"type": "object"},
             "recommendations": {"type": "array"},
-            "alarms": {"type": "array"}
+            "alarms": {"type": "array"},
+            "fused_label": {"type": "string"},
+            "fused_status": {
+                "type": "string",
+                "enum": ["normal", "warning", "abnormal", "critical", "unknown"]
+            },
+            "fusion_confidence": {"type": "number"},
+            "contributing_modalities": {"type": "array"},
+            "missing_modalities": {"type": "array"},
+            "conflict_status": {"type": "string"},
+            "evidence_chain": {"type": "array"},
+            "recommended_actions": {"type": "array"},
+            "metadata": {"type": "object"}
         }
     },
     
@@ -112,6 +148,40 @@
         "fusion_strategy": "hybrid",
         "max_history_length": 100,
         "alarm_threshold": 3,
+        "modalities": ["visual", "thermal", "acoustic", "gas", "hyperspectral"],
+        "modality_weights": {
+            "visual": 0.25,
+            "thermal": 0.15,
+            "acoustic": 0.20,
+            "gas": 0.20,
+            "hyperspectral": 0.20
+        },
+        "thresholds": {
+            "warning_confidence": 0.55,
+            "abnormal_confidence": 0.70,
+            "critical_confidence": 0.85,
+            "consensus_min_modalities": 2,
+            "conflict_severity_gap": 2,
+            "missing_modality_penalty": 0.03,
+            "conflict_confidence_penalty": 0.10,
+            "default_missing_confidence": 0.50
+        },
+        "evidence": {
+            "preserve_source_plugin_id": true,
+            "preserve_evidence_path": true,
+            "include_degradation_reasons": true
+        },
+        "fallback": {
+            "missing_modality_policy": "degrade",
+            "missing_field_policy": "default_with_reason",
+            "enhanced_engine_failure": "rule_fusion"
+        },
+        "upgrade_placeholders": {
+            "bayesian_fusion": "fuse_bayesian(observations, priors=None)",
+            "attention_fusion": "fuse_attention(observations, embeddings=None)",
+            "temporal_fusion": "fuse_temporal(observations, history_window=None)",
+            "evidence_chain_enhancement": "enhance_evidence_chain(observations, context)"
+        },
         "modality_dims": {
             "visual": 512,
             "thermal": 256,

@@ -1,0 +1,30 @@
+[run]
+branch = True
+source = plugins/bird_monitoring
+
+omit =
+    plugins/bird_monitoring/experimental/*
+    plugins/bird_monitoring/advanced_bird_detector.py
+    plugins/bird_monitoring/main.py
+    plugins/bird_monitoring/__main__.py
+    plugins/bird_monitoring/__init__.py
+    plugins/bird_monitoring/run_standalone.py
+    plugins/bird_monitoring/demo/*
+    plugins/bird_monitoring/notebooks/*
+    plugins/bird_monitoring/tests/*
+    plugins/bird_monitoring/scripts/*
+
+[report]
+fail_under = 60
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    raise RuntimeError\(.*experimental detector is opt-in only
+    \.\.\.
+
+[paths]
+source =
+    plugins/bird_monitoring

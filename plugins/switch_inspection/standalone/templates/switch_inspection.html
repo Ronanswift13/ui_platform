@@ -12,6 +12,11 @@
         padding: 1rem;
         margin-bottom: 1rem;
     }
+    .hero-panel {
+        background:
+            radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 32%),
+            linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.98));
+    }
     .panel-title {
         font-size: 0.85rem;
         text-transform: uppercase;
@@ -41,11 +46,265 @@
         font-size: 0.85rem;
     }
     .event-item:last-child { border-bottom: none; }
+    .control-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .mode-badge {
+        font-size: 0.8rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.75);
+    }
+    .mode-badge.mode-simulated {
+        color: #fde68a;
+        border-color: rgba(245, 158, 11, 0.35);
+        background: rgba(120, 53, 15, 0.28);
+    }
+    .mode-badge.mode-real {
+        color: #bfdbfe;
+        border-color: rgba(59, 130, 246, 0.35);
+        background: rgba(30, 64, 175, 0.22);
+    }
+    .toolbar-select {
+        min-width: 200px;
+        background-color: rgba(15, 23, 42, 0.92);
+        color: var(--text-primary);
+        border-color: var(--border-color);
+    }
+    .toolbar-button {
+        min-width: 112px;
+    }
+    .scene-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+    }
+    .scene-meta-card {
+        padding: 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.58);
+    }
+    .scene-meta-card .meta-label {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .scene-meta-card .meta-value {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-top: 0.2rem;
+    }
+    .state-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+    }
+    .state-card {
+        padding: 0.85rem;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.52);
+    }
+    .state-card-title {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.4rem;
+    }
+    .state-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid transparent;
+    }
+    .state-chip.state-open {
+        color: #fde68a;
+        background: rgba(146, 64, 14, 0.25);
+        border-color: rgba(245, 158, 11, 0.28);
+    }
+    .state-chip.state-closed {
+        color: #bbf7d0;
+        background: rgba(20, 83, 45, 0.28);
+        border-color: rgba(34, 197, 94, 0.32);
+    }
+    .state-chip.state-intermediate {
+        color: #fdba74;
+        background: rgba(124, 45, 18, 0.28);
+        border-color: rgba(249, 115, 22, 0.32);
+    }
+    .state-chip.state-unknown {
+        color: #cbd5e1;
+        background: rgba(71, 85, 105, 0.28);
+        border-color: rgba(100, 116, 139, 0.35);
+    }
+    .panel-toggle-target[hidden] {
+        display: none !important;
+    }
+    .insight-list {
+        display: grid;
+        gap: 0.55rem;
+    }
+    .insight-item {
+        padding: 0.7rem 0.8rem;
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.48);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        font-size: 0.82rem;
+    }
+    .timeline {
+        display: grid;
+        gap: 0.5rem;
+    }
+    .timeline-item {
+        padding: 0.55rem 0.7rem;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.44);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        font-size: 0.8rem;
+    }
+    .timeline-item.active {
+        border-color: rgba(59, 130, 246, 0.42);
+        background: rgba(30, 64, 175, 0.22);
+    }
+    .legend-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.85rem;
+    }
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        padding: 0.25rem 0.55rem;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.5);
+    }
+    .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .surface-note {
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+    .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.45rem;
+        margin-top: 0.5rem;
+    }
+    .evidence-pill {
+        padding: 0.45rem 0.55rem;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.42);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+    }
+    .result-title {
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.15rem;
+    }
+    .result-subtitle {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .canvas-shell {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.14);
+        background:
+            radial-gradient(circle at top, rgba(59, 130, 246, 0.14), transparent 30%),
+            linear-gradient(180deg, #020617, #0f172a 66%, #111827);
+    }
+    #detectionCanvas {
+        display: block;
+        width: 100%;
+        min-height: 460px;
+        background: transparent !important;
+    }
+    .status-banner {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        align-items: center;
+    }
+    .status-banner .surface-note {
+        margin: 0;
+    }
+    @media (max-width: 1200px) {
+        #detectionCanvas {
+            min-height: 380px;
+        }
+    }
+    @media (max-width: 768px) {
+        .control-strip {
+            width: 100%;
+        }
+        .toolbar-select,
+        .toolbar-button {
+            width: 100%;
+        }
+        #detectionCanvas {
+            min-height: 300px;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row g-3 p-3">
+    <div class="col-12">
+        <div class="panel hero-panel">
+            <div class="d-flex flex-column flex-xl-row justify-content-between gap-3">
+                <div class="flex-grow-1">
+                    <div class="panel-title">Standalone Mode Router</div>
+                    <div class="status-banner">
+                        <span class="mode-badge mode-real" id="runtime-mode-badge">真实监测模式</span>
+                        <span class="badge bg-dark-subtle text-info-emphasis border border-info-subtle" id="simulation-isolation-note">
+                            仿真演示引擎仅在浏览器端运行，不写入插件推理链路
+                        </span>
+                        <p class="surface-note" id="mode-description">
+                            当前优先展示真实监测占位图。切换到“模拟数据”后可直接播放变电站开关间隔仿真，用于适配调试与场景复盘。
+                        </p>
+                    </div>
+                </div>
+                <div class="control-strip">
+                    <select id="scenario-select" class="form-select form-select-sm toolbar-select" aria-label="仿真场景选择"></select>
+                    <button id="btn-play-simulation" class="btn btn-sm btn-outline-warning toolbar-button" type="button">
+                        <i class="bi bi-play-circle me-1"></i>启动仿真
+                    </button>
+                    <button id="btn-step-simulation" class="btn btn-sm btn-outline-light toolbar-button" type="button">
+                        <i class="bi bi-skip-forward me-1"></i>单步推进
+                    </button>
+                    <button id="btn-reset-simulation" class="btn btn-sm btn-outline-secondary toolbar-button" type="button">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>重置场景
+                    </button>
+                    <button id="btn-toggle-debug" class="btn btn-sm btn-outline-info toolbar-button" type="button">
+                        <i class="bi bi-bug me-1"></i>适配调试
+                    </button>
+                    <button id="btn-toggle-monitor" class="btn btn-sm btn-outline-success toolbar-button" type="button">
+                        <i class="bi bi-activity me-1"></i>监测看板
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Top Metrics -->
     <div class="col-md-3">
         <div class="panel text-center">
@@ -77,15 +336,31 @@
     </div>
 
     <!-- Detection View -->
-    <div class="col-md-8">
+    <div class="col-xl-8">
         <div class="panel">
             <div class="panel-title"><i class="bi bi-eye me-1"></i>Inspection View</div>
-            <canvas id="detectionCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
+            <div class="canvas-shell">
+                <canvas id="detectionCanvas" width="960" height="540" aria-label="开关间隔仿真场景画布"></canvas>
+            </div>
+            <div class="legend-row">
+                <span class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span>合位 / 已接通</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span>分位 / 断开</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#f97316;"></span>中间态 / 待复核</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#60a5fa;"></span>调试框 / 场景锚点</span>
+            </div>
         </div>
     </div>
 
     <!-- Results -->
-    <div class="col-md-4">
+    <div class="col-xl-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-diagram-3 me-1"></i>Scenario Summary</div>
+            <div class="scene-meta-grid" id="scene-meta-grid"></div>
+        </div>
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-hdd-network me-1"></i>Bay States</div>
+            <div class="state-grid" id="state-grid"></div>
+        </div>
         <div class="panel">
             <div class="panel-title"><i class="bi bi-list-check me-1"></i>Recognition Results</div>
             <div class="event-list" id="result-list">
@@ -94,8 +369,34 @@
         </div>
     </div>
 
+    <div class="col-xl-6">
+        <div class="panel panel-toggle-target" id="debug-panel" hidden>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="panel-title mb-0"><i class="bi bi-bug me-1"></i>Adaptive Debug Panel</div>
+                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle" id="debug-mode-badge">待命</span>
+            </div>
+            <p class="surface-note">
+                这里展示的是仿真适配建议、阈值筛选结果和被门限拦截的候选项，便于先在演示环境定位不足，再决定是否回到真实算法侧修订。
+            </p>
+            <div class="insight-list" id="debug-insights"></div>
+        </div>
+    </div>
+
+    <div class="col-xl-6">
+        <div class="panel panel-toggle-target" id="monitor-panel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="panel-title mb-0"><i class="bi bi-activity me-1"></i>Monitoring Panel</div>
+                <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle" id="monitor-mode-badge">在线</span>
+            </div>
+            <p class="surface-note">
+                监测面板只读展示当前模式、插件健康快照与推荐动作，不向真实推理链路回灌仿真结果。
+            </p>
+            <div class="insight-list" id="monitor-insights"></div>
+        </div>
+    </div>
+
     <!-- Interlock Validation -->
-    <div class="col-md-12">
+    <div class="col-xl-7">
         <div class="panel">
             <div class="panel-title"><i class="bi bi-shield-check me-1"></i>Interlock Validation Log</div>
             <div class="event-list" id="interlock-log">
@@ -103,16 +404,1247 @@
             </div>
         </div>
     </div>
+
+    <div class="col-xl-5">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-clock-history me-1"></i>Scenario Timeline</div>
+            <div class="timeline" id="timeline-list"></div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    function updateDashboard(data) {
-        if (!data) return;
-        document.getElementById('inference-count').textContent = data.inference_count || 0;
-        document.getElementById('plugin-status').textContent = data.status || 'ready';
-        document.getElementById('error-count').textContent = data.error_count || 0;
-    }
+    (function() {
+        const $ = (id) => document.getElementById(id);
+        const canvas = $('detectionCanvas');
+        if (!canvas) {
+            return;
+        }
+
+        const context = canvas.getContext('2d');
+        const LABEL_MAP = {
+            breaker_open: '断路器分闸',
+            breaker_closed: '断路器合闸',
+            breaker_intermediate: '断路器中间态',
+            isolator_open: '隔离开关分位',
+            isolator_closed: '隔离开关合位',
+            grounding_open: '接地开关分位',
+            grounding_closed: '接地开关闭位',
+            clarity_low: '清晰度过低',
+            logic_warning: '逻辑预警',
+            logic_error: '逻辑告警',
+        };
+        const DEVICE_MAP = {
+            breaker: '断路器',
+            isolator: '隔离开关',
+            grounding: '接地开关',
+        };
+
+        const scenarios = [
+            {
+                id: 'bay_nominal',
+                title: '35kV 间隔正常巡视',
+                summary: '模拟断路器与隔离开关合位、接地开关分位的稳定巡视画面。',
+                recommendedVoltage: '35kV',
+                focusDevice: 'breaker',
+                scene: {
+                    station: '东区 35kV I 段',
+                    weather: '夜间微雾',
+                    camera: '固定枪机 24mm',
+                    illumination: '补光灯已开启',
+                },
+                frames: [
+                    {
+                        stage: '热机完成',
+                        clarity: 0.86,
+                        processingMs: 132,
+                        states: { breaker: 'closed', isolator: 'closed', grounding: 'open' },
+                        telemetry: { load: '12.4kA', temperature: '28.1°C', vibration: '0.11g' },
+                        notes: ['画面稳定，适合作为阈值初始标定场景。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.92,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '合', green: 0.72, angle: 28, clarity: 0.86 },
+                                description: '指示窗绿色占比稳定，OCR 与角度证据一致。',
+                            },
+                            {
+                                label: 'isolator_closed',
+                                confidence: 0.87,
+                                deviceType: 'isolator',
+                                evidence: { ocr: '合', green: 0.61, angle: 18, clarity: 0.86 },
+                                description: '刀闸刀臂闭合，场景用于基线比对。',
+                            },
+                            {
+                                label: 'grounding_open',
+                                confidence: 0.84,
+                                deviceType: 'grounding',
+                                evidence: { ocr: '分', red: 0.54, angle: -76, clarity: 0.86 },
+                                description: '接地柄处于安全分位。',
+                            },
+                        ],
+                        interlocks: [],
+                    },
+                    {
+                        stage: '云台微调',
+                        clarity: 0.81,
+                        processingMs: 146,
+                        states: { breaker: 'closed', isolator: 'closed', grounding: 'open' },
+                        telemetry: { load: '12.1kA', temperature: '28.4°C', vibration: '0.14g' },
+                        notes: ['轻微视角变化可用于验证 ROI 贴合度。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.89,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '合', green: 0.67, angle: 25, clarity: 0.81 },
+                                description: '断路器仍保持合位，置信度较基线略有回落。',
+                            },
+                            {
+                                label: 'isolator_closed',
+                                confidence: 0.83,
+                                deviceType: 'isolator',
+                                evidence: { ocr: '合', green: 0.56, angle: 17, clarity: 0.81 },
+                                description: '隔离开关识别稳定，可观察刀臂边缘是否需要补框。',
+                            },
+                        ],
+                        interlocks: [],
+                    },
+                    {
+                        stage: '负载稳态',
+                        clarity: 0.84,
+                        processingMs: 139,
+                        states: { breaker: 'closed', isolator: 'closed', grounding: 'open' },
+                        telemetry: { load: '12.7kA', temperature: '28.0°C', vibration: '0.12g' },
+                        notes: ['适合观察长期监测页的信息密度是否过高。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.93,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '合', green: 0.74, angle: 29, clarity: 0.84 },
+                                description: '正常闭合结果作为长期监测样本。',
+                            },
+                        ],
+                        interlocks: [],
+                    },
+                ],
+            },
+            {
+                id: 'interlock_warning',
+                title: '刀闸分位联锁预警',
+                summary: '模拟断路器合位但隔离开关分位的异常工况提示场景。',
+                recommendedVoltage: '35kV',
+                focusDevice: 'isolator',
+                scene: {
+                    station: '西区 35kV 备用间隔',
+                    weather: '阵风伴扬尘',
+                    camera: '球机 18x 变倍',
+                    illumination: '背光补偿开启',
+                },
+                frames: [
+                    {
+                        stage: '刀闸回退',
+                        clarity: 0.79,
+                        processingMs: 158,
+                        states: { breaker: 'closed', isolator: 'open', grounding: 'open' },
+                        telemetry: { load: '6.8kA', temperature: '31.2°C', vibration: '0.18g' },
+                        notes: ['用于验证异常工况提示是否足够直观。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.91,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '合', green: 0.69, angle: 27, clarity: 0.79 },
+                                description: '断路器保持合位。',
+                            },
+                            {
+                                label: 'isolator_open',
+                                confidence: 0.82,
+                                deviceType: 'isolator',
+                                evidence: { ocr: '分', red: 0.48, angle: -63, clarity: 0.79 },
+                                description: '刀闸分位与当前断路器状态不一致。',
+                            },
+                        ],
+                        interlocks: [
+                            {
+                                severity: 'warning',
+                                rule: '异常工况提示：合闸但刀闸断开',
+                                message: '建议在真实算法修改前先核对刀臂 ROI 与逻辑提示文案。',
+                            },
+                        ],
+                    },
+                    {
+                        stage: '预警保持',
+                        clarity: 0.76,
+                        processingMs: 164,
+                        states: { breaker: 'closed', isolator: 'open', grounding: 'open' },
+                        telemetry: { load: '6.4kA', temperature: '31.7°C', vibration: '0.21g' },
+                        notes: ['可检查调试信息是否说明了告警来源与修复方向。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.88,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '合', green: 0.63, angle: 24, clarity: 0.76 },
+                                description: '断路器依旧合位。',
+                            },
+                            {
+                                label: 'isolator_open',
+                                confidence: 0.78,
+                                deviceType: 'isolator',
+                                evidence: { ocr: '分', red: 0.44, angle: -58, clarity: 0.76 },
+                                description: '隔离刀闸持续分位。',
+                            },
+                        ],
+                        interlocks: [
+                            {
+                                severity: 'warning',
+                                rule: '异常工况提示：合闸但刀闸断开',
+                                message: '预警持续存在，可用仿真验证监测面板是否足够醒目。',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                id: 'clarity_gate',
+                title: '低清晰度复拍演示',
+                summary: '模拟雨雾遮挡导致的 clarity gate 命中，验证调试建议与监测提示。',
+                recommendedVoltage: '110kV',
+                focusDevice: 'breaker',
+                scene: {
+                    station: '北区 110kV 主变间隔',
+                    weather: '雨夜重雾',
+                    camera: '固定枪机 35mm',
+                    illumination: '远端补光不足',
+                },
+                frames: [
+                    {
+                        stage: '雾滴遮挡',
+                        clarity: 0.46,
+                        processingMs: 174,
+                        states: { breaker: 'unknown', isolator: 'unknown', grounding: 'unknown' },
+                        telemetry: { load: '9.2kA', temperature: '22.5°C', vibration: '0.09g' },
+                        notes: ['真实链路此时应被 clarity gate 截停，不继续做状态判断。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.63,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '', green: 0.24, angle: 8, clarity: 0.46 },
+                                description: '候选结果仅用于调试展示，不应进入真实交付结果。',
+                            },
+                        ],
+                        interlocks: [],
+                    },
+                    {
+                        stage: '镜头回焦中',
+                        clarity: 0.58,
+                        processingMs: 161,
+                        states: { breaker: 'unknown', isolator: 'unknown', grounding: 'unknown' },
+                        telemetry: { load: '9.0kA', temperature: '22.8°C', vibration: '0.10g' },
+                        notes: ['适合比对调试面板是否解释清晰度不足原因。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.68,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '', green: 0.31, angle: 10, clarity: 0.58 },
+                                description: '候选框正在恢复，但仍未达到清晰度门限。',
+                            },
+                        ],
+                        interlocks: [],
+                    },
+                    {
+                        stage: '复拍恢复',
+                        clarity: 0.77,
+                        processingMs: 149,
+                        states: { breaker: 'closed', isolator: 'closed', grounding: 'open' },
+                        telemetry: { load: '9.4kA', temperature: '22.9°C', vibration: '0.08g' },
+                        notes: ['可用来确认从 clarity gate 恢复后页面反馈是否连贯。'],
+                        results: [
+                            {
+                                label: 'breaker_closed',
+                                confidence: 0.86,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '合', green: 0.59, angle: 26, clarity: 0.77 },
+                                description: '复拍成功后恢复正常识别。',
+                            },
+                            {
+                                label: 'isolator_closed',
+                                confidence: 0.8,
+                                deviceType: 'isolator',
+                                evidence: { ocr: '合', green: 0.48, angle: 16, clarity: 0.77 },
+                                description: '隔离开关同步恢复可见。',
+                            },
+                        ],
+                        interlocks: [],
+                    },
+                ],
+            },
+            {
+                id: 'grounding_risk',
+                title: '接地刀误合风险',
+                summary: '模拟接地刀闭位且隔离开关未先分位的错误工况，突出高优先级告警。',
+                recommendedVoltage: '220kV',
+                focusDevice: 'grounding',
+                scene: {
+                    station: '南区 220kV GIS 间隔',
+                    weather: '晴夜高对比',
+                    camera: '球机 25x 变倍',
+                    illumination: 'GIS 仓内补光正常',
+                },
+                frames: [
+                    {
+                        stage: '接地刀合入',
+                        clarity: 0.83,
+                        processingMs: 166,
+                        states: { breaker: 'open', isolator: 'closed', grounding: 'closed' },
+                        telemetry: { load: '0.0kA', temperature: '26.4°C', vibration: '0.06g' },
+                        notes: ['适合验证高优先级告警与文案是否足够醒目。'],
+                        results: [
+                            {
+                                label: 'breaker_open',
+                                confidence: 0.85,
+                                deviceType: 'breaker',
+                                evidence: { ocr: '分', red: 0.51, angle: -61, clarity: 0.83 },
+                                description: '断路器已分位。',
+                            },
+                            {
+                                label: 'isolator_closed',
+                                confidence: 0.82,
+                                deviceType: 'isolator',
+                                evidence: { ocr: '合', green: 0.52, angle: 17, clarity: 0.83 },
+                                description: '隔离开关仍处于合位。',
+                            },
+                            {
+                                label: 'grounding_closed',
+                                confidence: 0.88,
+                                deviceType: 'grounding',
+                                evidence: { ocr: '合', green: 0.66, angle: 12, clarity: 0.83 },
+                                description: '接地刀已合入，存在高风险。'},
+                        ],
+                        interlocks: [
+                            {
+                                severity: 'error',
+                                rule: '防止带接地刀合隔离开关',
+                                message: '仿真层保留错误演示，仅用于观察 UI 告警优先级与修复提示。',
+                            },
+                        ],
+                    },
+                    {
+                        stage: '风险保持',
+                        clarity: 0.81,
+                        processingMs: 171,
+                        states: { breaker: 'open', isolator: 'closed', grounding: 'closed' },
+                        telemetry: { load: '0.0kA', temperature: '26.7°C', vibration: '0.06g' },
+                        notes: ['场景可用于核对监测按钮下的风险升级提示。'],
+                        results: [
+                            {
+                                label: 'grounding_closed',
+                                confidence: 0.86,
+                                deviceType: 'grounding',
+                                evidence: { ocr: '合', green: 0.62, angle: 14, clarity: 0.81 },
+                                description: '接地刀闭位持续存在。',
+                            },
+                        ],
+                        interlocks: [
+                            {
+                                severity: 'error',
+                                rule: '防止带接地刀合隔离开关',
+                                message: '高危工况保持，请重点检查页面颜色、文案与按钮流转。',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ];
+
+        const runtime = {
+            mode: 'real_monitor',
+            connectionHealthy: false,
+            simulation: {
+                scenarioId: scenarios[0].id,
+                frameIndex: 0,
+                running: false,
+                timerId: null,
+                intervalMs: 1800,
+                framesProcessed: 0,
+                detections: 0,
+                alarms: 0,
+                totalProcessMs: 0,
+                lastView: null,
+            },
+            real: {
+                status: 'ready',
+                healthy: false,
+                health: null,
+                platformInfo: null,
+                lastUpdatedAt: null,
+            },
+            ui: {
+                debugVisible: false,
+                monitorVisible: true,
+            },
+        };
+
+        function textLabel(key, fallback) {
+            return LABEL_MAP[key] || fallback || key;
+        }
+
+        function readNumber(id, fallback) {
+            const element = $(id);
+            if (!element) {
+                return fallback;
+            }
+            const value = parseFloat(element.value || element.textContent);
+            return Number.isFinite(value) ? value : fallback;
+        }
+
+        function getControls() {
+            return {
+                voltage: $('sel-voltage-level') && $('sel-voltage-level').value ? $('sel-voltage-level').value : '35kV',
+                deviceType: $('sel-device-type') && $('sel-device-type').value ? $('sel-device-type').value : '',
+                confidenceThreshold: readNumber('cfg-conf-threshold', 0.45),
+                nmsThreshold: readNumber('cfg-nms-threshold', 0.5),
+                clarityThreshold: 0.7,
+            };
+        }
+
+        function getScenario() {
+            return scenarios.find((item) => item.id === runtime.simulation.scenarioId) || scenarios[0];
+        }
+
+        function activeSource() {
+            const selected = document.querySelector('.data-source-option.active');
+            return selected ? selected.getAttribute('data-source') : 'file';
+        }
+
+        function currentModeFromSource(source) {
+            return source === 'simulated' ? 'simulated' : 'real_monitor';
+        }
+
+        function formatConfidence(value) {
+            return Number.isFinite(value) ? value.toFixed(2) : '--';
+        }
+
+        function formatState(state) {
+            if (state === 'closed') return '合位';
+            if (state === 'open') return '分位';
+            if (state === 'intermediate') return '中间态';
+            return '未知';
+        }
+
+        function updateConnectionBadge(healthy) {
+            const badge = $('connection-status');
+            if (!badge) return;
+            badge.className = healthy ? 'badge bg-success' : 'badge bg-secondary';
+            badge.innerHTML = healthy
+                ? '<i class="bi bi-circle-fill me-1"></i>已连接'
+                : '<i class="bi bi-circle-fill me-1"></i>未连接';
+        }
+
+        function updateModeBanner() {
+            const badge = $('runtime-mode-badge');
+            const description = $('mode-description');
+            if (runtime.mode === 'simulated') {
+                badge.textContent = '仿真调试模式';
+                badge.className = 'mode-badge mode-simulated';
+                description.textContent = '仿真场景会根据当前电压等级、设备选择与阈值滑条动态给出适配建议，但不会写入真实插件算法。';
+            } else {
+                badge.textContent = '真实监测模式';
+                badge.className = 'mode-badge mode-real';
+                description.textContent = '真实监测模式只读展示插件健康与占位画面，等待文件上传或 RTSP 输入，不注入任何仿真识别结果。';
+            }
+        }
+
+        function setStatusAppearance(text, level) {
+            const status = $('plugin-status');
+            if (!status) return;
+            status.textContent = text;
+            status.className = 'metric-value ' + (
+                level === 'error' ? 'status-alarm' :
+                level === 'warning' ? 'status-warning' :
+                'status-normal'
+            );
+        }
+
+        function buildSimulationView() {
+            const scenario = getScenario();
+            const controls = getControls();
+            const frame = scenario.frames[runtime.simulation.frameIndex] || scenario.frames[0];
+            const clarityBlocked = frame.clarity < controls.clarityThreshold;
+            const visibleResults = [];
+            const hiddenResults = [];
+
+            frame.results.forEach((result) => {
+                if (clarityBlocked) {
+                    hiddenResults.push({
+                        label: result.label,
+                        confidence: result.confidence,
+                        reason: '清晰度未达到门限，真实链路应停留在 clarity gate。',
+                        evidence: result.evidence,
+                        description: result.description,
+                    });
+                    return;
+                }
+
+                if (result.confidence >= controls.confidenceThreshold) {
+                    visibleResults.push(result);
+                } else {
+                    hiddenResults.push({
+                        label: result.label,
+                        confidence: result.confidence,
+                        reason: '置信度低于当前调试阈值。',
+                        evidence: result.evidence,
+                        description: result.description,
+                    });
+                }
+            });
+
+            if (clarityBlocked) {
+                visibleResults.unshift({
+                    label: 'clarity_low',
+                    confidence: Math.max(0, 1 - frame.clarity),
+                    deviceType: 'breaker',
+                    evidence: { clarity: frame.clarity },
+                    description: '当前画面命中清晰度门限，真实识别链路不应继续输出设备状态。',
+                });
+            }
+
+            const adaptiveHints = [...frame.notes];
+            if (controls.voltage !== scenario.recommendedVoltage) {
+                adaptiveHints.push(`当前电压等级为 ${controls.voltage}，与场景标定 ${scenario.recommendedVoltage} 不一致，建议切回后观察适配差异。`);
+            }
+            if (controls.deviceType && controls.deviceType !== scenario.focusDevice) {
+                adaptiveHints.push(`当前设备选择是 ${DEVICE_MAP[controls.deviceType] || controls.deviceType}，而场景主设备是 ${DEVICE_MAP[scenario.focusDevice] || scenario.focusDevice}。`);
+            }
+            if (controls.nmsThreshold < 0.35 && scenario.scene.weather.indexOf('雾') >= 0) {
+                adaptiveHints.push('当前 NMS 阈值偏低，在雾天或粉尘场景下更容易出现碎框，建议优先在仿真中校准。');
+            }
+            if (clarityBlocked) {
+                adaptiveHints.push('此处故意保留候选结果，仅供调试面板观察；真实交付结果应继续保持空结果或 clarity_low。');
+            }
+
+            const interlocks = clarityBlocked ? [] : frame.interlocks;
+            const alerts = interlocks.length;
+            const detections = visibleResults.filter((item) => item.label !== 'clarity_low').length;
+            const adjustedMs = Math.round(frame.processingMs + Math.max(0, (controls.confidenceThreshold - 0.45) * 60));
+
+            return {
+                mode: 'simulated',
+                scenario,
+                frame,
+                controls,
+                visibleResults,
+                hiddenResults,
+                adaptiveHints,
+                interlocks,
+                detections,
+                alerts,
+                processingMs: adjustedMs,
+            };
+        }
+
+        function renderSceneMeta(view) {
+            const container = $('scene-meta-grid');
+            if (!container) return;
+            const metaCards = [
+                ['站点', view.scenario.scene.station],
+                ['阶段', view.frame.stage],
+                ['气象', view.scenario.scene.weather],
+                ['清晰度', formatConfidence(view.frame.clarity)],
+                ['负载', view.frame.telemetry.load],
+                ['镜头', view.scenario.scene.camera],
+            ];
+            container.innerHTML = metaCards.map(([label, value]) => `
+                <div class="scene-meta-card">
+                    <div class="meta-label">${label}</div>
+                    <div class="meta-value">${value}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderStateGrid(states) {
+            const grid = $('state-grid');
+            if (!grid) return;
+            grid.innerHTML = Object.keys(states).map((key) => {
+                const state = states[key];
+                const chipClass = `state-chip state-${state}`;
+                return `
+                    <div class="state-card">
+                        <div class="state-card-title">${DEVICE_MAP[key]}</div>
+                        <span class="${chipClass}">
+                            <i class="bi bi-circle-fill"></i>${formatState(state)}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderResults(view) {
+            const list = $('result-list');
+            if (!list) return;
+            if (!view.visibleResults.length) {
+                list.innerHTML = '<div class="event-item text-secondary">当前帧没有可展示的识别结果</div>';
+                return;
+            }
+            list.innerHTML = view.visibleResults.map((result) => {
+                const evidence = result.evidence || {};
+                const evidenceBlocks = [
+                    evidence.ocr ? `OCR: ${evidence.ocr}` : null,
+                    Number.isFinite(evidence.green) ? `Green: ${formatConfidence(evidence.green)}` : null,
+                    Number.isFinite(evidence.red) ? `Red: ${formatConfidence(evidence.red)}` : null,
+                    Number.isFinite(evidence.angle) ? `Angle: ${evidence.angle}°` : null,
+                    Number.isFinite(evidence.clarity) ? `Clarity: ${formatConfidence(evidence.clarity)}` : null,
+                ].filter(Boolean);
+                return `
+                    <div class="event-item">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <div class="result-title">${textLabel(result.label)}</div>
+                                <div class="result-subtitle">${result.description || '无附加说明'}</div>
+                            </div>
+                            <span class="badge ${result.label === 'clarity_low' ? 'bg-warning text-dark' : 'bg-primary'}">
+                                ${formatConfidence(result.confidence)}
+                            </span>
+                        </div>
+                        ${evidenceBlocks.length ? `<div class="evidence-grid">${evidenceBlocks.map((item) => `<div class="evidence-pill">${item}</div>`).join('')}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderInterlocks(view) {
+            const list = $('interlock-log');
+            if (!list) return;
+            if (!view.interlocks.length) {
+                list.innerHTML = '<div class="event-item text-secondary">当前场景未触发互锁事件</div>';
+                return;
+            }
+            list.innerHTML = view.interlocks.map((item) => `
+                <div class="event-item">
+                    <div class="d-flex justify-content-between align-items-center gap-2">
+                        <strong>${item.rule}</strong>
+                        <span class="badge ${item.severity === 'error' ? 'bg-danger' : 'bg-warning text-dark'}">
+                            ${item.severity === 'error' ? 'ERROR' : 'WARNING'}
+                        </span>
+                    </div>
+                    <div class="result-subtitle mt-1">${item.message}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderTimeline(view) {
+            const list = $('timeline-list');
+            if (!list) return;
+            list.innerHTML = view.scenario.frames.map((frame, index) => `
+                <div class="timeline-item ${view.frame.stage === frame.stage ? 'active' : ''}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>${index + 1}. ${frame.stage}</strong>
+                        <span class="text-secondary">${frame.telemetry.load}</span>
+                    </div>
+                    <div class="result-subtitle mt-1">清晰度 ${formatConfidence(frame.clarity)} / 处理 ${frame.processingMs}ms</div>
+                </div>
+            `).join('');
+        }
+
+        function renderInsights(view) {
+            const debugPanel = $('debug-insights');
+            const monitorPanel = $('monitor-insights');
+            const debugBadge = $('debug-mode-badge');
+            const monitorBadge = $('monitor-mode-badge');
+
+            if (debugPanel) {
+                const hiddenItems = view.hiddenResults.map((item) => ({
+                    title: `${textLabel(item.label)} 被拦截`,
+                    body: `${item.reason} 置信度 ${formatConfidence(item.confidence)}。`,
+                }));
+                const debugItems = [
+                    ...view.adaptiveHints.map((text) => ({ title: '调试建议', body: text })),
+                    ...hiddenItems,
+                ];
+                debugPanel.innerHTML = debugItems.length
+                    ? debugItems.map((item) => `<div class="insight-item"><strong>${item.title}</strong><div class="result-subtitle mt-1">${item.body}</div></div>`).join('')
+                    : '<div class="insight-item">当前没有额外调试建议。</div>';
+                debugBadge.textContent = view.hiddenResults.length ? '有待调整项' : '调试通过';
+                debugBadge.className = view.hiddenResults.length
+                    ? 'badge bg-warning-subtle text-warning-emphasis border border-warning-subtle'
+                    : 'badge bg-info-subtle text-info-emphasis border border-info-subtle';
+            }
+
+            if (monitorPanel) {
+                const realStatus = runtime.real.status || 'ready';
+                const healthSummary = runtime.real.healthy
+                    ? '真实插件健康正常，可在切回文件/RTSP后做只读监测。'
+                    : '尚未拿到真实健康快照，监测页先保留仿真提示。';
+                const items = [
+                    {
+                        title: runtime.mode === 'simulated' ? '仿真隔离说明' : '真实监测说明',
+                        body: runtime.mode === 'simulated'
+                            ? '当前画面和结果均来自浏览器端场景引擎，不会写入 plugin.py 或 detector_enhanced.py。'
+                            : '当前只展示真实模式占位与健康信息，等待真实帧源接入。',
+                    },
+                    {
+                        title: '健康快照',
+                        body: `状态 ${realStatus}，${healthSummary}`,
+                    },
+                    {
+                        title: '推荐动作',
+                        body: view.interlocks.length
+                            ? '先在仿真下观察告警颜色、文案和结果区层级，再决定是否回到算法侧修正。'
+                            : '优先检查监测页信息密度与调试按钮是否满足现场演示。'
+                    },
+                ];
+                monitorPanel.innerHTML = items.map((item) => `<div class="insight-item"><strong>${item.title}</strong><div class="result-subtitle mt-1">${item.body}</div></div>`).join('');
+                monitorBadge.textContent = runtime.mode === 'simulated' ? '仿真观察中' : '真实待接入';
+                monitorBadge.className = runtime.mode === 'simulated'
+                    ? 'badge bg-success-subtle text-success-emphasis border border-success-subtle'
+                    : 'badge bg-secondary';
+            }
+        }
+
+        function drawRoundedRect(x, y, width, height, radius) {
+            const safeRadius = Math.min(radius, width / 2, height / 2);
+            context.beginPath();
+            context.moveTo(x + safeRadius, y);
+            context.lineTo(x + width - safeRadius, y);
+            context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+            context.lineTo(x + width, y + height - safeRadius);
+            context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+            context.lineTo(x + safeRadius, y + height);
+            context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+            context.lineTo(x, y + safeRadius);
+            context.quadraticCurveTo(x, y, x + safeRadius, y);
+            context.closePath();
+        }
+
+        function drawBadge(x, y, text, color) {
+            context.save();
+            context.font = '14px sans-serif';
+            context.fillStyle = 'rgba(15, 23, 42, 0.78)';
+            context.strokeStyle = color;
+            context.lineWidth = 1;
+            drawRoundedRect(x, y, context.measureText(text).width + 22, 28, 14);
+            context.fill();
+            context.stroke();
+            context.fillStyle = color;
+            context.fillText(text, x + 11, y + 18);
+            context.restore();
+        }
+
+        function equipmentColor(state) {
+            if (state === 'closed') return '#22c55e';
+            if (state === 'open') return '#f59e0b';
+            if (state === 'intermediate') return '#f97316';
+            return '#94a3b8';
+        }
+
+        function drawBusbar() {
+            context.save();
+            context.strokeStyle = '#60a5fa';
+            context.lineWidth = 10;
+            context.beginPath();
+            context.moveTo(140, 110);
+            context.lineTo(canvas.width - 130, 110);
+            context.stroke();
+
+            context.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+            context.lineWidth = 3;
+            [240, 460, 680].forEach((x) => {
+                context.beginPath();
+                context.moveTo(x, 110);
+                context.lineTo(x, 210);
+                context.stroke();
+            });
+            context.restore();
+        }
+
+        function drawBreaker(x, y, state, label) {
+            context.save();
+            const color = equipmentColor(state);
+            context.strokeStyle = color;
+            context.lineWidth = 7;
+            context.beginPath();
+            context.moveTo(x - 48, y);
+            context.lineTo(x - 10, y);
+            context.stroke();
+            context.beginPath();
+            context.moveTo(x - 10, y);
+            if (state === 'closed') {
+                context.lineTo(x + 10, y);
+            } else if (state === 'intermediate') {
+                context.lineTo(x + 6, y - 20);
+            } else {
+                context.lineTo(x + 6, y - 28);
+            }
+            context.stroke();
+            context.beginPath();
+            context.moveTo(x + 10, y);
+            context.lineTo(x + 48, y);
+            context.stroke();
+            drawBadge(x - 55, y + 26, `${label} ${formatState(state)}`, color);
+            context.restore();
+        }
+
+        function drawIsolator(x, y, state, label) {
+            context.save();
+            const color = equipmentColor(state);
+            context.strokeStyle = color;
+            context.lineWidth = 6;
+            context.beginPath();
+            context.moveTo(x - 50, y);
+            context.lineTo(x - 6, y);
+            context.stroke();
+            context.beginPath();
+            context.moveTo(x - 6, y);
+            if (state === 'closed') {
+                context.lineTo(x + 38, y);
+            } else if (state === 'intermediate') {
+                context.lineTo(x + 28, y - 16);
+            } else {
+                context.lineTo(x + 16, y - 34);
+            }
+            context.stroke();
+            context.beginPath();
+            context.moveTo(x + 38, y);
+            context.lineTo(x + 60, y);
+            context.stroke();
+            drawBadge(x - 58, y + 24, `${label} ${formatState(state)}`, color);
+            context.restore();
+        }
+
+        function drawGrounding(x, y, state, label) {
+            context.save();
+            const color = equipmentColor(state);
+            context.strokeStyle = color;
+            context.lineWidth = 6;
+            context.beginPath();
+            context.moveTo(x, y - 50);
+            context.lineTo(x, y + 24);
+            context.stroke();
+            context.beginPath();
+            context.moveTo(x, y + 24);
+            if (state === 'closed') {
+                context.lineTo(x - 24, y + 56);
+            } else if (state === 'intermediate') {
+                context.lineTo(x - 12, y + 48);
+            } else {
+                context.lineTo(x + 22, y + 10);
+            }
+            context.stroke();
+            context.beginPath();
+            context.moveTo(x - 38, y + 56);
+            context.lineTo(x + 38, y + 56);
+            context.stroke();
+            drawBadge(x - 60, y + 74, `${label} ${formatState(state)}`, color);
+            context.restore();
+        }
+
+        function drawControlCabinet(view) {
+            context.save();
+            context.fillStyle = 'rgba(15, 23, 42, 0.74)';
+            context.strokeStyle = 'rgba(96, 165, 250, 0.35)';
+            context.lineWidth = 2;
+            drawRoundedRect(canvas.width - 220, 220, 160, 170, 14);
+            context.fill();
+            context.stroke();
+
+            context.fillStyle = '#e2e8f0';
+            context.font = '16px sans-serif';
+            context.fillText('机构箱监测', canvas.width - 185, 252);
+            [
+                ['清晰度', formatConfidence(view.frame.clarity), view.frame.clarity >= view.controls.clarityThreshold ? '#22c55e' : '#f59e0b'],
+                ['负载', view.frame.telemetry.load, '#60a5fa'],
+                ['温度', view.frame.telemetry.temperature, '#f97316'],
+                ['处理', `${view.processingMs}ms`, '#a78bfa'],
+            ].forEach((row, index) => {
+                const top = 286 + index * 28;
+                context.fillStyle = 'rgba(148, 163, 184, 0.9)';
+                context.font = '13px sans-serif';
+                context.fillText(row[0], canvas.width - 188, top);
+                context.fillStyle = row[2];
+                context.fillText(row[1], canvas.width - 110, top);
+            });
+            context.restore();
+        }
+
+        function drawSceneBase(view) {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            const sky = context.createLinearGradient(0, 0, 0, canvas.height);
+            sky.addColorStop(0, '#020617');
+            sky.addColorStop(0.55, '#0f172a');
+            sky.addColorStop(1, '#111827');
+            context.fillStyle = sky;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            context.fillStyle = 'rgba(30, 41, 59, 0.95)';
+            context.fillRect(0, canvas.height - 105, canvas.width, 105);
+
+            context.fillStyle = 'rgba(59, 130, 246, 0.06)';
+            context.beginPath();
+            context.arc(190, 100, 160, 0, Math.PI * 2);
+            context.fill();
+
+            context.fillStyle = '#f8fafc';
+            context.font = '20px sans-serif';
+            context.fillText(view.scenario.scene.station, 56, 48);
+            context.font = '14px sans-serif';
+            context.fillStyle = '#94a3b8';
+            context.fillText(`${view.scenario.scene.weather} · ${view.scenario.scene.illumination}`, 56, 74);
+
+            drawBusbar();
+            drawBreaker(240, 238, view.frame.states.breaker, '断路器');
+            drawIsolator(460, 238, view.frame.states.isolator, '隔离开关');
+            drawGrounding(680, 240, view.frame.states.grounding, '接地开关');
+            drawControlCabinet(view);
+
+            if (runtime.ui.debugVisible) {
+                context.save();
+                context.strokeStyle = 'rgba(96, 165, 250, 0.78)';
+                context.setLineDash([8, 6]);
+                [
+                    [162, 180, 156, 126, 'ROI breaker_indicator'],
+                    [382, 180, 154, 126, 'ROI isolator_linkage'],
+                    [624, 174, 126, 176, 'ROI grounding_handle'],
+                ].forEach(([x, y, w, h, label]) => {
+                    context.strokeRect(x, y, w, h);
+                    drawBadge(x + 6, y + 8, label, '#60a5fa');
+                });
+                context.restore();
+            }
+        }
+
+        function drawRealMonitorPlaceholder() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            const fill = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+            fill.addColorStop(0, '#020617');
+            fill.addColorStop(1, '#111827');
+            context.fillStyle = fill;
+            context.fillRect(0, 0, canvas.width, canvas.height);
+
+            context.strokeStyle = 'rgba(59, 130, 246, 0.28)';
+            context.lineWidth = 2;
+            context.strokeRect(80, 90, canvas.width - 160, canvas.height - 180);
+            context.fillStyle = '#e2e8f0';
+            context.font = '24px sans-serif';
+            context.fillText('真实监测占位画面', 120, 160);
+            context.font = '16px sans-serif';
+            context.fillStyle = '#94a3b8';
+            context.fillText('等待文件上传或 RTSP 输入。当前页面只读展示健康状态，不向真实识别链路注入仿真结果。', 120, 204);
+            context.fillText('切回“模拟数据”可播放站内场景，先做适配调试与监测版面验证。', 120, 236);
+        }
+
+        function renderMetrics(view) {
+            $('conf-threshold').textContent = formatConfidence(view.controls ? view.controls.confidenceThreshold : readNumber('cfg-conf-threshold', 0.45));
+
+            if (view.mode === 'simulated') {
+                $('inference-count').textContent = String(runtime.simulation.framesProcessed);
+                $('error-count').textContent = String(view.hiddenResults.length);
+                setStatusAppearance(view.interlocks.length ? 'Simulated' : 'Simulation', view.interlocks.length ? 'warning' : 'normal');
+                $('stat-fps').textContent = runtime.simulation.running ? '0.6' : '0';
+                $('stat-frames').textContent = String(runtime.simulation.framesProcessed);
+                $('stat-detections').textContent = String(runtime.simulation.detections);
+                $('stat-alarms').textContent = String(runtime.simulation.alarms);
+                $('stat-avg-time').textContent = runtime.simulation.framesProcessed
+                    ? String(Math.round(runtime.simulation.totalProcessMs / runtime.simulation.framesProcessed))
+                    : '0';
+                return;
+            }
+
+            $('inference-count').textContent = runtime.real.health && runtime.real.health.inference_count ? String(runtime.real.health.inference_count) : '0';
+            $('error-count').textContent = runtime.real.health && runtime.real.health.error_count ? String(runtime.real.health.error_count) : '0';
+            setStatusAppearance(runtime.real.status === 'error' ? 'Error' : 'Ready', runtime.real.status === 'error' ? 'error' : 'normal');
+            $('stat-fps').textContent = '0';
+            $('stat-frames').textContent = '0';
+            $('stat-detections').textContent = '0';
+            $('stat-alarms').textContent = '0';
+            $('stat-avg-time').textContent = '0';
+        }
+
+        function renderSimulation() {
+            const view = buildSimulationView();
+            runtime.simulation.lastView = view;
+            runtime.simulation.detections = view.detections;
+            runtime.simulation.alarms = view.alerts;
+            renderSceneMeta(view);
+            renderStateGrid(view.frame.states);
+            renderResults(view);
+            renderInterlocks(view);
+            renderTimeline(view);
+            renderInsights(view);
+            drawSceneBase(view);
+            renderMetrics(view);
+        }
+
+        function renderRealMonitor() {
+            const controls = getControls();
+            const status = runtime.real.status || 'ready';
+            const view = {
+                mode: 'real_monitor',
+                controls,
+                scenario: getScenario(),
+                frame: {
+                    stage: '等待真实帧源',
+                    clarity: 0,
+                    telemetry: { load: '--', temperature: '--', vibration: '--' },
+                    states: { breaker: 'unknown', isolator: 'unknown', grounding: 'unknown' },
+                },
+                hiddenResults: [],
+                interlocks: [],
+            };
+            renderSceneMeta({
+                scenario: {
+                    scene: {
+                        station: runtime.real.platformInfo && runtime.real.platformInfo.plugin_name ? runtime.real.platformInfo.plugin_name : '开关巡视实时监测',
+                        weather: '等待接入',
+                        camera: '文件 / RTSP',
+                        illumination: '只读占位',
+                    },
+                },
+                frame: {
+                    stage: runtime.real.healthy ? '健康正常' : '未连接',
+                    clarity: 0,
+                    telemetry: { load: '--', temperature: '--', vibration: '--' },
+                },
+            });
+            renderStateGrid(view.frame.states);
+            $('result-list').innerHTML = '<div class="event-item text-secondary">真实模式下等待上传图像或 RTSP 输入后再展示识别结果</div>';
+            $('interlock-log').innerHTML = '<div class="event-item text-secondary">当前无真实互锁事件，保持只读监测</div>';
+            $('timeline-list').innerHTML = `
+                <div class="timeline-item active">
+                    <strong>1. 模式待接入</strong>
+                    <div class="result-subtitle mt-1">状态 ${status} / 最后更新 ${runtime.real.lastUpdatedAt || '--'}</div>
+                </div>
+            `;
+            renderInsights({
+                mode: 'real_monitor',
+                hiddenResults: [],
+                interlocks: [],
+                adaptiveHints: [
+                    '真实模式保留空结果是预期行为，直到有真实图像输入。',
+                    '如需复现问题，请切回模拟数据先观察页面布局与调试流转。',
+                ],
+            });
+            drawRealMonitorPlaceholder();
+            renderMetrics({ mode: 'real_monitor', controls });
+        }
+
+        function setPanelVisibility() {
+            $('debug-panel').hidden = !runtime.ui.debugVisible;
+            $('monitor-panel').hidden = !runtime.ui.monitorVisible;
+        }
+
+        function updateSimulationButton() {
+            const button = $('btn-play-simulation');
+            if (!button) return;
+            if (runtime.mode !== 'simulated') {
+                button.innerHTML = '<i class="bi bi-play-circle me-1"></i>启动仿真';
+                button.disabled = true;
+                return;
+            }
+            button.disabled = false;
+            button.innerHTML = runtime.simulation.running
+                ? '<i class="bi bi-pause-circle me-1"></i>暂停仿真'
+                : '<i class="bi bi-play-circle me-1"></i>启动仿真';
+        }
+
+        function presentSimulationFrame(countStats) {
+            renderSimulation();
+            if (countStats) {
+                const view = runtime.simulation.lastView;
+                runtime.simulation.framesProcessed += 1;
+                runtime.simulation.totalProcessMs += view.processingMs;
+                runtime.simulation.frameIndex = (runtime.simulation.frameIndex + 1) % getScenario().frames.length;
+            }
+            renderMetrics(runtime.simulation.lastView);
+        }
+
+        function stopSimulation() {
+            if (runtime.simulation.timerId) {
+                clearInterval(runtime.simulation.timerId);
+            }
+            runtime.simulation.timerId = null;
+            runtime.simulation.running = false;
+            updateSimulationButton();
+        }
+
+        function startSimulation() {
+            if (runtime.mode !== 'simulated') {
+                return;
+            }
+            if (runtime.simulation.running) {
+                stopSimulation();
+                return;
+            }
+            runtime.simulation.running = true;
+            updateSimulationButton();
+            presentSimulationFrame(true);
+            runtime.simulation.timerId = window.setInterval(() => presentSimulationFrame(true), runtime.simulation.intervalMs);
+        }
+
+        function resetSimulationStats() {
+            runtime.simulation.frameIndex = 0;
+            runtime.simulation.framesProcessed = 0;
+            runtime.simulation.detections = 0;
+            runtime.simulation.alarms = 0;
+            runtime.simulation.totalProcessMs = 0;
+        }
+
+        function setRuntimeMode(mode) {
+            runtime.mode = mode;
+            updateModeBanner();
+            updateSimulationButton();
+            if (mode === 'simulated') {
+                renderSimulation();
+            } else {
+                stopSimulation();
+                renderRealMonitor();
+            }
+        }
+
+        function attachEvents() {
+            $('scenario-select').addEventListener('change', function() {
+                runtime.simulation.scenarioId = this.value;
+                resetSimulationStats();
+                if (runtime.mode === 'simulated') {
+                    if (runtime.simulation.running) {
+                        stopSimulation();
+                        startSimulation();
+                    } else {
+                        renderSimulation();
+                    }
+                }
+            });
+
+            $('btn-play-simulation').addEventListener('click', startSimulation);
+            $('btn-step-simulation').addEventListener('click', function() {
+                if (runtime.mode !== 'simulated') return;
+                stopSimulation();
+                presentSimulationFrame(true);
+            });
+            $('btn-reset-simulation').addEventListener('click', function() {
+                stopSimulation();
+                resetSimulationStats();
+                if (runtime.mode === 'simulated') {
+                    renderSimulation();
+                } else {
+                    renderRealMonitor();
+                }
+            });
+
+            $('btn-toggle-debug').addEventListener('click', function() {
+                runtime.ui.debugVisible = !runtime.ui.debugVisible;
+                setPanelVisibility();
+                if (runtime.mode === 'simulated') {
+                    renderSimulation();
+                } else {
+                    renderRealMonitor();
+                }
+            });
+
+            $('btn-toggle-monitor').addEventListener('click', function() {
+                runtime.ui.monitorVisible = !runtime.ui.monitorVisible;
+                setPanelVisibility();
+            });
+
+            ['sel-voltage-level', 'sel-device-type', 'cfg-conf-threshold', 'cfg-nms-threshold'].forEach((id) => {
+                const node = $(id);
+                if (!node) return;
+                node.addEventListener('change', function() {
+                    if (runtime.mode === 'simulated') {
+                        renderSimulation();
+                    } else {
+                        renderRealMonitor();
+                    }
+                });
+                node.addEventListener('input', function() {
+                    if (runtime.mode === 'simulated') {
+                        renderSimulation();
+                    }
+                });
+            });
+
+            document.querySelectorAll('.data-source-option').forEach((option) => {
+                option.addEventListener('click', function() {
+                    const nextMode = currentModeFromSource(option.getAttribute('data-source'));
+                    if (nextMode === 'simulated') {
+                        setRuntimeMode('simulated');
+                    } else {
+                        setRuntimeMode('real_monitor');
+                    }
+                });
+            });
+        }
+
+        async function fetchJson(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    return null;
+                }
+                return await response.json();
+            } catch (error) {
+                return null;
+            }
+        }
+
+        async function refreshHealth() {
+            const [health, platformInfo] = await Promise.all([
+                fetchJson('/api/health'),
+                fetchJson('/api/platform/info'),
+            ]);
+
+            runtime.real.healthy = Boolean(health && health.healthy);
+            runtime.real.health = health;
+            runtime.real.platformInfo = platformInfo;
+            runtime.real.status = platformInfo && platformInfo.status ? platformInfo.status : (runtime.real.healthy ? 'ready' : 'disconnected');
+            runtime.real.lastUpdatedAt = new Date().toLocaleTimeString();
+            runtime.connectionHealthy = runtime.real.healthy;
+            updateConnectionBadge(runtime.connectionHealthy);
+
+            if (runtime.mode === 'real_monitor') {
+                renderRealMonitor();
+            } else {
+                renderInsights(runtime.simulation.lastView || buildSimulationView());
+            }
+        }
+
+        function populateScenarioSelect() {
+            const select = $('scenario-select');
+            select.innerHTML = scenarios.map((scenario) => `
+                <option value="${scenario.id}">${scenario.title}</option>
+            `).join('');
+            select.value = runtime.simulation.scenarioId;
+        }
+
+        window.updateDashboard = function(data) {
+            if (!data || runtime.mode === 'simulated') {
+                return;
+            }
+            if (typeof data.inference_count === 'number') {
+                $('inference-count').textContent = String(data.inference_count);
+            }
+            if (typeof data.error_count === 'number') {
+                $('error-count').textContent = String(data.error_count);
+            }
+            if (data.status) {
+                runtime.real.status = data.status;
+                renderRealMonitor();
+            }
+        };
+
+        populateScenarioSelect();
+        setPanelVisibility();
+        attachEvents();
+        updateConnectionBadge(false);
+        setRuntimeMode(currentModeFromSource(activeSource()));
+        refreshHealth();
+        window.setInterval(refreshHealth, 5000);
+    })();
 </script>
 {% endblock %}

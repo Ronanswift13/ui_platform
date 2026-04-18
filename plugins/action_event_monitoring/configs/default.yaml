@@ -1,0 +1,142 @@
+# 动作事件监测插件默认配置
+# ============================
+
+# 采集间隔(秒)
+poll_interval_s: 1.0
+
+sampling:
+  sample_interval_seconds: 1.0
+  source_mode: simulated_or_protocol
+
+window:
+  size: 10.0
+  unit: seconds
+
+thresholds:
+  event_count_warning: 3
+
+# 协议配置(支持 opcua / mqtt / modbus / http / iec104 / iec61850)
+protocol:
+  type: ""
+  host: "127.0.0.1"
+  port: 4840
+  endpoint: ""
+  username: ""
+  password: ""
+
+# --- IEC 60870-5-104 配置示例 ---
+# protocol:
+#   type: "iec104"
+#   host: "192.168.1.100"
+#   port: 2404
+#   common_address: 1
+#   originator_address: 0
+#   k: 12                          # 未确认APDU上限
+#   w: 8                           # 确认阈值
+#   t1: 15                         # 发送超时(秒)
+#   t2: 10                         # 确认超时(秒)
+#   t3: 20                         # 测试帧超时(秒)
+#   general_interrogation_interval: 600  # 总召周期(秒), 0=禁用
+#   clock_sync_interval: 3600      # 对时周期(秒), 0=禁用
+
+# --- IEC 61850 配置示例 ---
+# protocol:
+#   type: "iec61850"
+#   host: "192.168.1.200"
+#   port: 102
+#   ied_name: "PROT_REL_01"
+#   access_point: "S1"
+#   dataset_ref: "PROT_REL_01/LLN0$dataset01"
+#   rcb_ref: "PROT_REL_01/LLN0$BR$brcb01"
+#   goose_enabled: true
+#   goose_appid: "0001"
+#   goose_interface: "eth0"
+#   tls_enabled: false
+#   tls_cert: ""
+#   tls_key: ""
+
+# 订阅节点列表(OPC UA node_id / MQTT topic / IEC信号)
+subscriptions: []
+# OPC UA 示例:
+# - node_id: "ns=2;s=Protection.Trip"
+#   signal_group: "protection"
+#   action_type_hint: "protection_trip"
+#
+# IEC 104 示例(IOA地址):
+# - node_id: "1001"
+#   signal_group: "protection"
+#   action_type_hint: "protection_trip"
+#   device_id: "PROT_01"
+# - node_id: "2001"
+#   signal_group: "breaker"
+#   action_type_hint: "breaker_open"
+#   device_id: "CB_01"
+#
+# IEC 61850 示例(DA引用):
+# - node_id: "PROT_REL_01/PTRC1.Tr.general"
+#   signal_group: "protection"
+#   action_type_hint: "protection_trip"
+#   device_id: "PROT_01"
+# - node_id: "PROT_REL_01/XCBR1.Pos.stVal"
+#   signal_group: "breaker"
+#   action_type_hint: "breaker_open"
+#   device_id: "CB_01"
+
+# 动作词映射(追加到默认映射)
+custom_action_keywords: {}
+# "某厂商保护动作": "protection_trip"
+
+# 分析触发配置
+analysis:
+  # 自动触发动作链分析的条件
+  auto_analyze_on_protection: true
+  auto_analyze_on_breaker: true
+  # --- 动作链分析规则阈值(秒) ---
+  # 正常跳闸链: 保护出口→断路器分闸 最大允许间隔
+  trip_chain_window_s: 10.0
+  # 重合闸: 从首次跳闸到重合闸失败 最大窗口
+  recloser_window_s: 30.0
+  # 拒动: 保护出口后等待断路器响应的超时
+  refuse_action_timeout_s: 5.0
+  # 误动: 断路器动作前后查找保护前兆的窗口
+  false_action_window_s: 10.0
+  # 信号抖动: 同一信号反复变位的窗口
+  jitter_window_s: 3.0
+  # 信号抖动: 最小变位次数
+  jitter_min_count: 3
+  # 控制回路: 断线信号关联事件的窗口
+  control_loop_window_s: 60.0
+  # 机构异常: 弹簧未储能关联事件的窗口
+  mechanism_window_s: 60.0
+
+# 告警配置
+alarm:
+  # 发送告警的最低严重程度
+  min_severity: "warning"
+  # 是否自动发送根因分析告警
+  auto_root_cause_alarm: true
+
+runtime:
+  mode: standalone
+  require_hardware: false
+  rule_confidence: 1.0
+
+model:
+  status: unavailable
+  trend_prediction_enabled: false
+  anomaly_detection_enabled: false
+
+alarm_rules:
+  min_status: warning
+  auto_root_cause_alarm: true
+
+upgrade_placeholders:
+  prediction_model: action sequence prediction model hook
+  anomaly_detection_model: SOE/action anomaly model hook
+  protocol_adapter: OPC UA/MQTT/IEC adapter hook
+  online_learning: online sequence baseline hook
+  model_features_placeholder: []
+  sequence_embedding_placeholder: null
+  temporal_pattern_placeholder: null
+  anomaly_score_trace_placeholder: []
+  root_cause_feature_placeholder: null

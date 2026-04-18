@@ -21,6 +21,8 @@ import logging
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
+from training.services.upload_batch_service import batch_service
+
 # 导入数据集下载器
 try:
     from .dataset_downloader import (
@@ -150,11 +152,13 @@ class TrainingManager:
     
     def generate_task_id(self, voltage_level: str, plugin: str) -> str:
         """生成任务ID"""
+        plugin = batch_service.to_legacy_plugin(batch_service.normalize_plugin_id(plugin))
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"{voltage_level}_{plugin}_{timestamp}"
     
     def get_task(self, voltage_level: str, plugin: str) -> Optional[TrainingTask]:
         """获取最新的训练任务"""
+        plugin = batch_service.to_legacy_plugin(batch_service.normalize_plugin_id(plugin))
         matching = [
             t for t in self.tasks.values()
             if t.voltage_level == voltage_level and t.plugin == plugin
@@ -165,6 +169,7 @@ class TrainingManager:
     
     def get_completed_model(self, voltage_level: str, plugin: str) -> Optional[Dict]:
         """获取已完成的模型"""
+        plugin = batch_service.to_legacy_plugin(batch_service.normalize_plugin_id(plugin))
         task = self.get_task(voltage_level, plugin)
         if task and task.status == TrainingStatus.COMPLETED and task.model_path:
             model_path = Path(task.model_path)
@@ -195,6 +200,7 @@ class TrainingManager:
     
     def get_dataset_status(self, plugin: str, voltage_level: str) -> Dict:
         """获取数据集状态"""
+        plugin = batch_service.to_legacy_plugin(batch_service.normalize_plugin_id(plugin))
         return self.downloader.get_dataset_stats(plugin, voltage_level)
     
     def get_available_datasets(self, plugin: str = None) -> Dict[str, Dict]:
@@ -233,6 +239,7 @@ class TrainingManager:
     
     def create_task(self, voltage_level: str, plugin: str) -> TrainingTask:
         """创建新训练任务"""
+        plugin = batch_service.to_legacy_plugin(batch_service.normalize_plugin_id(plugin))
         task_id = self.generate_task_id(voltage_level, plugin)
         task = TrainingTask(
             task_id=task_id,
@@ -517,6 +524,37 @@ async def list_plugins():
     return {
         "success": True,
         "plugins": ["transformer", "switch", "busbar", "capacitor", "meter"]
+    }
+
+
+@router.get("/capabilities")
+async def get_training_capabilities():
+    """返回 v1 / v2 训练能力边界，供平台迁移判断使用"""
+    try:
+        from training.registry import list_supported_plugins
+
+        v2_plugins = list_supported_plugins()
+    except Exception:
+        v2_plugins = []
+
+    return {
+        "success": True,
+        "api_version": "v1-legacy",
+        "legacy_scope": {
+            "plugins": ["transformer", "switch", "busbar", "capacitor", "meter"],
+            "task_types": ["detection"],
+            "model_artifact": "best.pt"
+        },
+        "recommended_v2_scope": {
+            "router_prefix": "/v2",
+            "supports_temporal_training": True,
+            "plugins": v2_plugins
+        },
+        "migration_notes": [
+            "视觉旧接口继续保留，用于 voltage_level + plugin 的兼容调用。",
+            "时序/数值异常类插件请使用 training_api_v2.py。",
+            "新的模型导出和 registry 调度统一走 plugin_id + task_type + version。"
+        ]
     }
 
 

@@ -7,6 +7,15 @@
 - 热成像集成: 红外图像温度提取
 """
 
-from plugins.transformer_inspection.plugin import TransformerInspectionPlugin
+import importlib as _importlib
 
 __all__ = ["TransformerInspectionPlugin"]
+
+
+def __getattr__(name: str):
+    """PEP 562 延迟加载，避免包级 import 触发 plugin.py → torch 链。"""
+    _plugin_names = {"TransformerInspectionPlugin"}
+    if name in _plugin_names:
+        mod = _importlib.import_module("plugins.transformer_inspection.plugin")
+        return getattr(mod, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

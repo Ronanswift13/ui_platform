@@ -1,0 +1,2 @@
+{"device_id":"edge_01","timestamp":"2026-04-01T00:00:00Z","alarm_level":"alarm","alarm_type":"memory_pressure","is_anomaly":1}
+{"device_id":"lidar_01","timestamp":"2026-04-01T00:30:00Z","alarm_level":"warning","alarm_type":"network_quality_drop","is_anomaly":1}

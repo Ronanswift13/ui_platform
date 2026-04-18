@@ -51,15 +51,19 @@ zoom:
   zmax: 12.0             # 最大变焦倍率
 
 # ============================================================
-# 检测标签（支持的缺陷类型）
+# 标签契约（单一交付基线）
 # ============================================================
 labels:
-  - ok
-  - pin_missing          # 销钉缺失
-  - crack                # 裂纹
-  - loose_fitting        # 金具松动
-  - broken_part          # 部件破损
-  - foreign_object       # 异物悬挂
+  runtime_supported:
+    - pin_missing        # 销钉缺失
+    - crack              # 裂纹
+    - foreign_object     # 异物悬挂
+    - quality_failed     # 质量门禁失败
+  aliases:
+    loose_fitting: fitting_loose
+  planned:
+    broken_part: blocked
+    fitting_loose: blocked
 
 # ============================================================
 # 告警规则
@@ -68,3 +72,67 @@ rules:
   alarm_thr_high: 0.75   # 高级别告警阈值
   alarm_thr_mid: 0.60    # 中级别告警阈值
   low_conf_thr: 0.40     # 低置信度阈值（需复核）
+
+# ============================================================
+# 决策层后处理（去 crack 偏置 / 复核仲裁 / 输出限流）
+# ============================================================
+decision:
+  unstable_reason_code: 2002
+
+  conflict_arbitration:
+    iou_threshold: 0.15
+    review_score_gap: 0.12
+
+  output_limits:
+    scene_max_detections: 12
+    per_class_topk:
+      crack: 2
+      foreign_object: 4
+      pin_missing: 4
+
+  traditional_crack_validation:
+    min_length_px: 40
+    min_slenderness: 4.0
+    min_local_contrast: 12.0
+    axis_aligned_tolerance_deg: 8.0
+    reject_axis_aligned: false
+    reject_vertical_axis_aligned: false
+    default_max_axis_aligned_span_ratio: 0.18
+    roi_overrides:
+      full_frame:
+        reject_axis_aligned: true
+        max_axis_aligned_span_ratio: 0.08
+        reject_vertical_axis_aligned: true
+      busbar_span:
+        reject_axis_aligned: true
+        max_axis_aligned_span_ratio: 0.10
+        reject_vertical_axis_aligned: true
+      foreign_object_zone:
+        reject_axis_aligned: true
+        max_axis_aligned_span_ratio: 0.08
+        reject_vertical_axis_aligned: true
+      insulator_string:
+        max_axis_aligned_span_ratio: 0.18
+      hardware_fitting:
+        max_axis_aligned_span_ratio: 0.16
+
+  roi_priors:
+    full_frame:
+      crack: -0.08
+      foreign_object: 0.02
+    busbar_span:
+      crack: -0.10
+      foreign_object: 0.12
+    foreign_object_zone:
+      crack: -0.12
+      foreign_object: 0.18
+    insulator_string:
+      crack: 0.08
+      foreign_object: 0.04
+    hardware_fitting:
+      pin_missing: 0.12
+      crack: -0.03
+    conductor_joint:
+      pin_missing: 0.05
+      foreign_object: 0.08
+      crack: -0.04

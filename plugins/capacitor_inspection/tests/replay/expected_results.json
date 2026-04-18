@@ -1,0 +1,100 @@
+{
+  "schema_version": "1.0",
+  "schema_ref": "docs/minimal_fixture_replay_schema.md",
+  "plugin_id": "capacitor_inspection",
+  "asset_root": "plugins/capacitor_inspection/tests/fixtures",
+  "collection_status": "planned_slots_only",
+  "samples": [
+    {
+      "sample_id": "cap_normal_structure_001",
+      "asset_relpath": "plugins/capacitor_inspection/tests/fixtures/normal/cap_normal_structure_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "capacitor_inspection",
+      "scenario_type": "normal",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [],
+      "expected_alarm_level": "none",
+      "collection_status": "planned",
+      "candidate_source_refs": [
+        "hv220_capacitor_training_images"
+      ],
+      "notes": "待人工筛选真实结构完整样本，要求无遮挡、无入侵、结构完整。"
+    },
+    {
+      "sample_id": "cap_structural_tilt_001",
+      "asset_relpath": "plugins/capacitor_inspection/tests/fixtures/anomaly/cap_structural_tilt_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "capacitor_inspection",
+      "scenario_type": "anomaly",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "tilt_warning"
+      ],
+      "expected_alarm_level": "warning",
+      "collection_status": "planned",
+      "candidate_source_refs": [
+        "hv220_capacitor_training_images"
+      ],
+      "notes": "待人工挑选或采集轻中度倾斜样本；如确认严重倾斜，可改为 tilt_error。"
+    },
+    {
+      "sample_id": "cap_intrusion_person_001",
+      "asset_relpath": "plugins/capacitor_inspection/tests/fixtures/anomaly/cap_intrusion_person_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "capacitor_inspection",
+      "scenario_type": "anomaly",
+      "expected_runtime_mode": "simulation",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "intrusion_person"
+      ],
+      "expected_alarm_level": "error",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "当前仓库内无已知入侵图像资产；需人工采集或脱敏构造。"
+    },
+    {
+      "sample_id": "cap_boundary_partial_occlusion_001",
+      "asset_relpath": "plugins/capacitor_inspection/tests/fixtures/boundary/cap_boundary_partial_occlusion_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "capacitor_inspection",
+      "scenario_type": "boundary",
+      "expected_runtime_mode": "traditional_fallback",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [
+        "tilt_warning"
+      ],
+      "expected_alarm_level": "info",
+      "collection_status": "planned",
+      "candidate_source_refs": [
+        "hv220_capacitor_training_images"
+      ],
+      "notes": "用于覆盖轻微遮挡/轻微倾斜边界，不应默默掉检。"
+    },
+    {
+      "sample_id": "cap_quality_dark_blur_001",
+      "asset_relpath": "plugins/capacitor_inspection/tests/fixtures/quality_fail/cap_quality_dark_blur_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "capacitor_inspection",
+      "scenario_type": "quality_fail",
+      "expected_runtime_mode": "simulation",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [],
+      "expected_alarm_level": "info",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "待人工采集低照度或模糊样本，目标是固定质量失败/复核语义。"
+    }
+  ],
+  "candidate_sources": [
+    {
+      "candidate_id": "hv220_capacitor_training_images",
+      "source_type": "real",
+      "asset_relpath": "training/data/processed/HV_220kV/capacitor/images",
+      "label_status": "untriaged",
+      "notes": "仓库内存在真实/已处理图像目录，classes.txt 包含 capacitor_unit/capacitor_tilted/capacitor_fallen/capacitor_missing/person/vehicle，但当前未完成插件级场景筛选和 expected baseline 映射。"
+    }
+  ]
+}

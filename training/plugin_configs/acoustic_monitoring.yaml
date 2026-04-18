@@ -1,0 +1,60 @@
+# 声学监测 - 时序异常训练配置模板
+plugin_id: acoustic_monitoring
+display_name: 声学监测
+
+model:
+  family: dual_path_audio_transformer
+  backbone: audio_transformer_small
+  input_modality: audio_waveform+spectrogram
+  paradigm: transformer_encoder
+
+task:
+  primary: acoustic_time_frequency_anomaly
+  label_schema: temporal_annotation
+  dual_path_enabled: true
+  feature_views: [raw_waveform, mel_spectrogram, log_mel]
+  classes:
+    anomaly_type:
+      - normal
+      - partial_discharge
+      - corona
+      - contact_noise
+      - bearing_fault
+      - mechanical_impact
+
+data_contract:
+  required_dirs: [waveforms]
+  optional_dirs: [spectrograms, labels, metadata]
+  manifest_required_fields: [sample_rate_hz, window_size, feature_views, temporal_schema]
+  notes:
+    - 原始音频路径: waveforms/*.wav 或 *.flac
+    - 时频图路径: spectrograms/*.npy 或 *.npz
+    - 支持仅 waveforms 训练，也支持 waveforms + spectrograms 双路径融合
+
+training:
+  epochs: 80
+  batch_size: 32
+  learning_rate: 0.0005
+  optimizer: AdamW
+  scheduler: cosine
+  sample_rate_hz: 16000
+  window_size: 2.0
+  hop_length: 512
+  n_fft: 2048
+  n_mels: 128
+
+evaluation:
+  metrics: [auc_roc, auc_pr, f1, false_alarm_rate, latency_ms]
+  qualification:
+    f1: 0.80
+    false_alarm_rate: 0.10
+
+export:
+  formats: [onnx]
+  model_roles:
+    audio_anomaly_transformer:
+      task_type: acoustic_time_frequency_anomaly
+      runtime: onnxruntime
+    ultrasonic_pd_detector:
+      task_type: acoustic_time_frequency_anomaly
+      runtime: onnxruntime

@@ -1,0 +1,67 @@
+runtime_mode: standalone
+fusion_strategy: hybrid
+max_history_length: 100
+alarm_threshold: 3
+
+modalities:
+  - visual
+  - thermal
+  - acoustic
+  - gas
+  - hyperspectral
+
+modality_weights:
+  visual: 0.25
+  thermal: 0.15
+  acoustic: 0.20
+  gas: 0.20
+  hyperspectral: 0.20
+
+thresholds:
+  warning_confidence: 0.55
+  abnormal_confidence: 0.70
+  critical_confidence: 0.85
+  consensus_min_modalities: 2
+  conflict_severity_gap: 2
+  missing_modality_penalty: 0.03
+  conflict_confidence_penalty: 0.10
+  default_missing_confidence: 0.50
+
+evidence:
+  preserve_source_plugin_id: true
+  preserve_evidence_path: true
+  include_degradation_reasons: true
+  evidence_chain_schema:
+    - modality
+    - label
+    - confidence
+    - severity
+    - value
+    - evidence_path
+    - source_plugin_id
+    - component_id
+    - timestamp
+
+fallback:
+  missing_modality_policy: degrade
+  missing_field_policy: default_with_reason
+  enhanced_engine_failure: rule_fusion
+  output_on_conflict: keep_result_with_conflict_status
+
+upgrade_placeholders:
+  bayesian_fusion:
+    status: placeholder
+    interface: fuse_bayesian(observations, priors=None)
+    notes: Reserved for Bayesian posterior fault inference.
+  attention_fusion:
+    status: placeholder
+    interface: fuse_attention(observations, embeddings=None)
+    notes: Reserved for learned cross-modal attention.
+  temporal_fusion:
+    status: placeholder
+    interface: fuse_temporal(observations, history_window=None)
+    notes: Reserved for time-window and trend-aware fusion.
+  evidence_chain_enhancement:
+    status: placeholder
+    interface: enhance_evidence_chain(observations, context)
+    notes: Reserved for richer source trace and root-cause graph links.

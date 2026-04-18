@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 import logging
+import os
 import time
 import json
 from pathlib import Path
@@ -142,81 +143,36 @@ class AlertManager:
 
 
 class RepelController:
-    """驱鸟设备控制器"""
+    """驱鸟设备控制器（生产禁用）。
+
+    bird_monitoring 当前只允许输出 deterrent_suggestion，不允许在检测器内
+    直接访问 HTTP/Modbus/GPIO 等物理设备控制通道。
+    """
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.enabled = config.get("repel_enabled", True)
+        self.enabled = False
         self._devices: Dict[str, Dict] = {}
         self._command_queue: deque = deque(maxlen=100)
         self._last_repel_time: Dict[str, float] = {}
         self._min_interval_s = config.get("repel_min_interval_s", 5.0)
 
-        # 加载设备配置
         self._load_devices(config.get("devices", []))
 
     def _load_devices(self, devices_config: List[Dict]) -> None:
-        """加载驱鸟设备"""
-        for dev in devices_config:
-            device_id = dev.get("id", f"repel_{len(self._devices)}")
-            self._devices[device_id] = {
-                "type": dev.get("type", "sound"),  # sound, light, laser, ultrasonic
-                "ip": dev.get("ip"),
-                "port": dev.get("port", 8080),
-                "protocol": dev.get("protocol", "http"),
-                "enabled": dev.get("enabled", True),
-                "coverage_angle": dev.get("coverage_angle", 60),
-                "direction": dev.get("direction", 0)
-            }
-            logger.info(f"驱鸟设备已加载: {device_id} ({dev.get('type')})")
+        """忽略驱鸟设备配置，保持生产链无硬件副作用。"""
+        if devices_config:
+            logger.warning("驱鸟设备配置已忽略；当前插件仅输出驱离建议")
 
     def trigger_repel(self, detection: BirdDetection,
                       intensity: int = 50) -> Optional[RepelCommand]:
-        """触发驱鸟"""
-        if not self.enabled:
-            return None
-
-        # 选择最佳设备
-        best_device = self._select_device(detection)
-        if not best_device:
-            return None
-
-        device_id, device = best_device
-
-        # 检查间隔
-        now = time.time()
-        if device_id in self._last_repel_time:
-            if now - self._last_repel_time[device_id] < self._min_interval_s:
-                return None
-
-        # 根据威胁等级调整强度
-        if detection.threat_level == ThreatLevel.CRITICAL:
-            intensity = 100
-        elif detection.threat_level == ThreatLevel.HIGH:
-            intensity = 80
-        elif detection.threat_level == ThreatLevel.MEDIUM:
-            intensity = 60
-
-        # 创建命令
-        command = RepelCommand(
-            device_id=device_id,
-            action=device["type"],
-            intensity=intensity,
-            duration_s=3.0,
-            target_direction_deg=self._calculate_direction(detection, device),
-            reason=f"{detection.class_name} detected at {detection.distance_m:.1f}m",
-            timestamp=now
+        """硬件驱离已阻断；调用方应消费 plugin metadata 中的建议。"""
+        logger.info(
+            "忽略驱鸟硬件触发请求: track_id=%s intensity=%s",
+            getattr(detection, "track_id", None),
+            intensity,
         )
-
-        # 执行命令
-        self._execute_command(command, device)
-        self._last_repel_time[device_id] = now
-        self._command_queue.append(command)
-
-        logger.info(f"驱鸟触发: {device_id} -> {detection.class_name}, "
-                   f"强度={intensity}, 方向={command.target_direction_deg:.1f}°")
-
-        return command
+        return None
 
     def _select_device(self, detection: BirdDetection) -> Optional[Tuple[str, Dict]]:
         """选择最佳驱鸟设备"""
@@ -250,46 +206,9 @@ class RepelController:
         return target_angle - device["direction"]
 
     def _execute_command(self, command: RepelCommand, device: Dict) -> bool:
-        """执行驱鸟命令"""
-        # 这里集成实际的设备控制协议
-        protocol = device.get("protocol", "http")
-        ip = device.get("ip")
-        port = device.get("port", 8080)
-
-        if not ip:
-            logger.debug(f"设备 {command.device_id} 无IP配置，模拟执行")
-            return True
-
-        try:
-            if protocol == "http":
-                # HTTP REST API控制
-                import urllib.request
-                import urllib.parse
-
-                url = f"http://{ip}:{port}/api/repel"
-                data = json.dumps({
-                    "action": command.action,
-                    "intensity": command.intensity,
-                    "duration": command.duration_s,
-                    "direction": command.target_direction_deg
-                }).encode()
-
-                req = urllib.request.Request(url, data=data,
-                                             headers={"Content-Type": "application/json"},
-                                             method="POST")
-                urllib.request.urlopen(req, timeout=2.0)
-                return True
-
-            elif protocol == "modbus":
-                # Modbus控制 - 需要pymodbus
-                logger.info(f"Modbus控制: {ip}:{port}")
-                return True
-
-        except Exception as e:
-            logger.warning(f"驱鸟命令执行失败: {e}")
-            return False
-
-        return True
+        """禁止执行物理设备命令。"""
+        logger.warning("驱鸟硬件命令已阻断: device_id=%s", command.device_id)
+        return False
 
     def get_command_history(self, count: int = 10) -> List[RepelCommand]:
         """获取命令历史"""
@@ -327,6 +246,19 @@ class BirdDetector:
         self.config = config
         self.model = None
         self.session = None
+        self.model_path_configured: Optional[str] = None
+        self.model_path_resolved: Optional[str] = None
+        self.model_file_exists = False
+        self.real_model_loaded = False
+        self.onnx_session_ready = False
+        self.model_load_error: Optional[str] = None
+        # real_dl preflight 结果；默认未执行
+        self._preflight_report: Dict[str, Any] = {
+            "performed": False,
+            "passed": False,
+            "checks": {},
+            "issues": [],
+        }
         
         # 推理参数
         model_config = config.get("model", {})
@@ -350,25 +282,138 @@ class BirdDetector:
     def _load_model(self, model_path: Optional[str] = None):
         """加载ONNX模型"""
         if model_path is None:
+            configured_model_path = Path("models/bird_yolov8n.onnx")
             model_path = Path(__file__).parent / "models" / "bird_yolov8n.onnx"
         else:
-            model_path = Path(model_path)
+            configured_model_path = Path(model_path)
+            model_path = (
+                configured_model_path
+                if configured_model_path.is_absolute()
+                else Path(__file__).parent / configured_model_path
+            )
+
+        self.model_path_configured = str(configured_model_path)
+        self.model_path_resolved = str(model_path.resolve(strict=False))
+        self.model_file_exists = model_path.exists()
         
-        if not model_path.exists():
-            print(f"[BirdDetector] 模型文件不存在: {model_path}")
-            print(f"[BirdDetector] 使用模拟检测模式")
+        if not self.model_file_exists:
+            logger.info(f"[BirdDetector] 模型文件不存在: {model_path}, 使用模拟检测模式")
             return
-        
+
         if ort is None:
-            print(f"[BirdDetector] onnxruntime未安装，使用模拟模式")
+            self.model_load_error = "onnxruntime_unavailable"
+            logger.info("[BirdDetector] onnxruntime未安装，使用模拟模式")
             return
-        
+
         try:
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if self.device == 'cuda' else ['CPUExecutionProvider']
             self.session = ort.InferenceSession(str(model_path), providers=providers)
-            print(f"[BirdDetector] 模型加载成功: {model_path}")
+            self.onnx_session_ready = self.session is not None
+            logger.info(f"[BirdDetector] 模型加载成功: {model_path}")
         except Exception as e:
-            print(f"[BirdDetector] 模型加载失败: {e}")
+            self.model_load_error = str(e)
+            logger.warning(f"[BirdDetector] 模型加载失败: {e}")
+            self.session = None
+            self.onnx_session_ready = False
+            return
+
+        # real_dl preflight: 只有模型 session 就绪后才有意义
+        self._preflight_report = self._preflight_onnx()
+        if self._preflight_report.get("passed"):
+            self.real_model_loaded = True
+            logger.info("[BirdDetector] real_dl preflight 通过")
+        else:
+            # preflight 失败 → 回落 simulation；不销毁 session 以便 healthcheck 暴露原因
+            issues = self._preflight_report.get("issues", [])
+            self.real_model_loaded = False
+            self.model_load_error = (
+                self.model_load_error
+                or f"preflight_failed:{','.join(issues)}"
+            )
+            logger.warning(
+                "[BirdDetector] real_dl preflight 未通过，回落 simulation: %s", issues
+            )
+            self.session = None
+            self.onnx_session_ready = False
+
+    def _preflight_onnx(self) -> Dict[str, Any]:
+        """对已加载的 ONNX session 做结构化校验。
+
+        校验项:
+        - input 张量数量 / rank / 尺寸（与 config.model.input_size 对齐）
+        - output 张量数量 / channel 数（与 CLASSES 对齐，YOLOv8 格式 = 4+num_classes）
+        - class map 大小（默认 `CLASSES` 至少 8 个条目才能支撑现有标签映射）
+
+        返回结构化报告，不抛异常。
+        """
+        report: Dict[str, Any] = {
+            "performed": False,
+            "passed": False,
+            "checks": {},
+            "issues": [],
+        }
+        if self.session is None:
+            report["issues"].append("session_not_ready")
+            return report
+
+        report["performed"] = True
+        try:
+            inputs = self.session.get_inputs()
+            outputs = self.session.get_outputs()
+            report["checks"]["input_count"] = len(inputs)
+            report["checks"]["output_count"] = len(outputs)
+
+            if not inputs:
+                report["issues"].append("no_input_tensor")
+            else:
+                input_shape = list(inputs[0].shape)
+                report["checks"]["input_shape"] = input_shape
+                if len(input_shape) != 4:
+                    report["issues"].append(
+                        f"unexpected_input_rank:{len(input_shape)}"
+                    )
+                else:
+                    h_dim, w_dim = input_shape[2], input_shape[3]
+                    cfg_h, cfg_w = self.input_size[0], self.input_size[1]
+                    if isinstance(h_dim, int) and h_dim > 0 and h_dim != cfg_h:
+                        report["issues"].append(
+                            f"input_h_mismatch:model={h_dim},config={cfg_h}"
+                        )
+                    if isinstance(w_dim, int) and w_dim > 0 and w_dim != cfg_w:
+                        report["issues"].append(
+                            f"input_w_mismatch:model={w_dim},config={cfg_w}"
+                        )
+
+            if not outputs:
+                report["issues"].append("no_output_tensor")
+            else:
+                output_shape = list(outputs[0].shape)
+                report["checks"]["output_shape"] = output_shape
+                expected_channels = 4 + len(self.CLASSES)
+                report["checks"]["expected_channels"] = expected_channels
+                static_dims = [
+                    s for s in output_shape if isinstance(s, int) and s > 0
+                ]
+                channels_match = expected_channels in static_dims
+                report["checks"]["channels_match"] = channels_match
+                if static_dims and not channels_match:
+                    report["issues"].append(
+                        f"class_channel_mismatch:expected={expected_channels}"
+                        f",output_shape={output_shape}"
+                    )
+
+            report["checks"]["class_map_size"] = len(self.CLASSES)
+            report["checks"]["class_map"] = list(self.CLASSES)
+            if len(self.CLASSES) < 8:
+                report["issues"].append(
+                    f"class_map_too_small:{len(self.CLASSES)}"
+                )
+
+            report["passed"] = not report["issues"]
+        except Exception as e:  # pragma: no cover - defensive
+            report["issues"].append(f"preflight_exception:{e}")
+            report["passed"] = False
+        return report
     
     def detect(self, image: np.ndarray) -> List[Dict[str, Any]]:
         """
@@ -564,453 +609,108 @@ class BirdDetector:
         
         return detections
     
+    def assess_image_quality(self, image: np.ndarray) -> Dict[str, Any]:
+        """评估输入图像质量，返回结构化质量报告"""
+        h, w = image.shape[:2]
+        quality = {
+            "resolution": {"width": w, "height": h},
+            "is_valid": True,
+            "issues": [],
+            "clarity_score": 1.0,
+            "brightness_score": 1.0,
+            "overall_score": 1.0,
+        }
+
+        # 尺寸检查
+        min_dim = self.config.get("quality", {}).get("min_dimension", 64)
+        if w < min_dim or h < min_dim:
+            quality["issues"].append(f"图像尺寸过小({w}x{h})，最小要求{min_dim}px")
+            quality["is_valid"] = False
+
+        # 亮度检查（灰度均值）
+        if cv2 is not None:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            brightness = float(np.mean(gray))
+            quality["brightness_score"] = min(1.0, brightness / 128.0) if brightness < 128 else min(1.0, (255 - brightness) / 64.0)
+            if brightness < 30:
+                quality["issues"].append(f"图像过暗(亮度={brightness:.0f})")
+            elif brightness > 240:
+                quality["issues"].append(f"图像过曝(亮度={brightness:.0f})")
+
+            # 清晰度检查（拉普拉斯方差）
+            laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+            clarity_threshold = self.config.get("quality", {}).get("clarity_threshold", 50.0)
+            quality["clarity_score"] = min(1.0, laplacian_var / (clarity_threshold * 2))
+            if laplacian_var < clarity_threshold:
+                quality["issues"].append(f"图像模糊(清晰度={laplacian_var:.1f})")
+        else:
+            quality["issues"].append("cv2不可用，跳过质量评估")
+
+        quality["overall_score"] = (quality["clarity_score"] + quality["brightness_score"]) / 2
+        return quality
+
     def _simulate_detection(self, image: np.ndarray) -> List[Dict]:
-        """模拟检测（用于测试）"""
-        # 不产生模拟数据，返回空列表
+        """模拟检测 — 无真实模型时返回空列表，不产生虚假检测"""
         return []
-    
+
+    @property
+    def runtime_mode(self) -> str:
+        """返回当前运行模式"""
+        if self.session is not None:
+            return "real_dl"
+        return "simulation"
+
+    def get_runtime_status(self) -> Dict[str, Any]:
+        """返回真实运行状态快照，供 plugin.healthcheck 暴露。"""
+        return {
+            "runtime_mode": self.runtime_mode,
+            "model_path_configured": self.model_path_configured,
+            "model_path_resolved": self.model_path_resolved,
+            "model_file_exists": self.model_file_exists,
+            "real_model_loaded": self.real_model_loaded,
+            "onnx_session_ready": self.onnx_session_ready,
+            "fallback_enabled": False,
+            "simulation_enabled": self.runtime_mode == "simulation",
+            "model_load_error": self.model_load_error,
+            "preflight": dict(self._preflight_report),
+        }
+
     def cleanup(self):
         """清理资源"""
         self._tracks.clear()
         self.session = None
+        self.real_model_loaded = False
+        self.onnx_session_ready = False
 
 
 class BirdDetectorEnhanced(BirdDetector):
+    """Opt-in shim: 实体实现已迁至 `experimental/enhanced_detector.py`。
+
+    默认不加载。如需启用，必须显式设置环境变量
+    `BIRD_ENABLE_ENHANCED_DETECTOR=1`。启用后实例化时会委托给
+    `plugins.bird_monitoring.experimental.enhanced_detector.EnhancedBirdDetector`。
+
+    约束:
+    - `plugin.py` 的生产主链仍只加载 `BirdDetector`，不会自动接入增强检测器。
+    - 该 shim 仅用于保持旧 import 路径可用；新代码请直接从 experimental/ 导入。
     """
-    增强版鸟类检测器 V2.0
 
-    工程级功能:
-    - 多尺度检测与多物种分类
-    - 3D距离估计与卡尔曼滤波跟踪
-    - 飞行轨迹预测
-    - 威胁等级评估
-    - 智能告警系统
-    - 声光驱鸟设备集成
-    """
+    _OPT_IN_ENV = "BIRD_ENABLE_ENHANCED_DETECTOR"
 
-    # 危险区域定义 (归一化坐标)
-    DEFAULT_DANGER_ZONES = [
-        {"name": "transmission_line_1", "x": 0.0, "y": 0.3, "w": 1.0, "h": 0.1},
-        {"name": "transmission_line_2", "x": 0.0, "y": 0.5, "w": 1.0, "h": 0.1},
-        {"name": "insulator_area", "x": 0.4, "y": 0.2, "w": 0.2, "h": 0.6},
-    ]
-
-    # 物种危险系数 (某些鸟类更易造成问题)
-    SPECIES_RISK_FACTOR = {
-        "crow": 1.5,      # 乌鸦 - 聪明，喜欢啄食
-        "magpie": 1.3,    # 喜鹊 - 筑巢行为
-        "eagle": 1.4,     # 老鹰 - 大型，休息时间长
-        "heron": 1.2,     # 苍鹭 - 大型
-        "sparrow": 0.8,   # 麻雀 - 小型，危害较小
-        "swallow": 0.7,   # 燕子 - 快速飞过
-        "egret": 1.1,     # 白鹭
-        "dove": 0.9,      # 斑鸠
-        "nest": 2.0,      # 鸟巢 - 需要立即处理
-        "bird_generic": 1.0
-    }
-
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
-
-        # 3D估计参数
-        camera_config = config.get("camera", {})
-        self.camera_height_m = camera_config.get("height_m", 15.0)
-        self.camera_fov_deg = camera_config.get("fov_deg", 60.0)
-        self.reference_bird_size_m = 0.3  # 参考鸟类尺寸
-
-        # 危险区域
-        self.danger_zones = config.get("danger_zones", self.DEFAULT_DANGER_ZONES)
-
-        # 威胁评估参数
-        threat_config = config.get("threat", {})
-        self.distance_thresholds = {
-            ThreatLevel.CRITICAL: threat_config.get("critical_distance_m", 3.0),
-            ThreatLevel.HIGH: threat_config.get("high_distance_m", 8.0),
-            ThreatLevel.MEDIUM: threat_config.get("medium_distance_m", 15.0),
-            ThreatLevel.LOW: threat_config.get("low_distance_m", 30.0),
-        }
-        self.perch_time_threshold_s = threat_config.get("perch_time_threshold_s", 10.0)
-
-        # 轨迹历史
-        self._trajectory_history: Dict[int, List[Dict]] = {}
-        self._max_trajectory_length = 30
-
-        # 区域停留时间
-        self._zone_entry_time: Dict[int, float] = {}
-
-        # 告警管理器
-        self.alert_manager = AlertManager(config.get("alert", {}))
-
-        # 驱鸟控制器
-        self.repel_controller = RepelController(config.get("repel", {}))
-
-        # 统计信息
-        self._stats = {
-            "total_detections": 0,
-            "high_threat_count": 0,
-            "repel_triggered": 0,
-            "alerts_sent": 0
-        }
-
-        logger.info("增强版鸟类检测器 V2.0 初始化完成")
-
-    def detect(self, image: np.ndarray) -> List[BirdDetection]:
-        """
-        增强检测 - 完整检测流程
-
-        Args:
-            image: BGR格式图像
-
-        Returns:
-            BirdDetection列表
-        """
-        # 基础检测
-        raw_detections = super().detect(image)
-        current_time = time.time()
-        image_size = image.shape[:2]
-
-        # 转换为增强检测结果
-        enhanced_detections: List[BirdDetection] = []
-
-        for det in raw_detections:
-            # 估计3D距离
-            distance = self._estimate_distance(det, image_size)
-
-            # 更新轨迹
-            self._update_trajectory(det)
-
-            # 估计速度和航向
-            speed, heading = self._estimate_velocity(det["track_id"])
-
-            # 判断行为状态
-            behavior = self._determine_behavior(det, distance)
-
-            # 计算区域停留时间
-            time_in_zone = self._update_zone_time(det["track_id"], det["bbox"], current_time)
-
-            # 评估威胁等级
-            threat_level = self._assess_threat(det, distance, behavior, time_in_zone)
-
-            # 创建增强检测结果
-            bbox = det["bbox"]
-            h, w = image_size
-
-            detection = BirdDetection(
-                track_id=det["track_id"],
-                class_id=det["class_id"],
-                class_name=det["class_name"],
-                confidence=det["confidence"],
-                bbox=bbox,
-                bbox_pixel={
-                    "x": int(bbox["x"] * w),
-                    "y": int(bbox["y"] * h),
-                    "width": int(bbox["width"] * w),
-                    "height": int(bbox["height"] * h)
-                },
-                distance_m=distance,
-                behavior=behavior,
-                threat_level=threat_level,
-                speed_ms=speed,
-                heading_deg=heading,
-                time_in_zone_s=time_in_zone,
-                timestamp=current_time
+    def __new__(cls, config: Dict[str, Any]):
+        if os.environ.get(cls._OPT_IN_ENV) != "1":
+            raise RuntimeError(
+                "BirdDetectorEnhanced 已迁至 experimental/enhanced_detector.py；"
+                "默认禁用。如需启用，请设置环境变量 "
+                f"{cls._OPT_IN_ENV}=1 或直接从 "
+                "plugins.bird_monitoring.experimental.enhanced_detector 导入 "
+                "EnhancedBirdDetector。"
             )
-
-            enhanced_detections.append(detection)
-            self._stats["total_detections"] += 1
-
-            # 处理高威胁
-            if threat_level.value >= ThreatLevel.HIGH.value:
-                self._handle_high_threat(detection)
-
-        return enhanced_detections
-
-    def detect_with_response(self, image: np.ndarray) -> Dict[str, Any]:
-        """检测并返回完整响应（包含告警和驱鸟动作）"""
-        detections = self.detect(image)
-
-        return {
-            "timestamp": time.time(),
-            "detections": [self._detection_to_dict(d) for d in detections],
-            "threat_summary": self._get_threat_summary(detections),
-            "recent_alerts": self.alert_manager.get_recent_alerts(5),
-            "recent_repel_commands": [
-                {"device": c.device_id, "action": c.action, "intensity": c.intensity}
-                for c in self.repel_controller.get_command_history(5)
-            ],
-            "stats": self._stats.copy()
-        }
-
-    def _detection_to_dict(self, detection: BirdDetection) -> Dict:
-        """转换检测结果为字典"""
-        return {
-            "track_id": detection.track_id,
-            "class_id": detection.class_id,
-            "class_name": detection.class_name,
-            "confidence": detection.confidence,
-            "bbox": detection.bbox,
-            "bbox_pixel": detection.bbox_pixel,
-            "distance_m": detection.distance_m,
-            "behavior": detection.behavior.value,
-            "threat_level": detection.threat_level.name,
-            "speed_ms": detection.speed_ms,
-            "heading_deg": detection.heading_deg,
-            "time_in_zone_s": detection.time_in_zone_s
-        }
-
-    def _get_threat_summary(self, detections: List[BirdDetection]) -> Dict:
-        """获取威胁摘要"""
-        summary = {
-            ThreatLevel.NONE.name: 0,
-            ThreatLevel.LOW.name: 0,
-            ThreatLevel.MEDIUM.name: 0,
-            ThreatLevel.HIGH.name: 0,
-            ThreatLevel.CRITICAL.name: 0,
-        }
-        for det in detections:
-            summary[det.threat_level.name] += 1
-        summary["max_threat"] = max(
-            (det.threat_level for det in detections),
-            default=ThreatLevel.NONE
-        ).name
-        return summary
-
-    def _assess_threat(self, detection: Dict, distance: float,
-                       behavior: BirdBehavior, time_in_zone: float) -> ThreatLevel:
-        """评估威胁等级"""
-        # 基础威胁等级（基于距离）
-        base_level = ThreatLevel.NONE
-        for level in [ThreatLevel.CRITICAL, ThreatLevel.HIGH, ThreatLevel.MEDIUM, ThreatLevel.LOW]:
-            if distance <= self.distance_thresholds[level]:
-                base_level = level
-                break
-
-        # 物种风险系数
-        species = detection.get("class_name", "bird_generic")
-        risk_factor = self.SPECIES_RISK_FACTOR.get(species, 1.0)
-
-        # 行为调整
-        behavior_factor = 1.0
-        if behavior == BirdBehavior.NESTING:
-            behavior_factor = 2.0  # 筑巢最危险
-        elif behavior == BirdBehavior.PERCHED:
-            behavior_factor = 1.5
-        elif behavior == BirdBehavior.APPROACHING:
-            behavior_factor = 1.3
-
-        # 停留时间调整
-        time_factor = 1.0 + (time_in_zone / 60.0)  # 每分钟增加风险
-
-        # 综合评分
-        total_score = base_level.value * risk_factor * behavior_factor * time_factor
-
-        # 映射回威胁等级
-        if total_score >= ThreatLevel.CRITICAL.value * 1.5:
-            return ThreatLevel.CRITICAL
-        elif total_score >= ThreatLevel.HIGH.value * 1.3:
-            return ThreatLevel.HIGH
-        elif total_score >= ThreatLevel.MEDIUM.value * 1.2:
-            return ThreatLevel.MEDIUM
-        elif total_score >= ThreatLevel.LOW.value:
-            return ThreatLevel.LOW
-
-        return ThreatLevel.NONE
-
-    def _handle_high_threat(self, detection: BirdDetection) -> None:
-        """处理高威胁检测"""
-        self._stats["high_threat_count"] += 1
-
-        # 发送告警
-        if detection.threat_level == ThreatLevel.CRITICAL:
-            message = f"紧急！{detection.class_name}正在接触输电设备，距离{detection.distance_m:.1f}m"
-        elif detection.threat_level == ThreatLevel.HIGH:
-            if detection.behavior == BirdBehavior.NESTING:
-                message = f"警告：检测到{detection.class_name}筑巢行为"
-            elif detection.behavior == BirdBehavior.PERCHED:
-                message = f"警告：{detection.class_name}在危险区域停留{detection.time_in_zone_s:.0f}秒"
-            else:
-                message = f"警告：{detection.class_name}接近输电线，距离{detection.distance_m:.1f}m"
-
-        if self.alert_manager.send_alert(detection, message):
-            self._stats["alerts_sent"] += 1
-
-        # 触发驱鸟
-        if detection.threat_level.value >= ThreatLevel.HIGH.value:
-            command = self.repel_controller.trigger_repel(detection)
-            if command:
-                self._stats["repel_triggered"] += 1
-
-    def _determine_behavior(self, detection: Dict, distance: float) -> BirdBehavior:
-        """判断鸟类行为状态"""
-        track_id = detection["track_id"]
-        class_name = detection.get("class_name", "")
-
-        # 鸟巢特殊处理
-        if class_name == "nest":
-            return BirdBehavior.NESTING
-
-        # 检查轨迹历史
-        if track_id in self._trajectory_history:
-            history = self._trajectory_history[track_id]
-            if len(history) >= 5:
-                recent = history[-5:]
-                x_var = np.var([h["x"] for h in recent])
-                y_var = np.var([h["y"] for h in recent])
-
-                # 几乎不动 -> 栖息
-                if x_var < 0.0005 and y_var < 0.0005:
-                    return BirdBehavior.PERCHED
-
-                # 检查是否在离开
-                if len(history) >= 10:
-                    early = history[-10:-5]
-                    late = history[-5:]
-                    early_dist = np.mean([self._point_to_center_dist(p) for p in early])
-                    late_dist = np.mean([self._point_to_center_dist(p) for p in late])
-
-                    if late_dist > early_dist + 0.1:
-                        return BirdBehavior.LEAVING
-
-        # 检查是否接近
-        if distance < 15:
-            return BirdBehavior.APPROACHING
-
-        return BirdBehavior.FLYING
-
-    def _point_to_center_dist(self, point: Dict) -> float:
-        """计算点到画面中心的距离"""
-        return np.sqrt((point["x"] - 0.5) ** 2 + (point["y"] - 0.5) ** 2)
-
-    def _update_zone_time(self, track_id: int, bbox: Dict, current_time: float) -> float:
-        """更新危险区域停留时间"""
-        in_danger_zone = self._is_in_danger_zone(bbox)
-
-        if in_danger_zone:
-            if track_id not in self._zone_entry_time:
-                self._zone_entry_time[track_id] = current_time
-            return current_time - self._zone_entry_time[track_id]
-        else:
-            if track_id in self._zone_entry_time:
-                del self._zone_entry_time[track_id]
-            return 0.0
-
-    def _is_in_danger_zone(self, bbox: Dict) -> bool:
-        """检查是否在危险区域"""
-        cx = bbox["x"] + bbox["width"] / 2
-        cy = bbox["y"] + bbox["height"] / 2
-
-        for zone in self.danger_zones:
-            if (zone["x"] <= cx <= zone["x"] + zone["w"] and
-                zone["y"] <= cy <= zone["y"] + zone["h"]):
-                return True
-        return False
-
-    def detect(self, image: np.ndarray) -> List[Dict[str, Any]]:
-        """增强检测 - 兼容原始接口"""
-        raw_detections = BirdDetector.detect(self, image)
-        current_time = time.time()
-        image_size = image.shape[:2]
-
-        # 增强每个检测结果
-        for det in raw_detections:
-            det["distance"] = self._estimate_distance(det, image_size)
-            self._update_trajectory(det)
-            det["speed"], det["heading"] = self._estimate_velocity(det["track_id"])
-            behavior = self._determine_behavior(det, det["distance"])
-            det["status"] = behavior.value
-            time_in_zone = self._update_zone_time(det["track_id"], det["bbox"], current_time)
-            det["time_in_zone"] = time_in_zone
-            threat = self._assess_threat(det, det["distance"], behavior, time_in_zone)
-            det["threat_level"] = threat.name
-
-        return raw_detections
-    
-    def _estimate_distance(self, detection: Dict, image_size: Tuple[int, int]) -> float:
-        """估计鸟类与输电线的距离"""
-        bbox = detection["bbox"]
-        
-        # 基于边界框大小估计距离
-        box_height = bbox["height"] * image_size[0]
-        
-        if box_height < 1:
-            return 50.0  # 太小，认为很远
-        
-        # 简单的透视距离估计
-        # 假设鸟类平均高度约0.3米
-        focal_length = image_size[1] / (2 * np.tan(np.radians(self.camera_fov_deg / 2)))
-        distance = (self.reference_bird_size_m * focal_length) / box_height
-        
-        return float(np.clip(distance, 1.0, 100.0))
-    
-    def _determine_status(self, detection: Dict) -> str:
-        """判断鸟类状态"""
-        track_id = detection["track_id"]
-        
-        if track_id in self._trajectory_history:
-            history = self._trajectory_history[track_id]
-            if len(history) >= 5:
-                # 检查位置变化
-                recent = history[-5:]
-                x_var = np.var([h["x"] for h in recent])
-                y_var = np.var([h["y"] for h in recent])
-                
-                if x_var < 0.001 and y_var < 0.001:
-                    return "perched"  # 停留
-        
-        # 检查是否接近
-        if detection.get("distance", 50) < 10:
-            return "approaching"
-        
-        return "flying"
-    
-    def _update_trajectory(self, detection: Dict):
-        """更新轨迹历史"""
-        track_id = detection["track_id"]
-        bbox = detection["bbox"]
-        
-        point = {
-            "x": bbox["x"] + bbox["width"] / 2,
-            "y": bbox["y"] + bbox["height"] / 2,
-            "frame": self._frame_count,
-        }
-        
-        if track_id not in self._trajectory_history:
-            self._trajectory_history[track_id] = []
-        
-        self._trajectory_history[track_id].append(point)
-        
-        # 限制长度
-        if len(self._trajectory_history[track_id]) > self._max_trajectory_length:
-            self._trajectory_history[track_id].pop(0)
-    
-    def _estimate_velocity(self, track_id: int) -> Tuple[float, float]:
-        """估计速度和航向"""
-        if track_id not in self._trajectory_history:
-            return 0.0, 0.0
-        
-        history = self._trajectory_history[track_id]
-        if len(history) < 2:
-            return 0.0, 0.0
-        
-        # 使用最近两个点计算
-        p1, p2 = history[-2], history[-1]
-        dx = p2["x"] - p1["x"]
-        dy = p2["y"] - p1["y"]
-        dt = p2["frame"] - p1["frame"]
-        
-        if dt == 0:
-            return 0.0, 0.0
-        
-        # 速度（像素/帧 -> 米/秒，假设30fps）
-        speed_px = np.sqrt(dx**2 + dy**2) / dt
-        speed_ms = speed_px * 30 * 0.1  # 简化转换
-        
-        # 航向
-        heading = np.degrees(np.arctan2(dy, dx))
-        
-        return float(speed_ms), float(heading)
-    
-    def cleanup(self):
-        """清理资源"""
-        super().cleanup()
-        self._trajectory_history.clear()
+        from plugins.bird_monitoring.experimental.enhanced_detector import (
+            EnhancedBirdDetector,
+        )
+        logger.warning(
+            "[BirdDetectorEnhanced] 正在通过 opt-in shim 加载 experimental 实现；"
+            "该路径不属于生产主链。"
+        )
+        return EnhancedBirdDetector(config)

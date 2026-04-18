@@ -1,0 +1,84 @@
+# 母线巡检 - 训练配置模板
+plugin_id: busbar_inspection
+legacy_alias: busbar
+display_name: 母线巡检
+
+# 模型配置
+model:
+  family: yolov8
+  backbone: yolov8n
+  pretrained: yolov8n.pt
+  input_modality: rgb
+  image_size: 640
+
+# 任务类型
+task:
+  primary: detection
+  label_schema: detection_bbox
+  classes:
+    insulator_defect:
+      - insulator_normal
+      - insulator_damaged
+      - insulator_flashover
+    fitting_defect:
+      - fitting_normal
+      - fitting_loose
+      - fitting_corroded
+    wire_defect:
+      - wire_normal
+      - wire_broken
+      - wire_displaced
+    foreign_object:
+      - bird_nest
+      - debris
+      - kite
+
+# 训练超参
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 3
+  weight_decay: 0.0005
+  early_stopping_patience: 15
+
+# 数据增强
+augmentation:
+  mosaic: 1.0
+  mixup: 0.1
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  fliplr: 0.5
+  scale: 0.5
+  # 小目标增强
+  copy_paste: 0.1
+
+# 评估指标
+evaluation:
+  metrics:
+    - mAP@0.5
+    - mAP@0.5:0.95
+    - recall
+    - precision
+  qualification:
+    mAP@0.5: 0.65
+    recall: 0.70
+
+# 导出
+export:
+  formats:
+    - onnx
+    - tensorrt
+  opset_version: 11
+  dynamic_batch: true
+
+# 适用电压等级
+voltage_levels:
+  - UHV_1000kV_AC
+  - EHV_500kV
+  - HV_220kV
+  - HV_110kV
+  - MV_35kV

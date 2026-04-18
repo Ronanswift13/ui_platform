@@ -1,171 +1,248 @@
 {
-    "id": "device_monitoring",
-    "name": "设备状态监测插件",
-    "version": "1.0.0",
-    "description": "实时监测室内所有设备运行状态与健康指标，支持SNMP/Modbus协议接入、健康指数计算、故障预测、工单自动生成与统计报表导出",
-    "author": "室内监测组",
-    "category": "indoor",
-    "enabled": true,
-
-    "entrypoint": "plugin.py",
-    "plugin_class": "DeviceMonitoringPlugin",
-
-    "capabilities": [
-        "device_status_monitoring",
-        "health_index_calculation",
-        "fault_prediction",
-        "anomaly_detection",
-        "maintenance_scheduling",
-        "statistics_reporting",
-        "protocol_integration"
-    ],
-
-    "device_types": [
-        "camera",
-        "lidar",
-        "temperature_sensor",
-        "smoke_sensor",
-        "gas_sensor",
-        "relay",
-        "alarm_device",
-        "network_switch",
-        "ups",
-        "plc",
-        "edge_computing_node"
-    ],
-
-    "dependencies": [
-        "numpy"
-    ],
-
-    "min_platform_version": "1.0.0",
-
-    "models_required": [
-        {
-            "model_id": "device_anomaly_autoencoder",
-            "model_path": "models/device/anomaly_autoencoder.onnx",
-            "description": "基于自编码器的设备异常检测模型",
-            "required": false
-        },
-        {
-            "model_id": "failure_predictor",
-            "model_path": "models/device/failure_predictor_lstm.onnx",
-            "description": "LSTM设备故障预测模型",
-            "required": false
-        }
-    ],
-
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "device_readings": {
-                "type": "array",
-                "description": "设备状态读数列表",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "device_id": {"type": "string"},
-                        "device_type": {"type": "string"},
-                        "device_name": {"type": "string"},
-                        "metrics": {
-                            "type": "object",
-                            "properties": {
-                                "cpu_temp": {"type": "number"},
-                                "cpu_usage": {"type": "number"},
-                                "memory_usage": {"type": "number"},
-                                "disk_usage": {"type": "number"},
-                                "network_quality": {"type": "number"},
-                                "uptime_hours": {"type": "number"},
-                                "error_count": {"type": "integer"},
-                                "last_heartbeat": {"type": "number"}
-                            }
-                        },
-                        "status": {"type": "string", "enum": ["online", "standby", "warning", "error", "offline"]}
-                    }
-                }
-            }
-        },
-        "required": ["device_readings"]
+  "id": "device_monitoring",
+  "name": "设备状态监测插件",
+  "version": "1.0.0",
+  "description": "实时监测设备运行状态与健康指标，支持规则健康评估、故障预测占位和标准告警输出",
+  "author": "室内监测组",
+  "category": "indoor",
+  "enabled": true,
+  "entrypoint": "plugin.py",
+  "plugin_class": "DeviceMonitoringPlugin",
+  "config_file": "configs/default.yaml",
+  "capabilities": [
+    "device_status_monitoring",
+    "health_index_calculation",
+    "fault_prediction",
+    "anomaly_detection",
+    "protocol_integration"
+  ],
+  "domain_capabilities": [
+    "sensor_input",
+    "time_series_monitoring",
+    "standard_alarm_output"
+  ],
+  "device_types": [
+    "camera",
+    "lidar",
+    "temperature_sensor",
+    "smoke_sensor",
+    "gas_sensor",
+    "relay",
+    "alarm_device",
+    "network_switch",
+    "ups",
+    "plc",
+    "edge_computing_node"
+  ],
+  "dependencies": [
+    "numpy"
+  ],
+  "min_platform_version": "1.0.0",
+  "models_required": [
+    {
+      "model_id": "device_anomaly_autoencoder",
+      "model_path": "models/device/anomaly_autoencoder.onnx",
+      "description": "基于自编码器的设备异常检测模型",
+      "required": false
     },
-
-    "output_schema": {
-        "type": "object",
-        "properties": {
-            "plugin_id": {"type": "string"},
-            "timestamp": {"type": "string"},
-            "success": {"type": "boolean"},
-            "status": {"type": "string"},
-            "devices": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "device_id": {"type": "string"},
-                        "device_name": {"type": "string"},
-                        "device_type": {"type": "string"},
-                        "status": {"type": "string"},
-                        "health_index": {"type": "number"},
-                        "anomaly_score": {"type": "number"},
-                        "predicted_failure": {"type": "object"},
-                        "recommendations": {"type": "array"}
-                    }
-                }
-            },
-            "summary": {"type": "object"},
-            "alarms": {"type": "array"},
-            "maintenance_tickets": {"type": "array"}
-        }
+    {
+      "model_id": "failure_predictor",
+      "model_path": "models/device/failure_predictor_lstm.onnx",
+      "description": "LSTM设备故障预测模型",
+      "required": false
     },
-
-    "config_schema": {
-        "type": "object",
-        "properties": {
-            "health_weights": {
-                "type": "object",
-                "description": "健康指数权重",
-                "properties": {
-                    "cpu_temp": {"type": "number", "default": 0.15},
-                    "cpu_usage": {"type": "number", "default": 0.15},
-                    "memory_usage": {"type": "number", "default": 0.10},
-                    "network_quality": {"type": "number", "default": 0.20},
-                    "error_rate": {"type": "number", "default": 0.20},
-                    "uptime": {"type": "number", "default": 0.20}
-                }
-            },
-            "thresholds": {
-                "type": "object",
-                "properties": {
-                    "health_warning": {"type": "number", "default": 70},
-                    "health_alarm": {"type": "number", "default": 50},
-                    "health_critical": {"type": "number", "default": 30},
-                    "heartbeat_timeout_sec": {"type": "number", "default": 60},
-                    "cpu_temp_warning": {"type": "number", "default": 70},
-                    "cpu_temp_alarm": {"type": "number", "default": 85}
-                }
-            },
-            "prediction": {
-                "type": "object",
-                "properties": {
-                    "enabled": {"type": "boolean", "default": true},
-                    "method": {"type": "string", "enum": ["statistical", "autoencoder", "lstm"], "default": "statistical"},
-                    "prediction_horizon_hours": {"type": "integer", "default": 168}
-                }
-            },
-            "maintenance": {
-                "type": "object",
-                "properties": {
-                    "auto_ticket": {"type": "boolean", "default": true},
-                    "notification_channels": {"type": "array", "default": ["ui", "email"]}
-                }
-            },
-            "protocols": {
-                "type": "object",
-                "properties": {
-                    "snmp_enabled": {"type": "boolean", "default": false},
-                    "modbus_enabled": {"type": "boolean", "default": false},
-                    "api_polling_interval_sec": {"type": "integer", "default": 30}
-                }
-            }
-        }
+    {
+      "model_id": "health_calibrator",
+      "model_path": "models/device/health_calibrator.onnx",
+      "description": "设备健康指数校准模型",
+      "required": false
     }
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "device_id": {
+        "type": "string"
+      },
+      "timestamp": {
+        "oneOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string",
+            "format": "date-time"
+          }
+        ]
+      },
+      "readings": {
+        "type": "array",
+        "description": "统一设备指标输入壳"
+      },
+      "device_readings": {
+        "type": "array",
+        "description": "兼容旧入口的设备状态读数列表"
+      },
+      "sampled_sequence": {
+        "type": "array",
+        "description": "设备采样序列"
+      },
+      "sensor_window": {
+        "type": "object",
+        "description": "窗口化设备指标输入"
+      },
+      "structured_timeseries": {
+        "type": "object",
+        "description": "结构化设备指标时序输入"
+      },
+      "protocol_ingested_data": {
+        "type": "object",
+        "description": "SNMP/Modbus/API 等协议采集后的设备数据"
+      },
+      "context": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "device_id"
+    ],
+    "anyOf": [
+      {
+        "required": [
+          "readings"
+        ]
+      },
+      {
+        "required": [
+          "device_readings"
+        ]
+      },
+      {
+        "required": [
+          "structured_timeseries"
+        ]
+      },
+      {
+        "required": [
+          "sensor_window"
+        ]
+      },
+      {
+        "required": [
+          "protocol_ingested_data"
+        ]
+      }
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "label": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "warning",
+          "abnormal",
+          "error"
+        ]
+      },
+      "value": {
+        "type": "object"
+      },
+      "confidence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "results": {
+        "type": "array"
+      },
+      "devices": {
+        "type": "array"
+      },
+      "summary": {
+        "type": "object"
+      },
+      "alarms": {
+        "type": "array"
+      },
+      "plugin_name": {
+        "type": "string"
+      },
+      "task_type": {
+        "type": "string"
+      },
+      "anomaly_events": {
+        "type": "array"
+      },
+      "abnormal_intervals": {
+        "type": "array"
+      },
+      "severity": {
+        "type": "string"
+      },
+      "reason_codes": {
+        "type": "array"
+      },
+      "recommended_actions": {
+        "type": "array"
+      },
+      "trend_diagnosis": {
+        "type": "object"
+      },
+      "evidence": {
+        "type": "array"
+      },
+      "review_required": {
+        "type": "boolean"
+      },
+      "model_info": {
+        "type": "object"
+      },
+      "placeholders": {
+        "type": "object"
+      },
+      "input_protocol": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "success",
+      "status",
+      "label",
+      "value",
+      "confidence",
+      "metadata",
+      "summary",
+      "anomaly_events",
+      "abnormal_intervals",
+      "trend_diagnosis",
+      "reason_codes",
+      "recommended_actions",
+      "evidence",
+      "model_info",
+      "placeholders"
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "required": [
+      "sampling",
+      "window",
+      "thresholds",
+      "runtime",
+      "model",
+      "alarm_rules",
+      "upgrade_placeholders"
+    ]
+  }
 }

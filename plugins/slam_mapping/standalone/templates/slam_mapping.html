@@ -1,325 +1,866 @@
 {% extends "base_standalone.html" %}
 
 {% block title %}SLAM Mapping - DarkBreaker{% endblock %}
-{% block navbar_title %}SLAM Mapping Dashboard{% endblock %}
+{% block navbar_title %}SLAM Mapping Sandbox{% endblock %}
 
 {% block extra_head %}
 <style>
-    .panel {
-        background-color: var(--panel-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 1rem;
+    :root {
+        --slam-bg: radial-gradient(circle at top left, rgba(32, 86, 156, 0.26), transparent 42%), linear-gradient(160deg, #07111d 0%, #0f1b2d 48%, #18283b 100%);
+        --slam-panel: rgba(9, 17, 27, 0.76);
+        --slam-border: rgba(123, 169, 216, 0.22);
+        --slam-accent: #65c8ff;
+        --slam-accent-strong: #43f0d5;
+        --slam-warning: #f9b562;
+        --slam-danger: #ff7c7c;
+        --slam-success: #56d486;
+        --slam-muted: #94a3b8;
+    }
+    .slam-shell {
+        padding: 1.25rem;
+        background: var(--slam-bg);
+        border-radius: 22px;
+        border: 1px solid rgba(101, 200, 255, 0.12);
+        box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28);
+    }
+    .slam-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+        gap: 1rem;
         margin-bottom: 1rem;
     }
-    .panel-title {
-        font-size: 0.85rem;
+    .slam-panel {
+        background: var(--slam-panel);
+        border: 1px solid var(--slam-border);
+        border-radius: 20px;
+        padding: 1rem 1.1rem;
+        backdrop-filter: blur(8px);
+    }
+    .slam-kicker {
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: var(--text-secondary);
+        color: var(--slam-accent);
+        margin-bottom: 0.55rem;
+    }
+    .slam-title {
+        font-size: clamp(1.45rem, 2vw, 2.3rem);
         margin-bottom: 0.75rem;
-        letter-spacing: 0.05em;
+        font-weight: 700;
+    }
+    .slam-summary {
+        color: #d6e2ef;
+        max-width: 62ch;
+        line-height: 1.65;
+        margin-bottom: 1rem;
+    }
+    .mode-row,
+    .toolbar-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        align-items: center;
+    }
+    .mode-row { margin-bottom: 0.75rem; }
+    .mode-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+    }
+    .mode-badge.mode-simulated {
+        background: rgba(67, 240, 213, 0.14);
+        color: var(--slam-accent-strong);
+        border: 1px solid rgba(67, 240, 213, 0.28);
+    }
+    .mode-badge.mode-real {
+        background: rgba(249, 181, 98, 0.16);
+        color: var(--slam-warning);
+        border: 1px solid rgba(249, 181, 98, 0.24);
+    }
+    .mode-btn,
+    .toolbar-btn {
+        border-radius: 999px;
+        border: 1px solid rgba(101, 200, 255, 0.22);
+        color: #e5eef8;
+        background: rgba(15, 23, 42, 0.7);
+        padding: 0.5rem 0.9rem;
+        font-size: 0.9rem;
+        transition: all 0.18s ease;
+    }
+    .mode-btn.active,
+    .toolbar-btn.primary {
+        background: linear-gradient(135deg, rgba(67, 240, 213, 0.18), rgba(101, 200, 255, 0.28));
+        border-color: rgba(67, 240, 213, 0.4);
+        color: white;
+    }
+    .mode-btn:hover,
+    .toolbar-btn:hover {
+        transform: translateY(-1px);
+        border-color: rgba(101, 200, 255, 0.38);
+    }
+    .toolbar-select {
+        min-width: 220px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.9);
+        color: #e5eef8;
+        border: 1px solid rgba(101, 200, 255, 0.18);
+    }
+    .isolation-card {
+        display: grid;
+        gap: 0.75rem;
+    }
+    .isolation-note {
+        color: #dbe8f5;
+        line-height: 1.65;
+        margin: 0;
+    }
+    .isolation-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.4rem 0.7rem;
+        border-radius: 14px;
+        background: rgba(101, 200, 255, 0.09);
+        color: #d7ebff;
+        font-size: 0.82rem;
+    }
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    .metric-card {
+        padding: 0.95rem;
+        border-radius: 18px;
+        background: rgba(6, 14, 24, 0.68);
+        border: 1px solid rgba(101, 200, 255, 0.12);
+    }
+    .metric-label {
+        color: var(--slam-muted);
+        font-size: 0.78rem;
+        margin-bottom: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
     }
     .metric-value {
         font-size: 1.8rem;
         font-weight: 700;
-        line-height: 1.2;
+        line-height: 1.1;
     }
-    .metric-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
+    .metric-hint {
+        font-size: 0.82rem;
+        color: #cfdeef;
+        margin-top: 0.3rem;
     }
-    .status-normal { color: var(--success); }
-    .status-warning { color: var(--warning); }
-    .status-alarm { color: var(--danger); }
-    .pointcloud-canvas {
-        width: 100%;
-        height: 360px;
-        background-color: #0a0e17;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
+    .main-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.95fr);
+        gap: 1rem;
+    }
+    .bottom-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    .panel-title {
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        justify-content: center;
-        position: relative;
+        gap: 0.75rem;
+        margin-bottom: 0.8rem;
     }
-    .pointcloud-canvas canvas {
+    .panel-title strong {
+        font-size: 1rem;
+        letter-spacing: 0.03em;
+    }
+    .panel-subtitle {
+        color: var(--slam-muted);
+        font-size: 0.83rem;
+    }
+    .canvas-shell {
+        background: linear-gradient(180deg, rgba(10, 17, 27, 0.96), rgba(14, 24, 36, 0.92));
+        border-radius: 18px;
+        border: 1px solid rgba(101, 200, 255, 0.1);
+        padding: 0.85rem;
+        min-height: 420px;
+    }
+    .canvas-shell.compact { min-height: 320px; }
+    .telemetry-canvas {
         width: 100%;
         height: 100%;
-        border-radius: 6px;
+        min-height: 360px;
+        border-radius: 14px;
+        background:
+            linear-gradient(90deg, rgba(101, 200, 255, 0.04) 1px, transparent 1px),
+            linear-gradient(rgba(101, 200, 255, 0.04) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(6, 13, 22, 0.96), rgba(5, 10, 18, 0.98));
+        background-size: 40px 40px, 40px 40px, auto;
     }
-    .pointcloud-placeholder {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
+    .status-list,
+    .device-list,
+    .subsidence-list,
+    .alert-list {
+        display: grid;
+        gap: 0.7rem;
+    }
+    .status-row,
+    .device-item,
+    .subsidence-item,
+    .alert-item {
+        border-radius: 16px;
+        padding: 0.8rem 0.9rem;
+        background: rgba(7, 13, 23, 0.72);
+        border: 1px solid rgba(101, 200, 255, 0.08);
+    }
+    .status-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: center;
+    }
+    .status-name {
+        color: var(--slam-muted);
+        font-size: 0.82rem;
+    }
+    .status-value {
+        font-weight: 600;
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    }
+    .device-item strong,
+    .subsidence-item strong,
+    .alert-item strong {
+        display: block;
+        margin-bottom: 0.2rem;
+    }
+    .device-meta,
+    .subsidence-meta,
+    .alert-meta,
+    .scene-detail {
+        color: #d5e2ef;
+        font-size: 0.86rem;
+        line-height: 1.55;
+    }
+    .scene-detail {
+        display: grid;
+        gap: 0.55rem;
+    }
+    .severity-ok { color: var(--slam-success); }
+    .severity-warn { color: var(--slam-warning); }
+    .severity-alert { color: var(--slam-danger); }
+    .empty-state {
+        border: 1px dashed rgba(101, 200, 255, 0.18);
+        border-radius: 16px;
+        padding: 1rem;
+        color: var(--slam-muted);
         text-align: center;
     }
-    .occupancy-grid {
-        width: 100%;
-        height: 280px;
-        background-color: #0a0e17;
-        border: 1px solid var(--border-color);
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    @media (max-width: 1200px) {
+        .slam-hero,
+        .main-grid,
+        .bottom-grid,
+        .metric-grid {
+            grid-template-columns: 1fr;
+        }
     }
-    .occupancy-grid canvas {
-        width: 100%;
-        height: 100%;
-        border-radius: 6px;
-    }
-    .pose-info {
-        font-family: 'Courier New', monospace;
-        font-size: 0.85rem;
-    }
-    .pose-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.3rem 0;
-        border-bottom: 1px solid var(--border-color);
-    }
-    .pose-row:last-child { border-bottom: none; }
-    .pose-label { color: var(--text-secondary); }
-    .pose-value { font-weight: 600; }
-    .device-list {
-        max-height: 280px;
-        overflow-y: auto;
-    }
-    .device-item {
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--border-color);
-        font-size: 0.85rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .device-item:last-child { border-bottom: none; }
-    .device-type-badge {
-        font-size: 0.7rem;
-        padding: 0.15rem 0.4rem;
-        border-radius: 4px;
-        background-color: rgba(59, 130, 246, 0.2);
-        color: #60a5fa;
-    }
-    .subsidence-list {
-        max-height: 240px;
-        overflow-y: auto;
-    }
-    .subsidence-item {
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--border-color);
-        font-size: 0.85rem;
-    }
-    .subsidence-item:last-child { border-bottom: none; }
-    .subsidence-value {
-        font-weight: 600;
-        font-family: 'Courier New', monospace;
-    }
-    .subsidence-ok { color: var(--success); }
-    .subsidence-warn { color: var(--warning); }
-    .subsidence-alert { color: var(--danger); }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row g-3 p-3">
-    <!-- Top Metrics Row -->
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Frames Processed</div>
-            <div class="metric-value" id="frame-count">0</div>
-            <div class="metric-label">Point cloud frames</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Registered Devices</div>
-            <div class="metric-value status-normal" id="device-count">0</div>
-            <div class="metric-label">Located in map</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Subsidence Points</div>
-            <div class="metric-value status-warning" id="subsidence-count">0</div>
-            <div class="metric-label">Monitoring stations</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Map Resolution</div>
-            <div class="metric-value" id="map-resolution">--</div>
-            <div class="metric-label">Meters per cell</div>
-        </div>
-    </div>
-
-    <!-- 3D Point Cloud Visualization -->
-    <div class="col-md-8">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-box me-1"></i>3D Point Cloud</div>
-            <div class="pointcloud-canvas" id="pointcloud-container">
-                <canvas id="pointcloud-canvas"></canvas>
-                <div class="pointcloud-placeholder" id="pointcloud-placeholder">
-                    <i class="bi bi-box" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
-                    Awaiting point cloud data...
-                </div>
+<div class="slam-shell">
+    <section class="slam-hero">
+        <div class="slam-panel">
+            <div class="slam-kicker">Standalone / SLAM Sandbox</div>
+            <div class="slam-title">变电站 SLAM 仿真沙盘与真实状态分离观测</div>
+            <p class="slam-summary">
+                当前独立页优先提供和本插件算法链路对齐的点云仿真模式，用独立实例做站区场景回放，方便先看建图、设备定位和沉降告警的直观性，再决定是否回到真实算法做修订。
+            </p>
+            <div class="mode-row">
+                <button class="mode-btn active" id="btn-mode-simulated" type="button">仿真调试模式</button>
+                <button class="mode-btn" id="btn-mode-real" type="button">真实监测模式</button>
+                <span class="mode-badge mode-simulated" id="runtime-mode-badge">仿真调试中</span>
+            </div>
+            <div class="toolbar-row">
+                <select id="scenario-select" class="form-select form-select-sm toolbar-select" aria-label="仿真场景选择"></select>
+                <button class="toolbar-btn primary" id="btn-play-sim" type="button"><i class="bi bi-play-circle me-1"></i>启动仿真</button>
+                <button class="toolbar-btn" id="btn-step-sim" type="button"><i class="bi bi-fast-forward me-1"></i>单步推进</button>
+                <button class="toolbar-btn" id="btn-reset-sim" type="button"><i class="bi bi-arrow-clockwise me-1"></i>重载场景</button>
             </div>
         </div>
-    </div>
-
-    <!-- Current Pose Info -->
-    <div class="col-md-4">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-compass me-1"></i>Current Pose</div>
-            <div class="pose-info">
-                <div class="pose-row">
-                    <span class="pose-label">X</span>
-                    <span class="pose-value" id="pose-x">0.000</span>
-                </div>
-                <div class="pose-row">
-                    <span class="pose-label">Y</span>
-                    <span class="pose-value" id="pose-y">0.000</span>
-                </div>
-                <div class="pose-row">
-                    <span class="pose-label">Z</span>
-                    <span class="pose-value" id="pose-z">0.000</span>
-                </div>
-                <div class="pose-row">
-                    <span class="pose-label">Roll</span>
-                    <span class="pose-value" id="pose-roll">0.000&deg;</span>
-                </div>
-                <div class="pose-row">
-                    <span class="pose-label">Pitch</span>
-                    <span class="pose-value" id="pose-pitch">0.000&deg;</span>
-                </div>
-                <div class="pose-row">
-                    <span class="pose-label">Yaw</span>
-                    <span class="pose-value" id="pose-yaw">0.000&deg;</span>
-                </div>
+        <div class="slam-panel isolation-card">
+            <div class="panel-title">
+                <strong>隔离说明</strong>
+                <span class="panel-subtitle" id="runtime-updated-at">等待首帧仿真</span>
+            </div>
+            <div class="isolation-chip"><i class="bi bi-shield-lock"></i><span id="isolation-chip-text">独立仿真链路仅使用 standalone 内部实例推演</span></div>
+            <p class="isolation-note" id="isolation-note">
+                真实监测模式只读取插件当前状态，不向真实建图链路注入任何仿真点云。仿真模式会加载独立的站区场景，用于观察 UI 呈现和算法不足。
+            </p>
+            <div class="scene-detail">
+                <div><strong>当前场景：</strong><span id="scene-name">等待选择</span></div>
+                <div><strong>场区：</strong><span id="scene-area">--</span></div>
+                <div><strong>电压等级：</strong><span id="scene-voltage">--</span></div>
+                <div><strong>关注点：</strong><span id="scene-focus">--</span></div>
             </div>
         </div>
+    </section>
 
-        <!-- Stats Panel -->
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-bar-chart me-1"></i>Processing Stats</div>
-            <div class="pose-info">
-                <div class="pose-row">
-                    <span class="pose-label">Pose History</span>
-                    <span class="pose-value" id="pose-history-len">0</span>
+    <section class="metric-grid">
+        <div class="metric-card">
+            <div class="metric-label">已处理帧</div>
+            <div class="metric-value" id="metric-frame-count">0</div>
+            <div class="metric-hint" id="metric-frame-hint">当前算法累计处理的点云帧数</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">设备锚点</div>
+            <div class="metric-value" id="metric-device-count">0</div>
+            <div class="metric-hint">站区中已挂到地图上的设备或结构</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">沉降监测点</div>
+            <div class="metric-value" id="metric-subsidence-count">0</div>
+            <div class="metric-hint">用于提前发现地基异常的位置</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">地图分辨率</div>
+            <div class="metric-value" id="metric-map-resolution">--</div>
+            <div class="metric-hint" id="metric-scene-mode">仿真模式正在等待场景数据</div>
+        </div>
+    </section>
+
+    <section class="main-grid">
+        <div class="slam-panel">
+            <div class="panel-title">
+                <div>
+                    <strong>站区建图俯视图</strong>
+                    <div class="panel-subtitle">占据栅格、巡检轨迹与设备锚点叠加</div>
                 </div>
-                <div class="pose-row">
-                    <span class="pose-label">Map Size</span>
-                    <span class="pose-value" id="map-size">--</span>
+                <span class="panel-subtitle" id="map-caption">等待仿真数据</span>
+            </div>
+            <div class="canvas-shell">
+                <canvas class="telemetry-canvas" id="map-canvas" width="960" height="520" aria-label="站区俯视建图画布"></canvas>
+            </div>
+        </div>
+        <div class="slam-panel">
+            <div class="panel-title">
+                <div>
+                    <strong>局部点云剖面</strong>
+                    <div class="panel-subtitle">当前传感器坐标系下的点云截面</div>
                 </div>
-                <div class="pose-row">
-                    <span class="pose-label">DL Enabled</span>
-                    <span class="pose-value" id="dl-enabled">No</span>
-                </div>
+                <span class="panel-subtitle" id="cloud-caption">等待仿真数据</span>
             </div>
+            <div class="canvas-shell compact">
+                <canvas class="telemetry-canvas" id="cloud-canvas" width="720" height="400" aria-label="局部点云剖面画布"></canvas>
+            </div>
+            <div class="status-list mt-3" id="status-list"></div>
         </div>
-    </div>
+    </section>
 
-    <!-- Occupancy Grid Display -->
-    <div class="col-md-6">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-grid-3x3 me-1"></i>Occupancy Grid (2D Projection)</div>
-            <div class="occupancy-grid" id="occupancy-container">
-                <canvas id="occupancy-canvas"></canvas>
+    <section class="bottom-grid">
+        <div class="slam-panel">
+            <div class="panel-title">
+                <strong>设备定位清单</strong>
+                <span class="panel-subtitle">设备坐标与类型锚点</span>
+            </div>
+            <div class="device-list" id="device-list"></div>
+        </div>
+        <div class="slam-panel">
+            <div class="panel-title">
+                <strong>沉降与告警</strong>
+                <span class="panel-subtitle">监测点趋势与门限结果</span>
+            </div>
+            <div class="subsidence-list mb-3" id="subsidence-list"></div>
+            <div class="alert-list" id="alert-list"></div>
+        </div>
+        <div class="slam-panel">
+            <div class="panel-title">
+                <strong>场景说明</strong>
+                <span class="panel-subtitle">为什么这个仿真适合当前插件</span>
+            </div>
+            <div class="scene-detail" id="scene-detail">
+                <div>页面启动后会优先载入和 `process_point_cloud()` 相匹配的点云仿真。</div>
+                <div>真实监测模式只展示当前插件状态，不混入仿真结果。</div>
             </div>
         </div>
-    </div>
-
-    <!-- Device Locations Panel -->
-    <div class="col-md-6">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-geo-alt me-1"></i>Device Locations</div>
-            <div class="device-list" id="device-list">
-                <div class="device-item text-secondary">No devices registered</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Subsidence Monitoring Panel -->
-    <div class="col-md-12">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-arrow-down-circle me-1"></i>Subsidence Monitoring</div>
-            <div class="subsidence-list" id="subsidence-list">
-                <div class="subsidence-item text-secondary">No monitoring points configured</div>
-            </div>
-        </div>
-    </div>
+    </section>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    function updateDashboard(data) {
-        if (!data || !data.success) return;
-        const s = data.status || {};
+(() => {
+    const runtime = {
+        mode: 'simulated',
+        playing: false,
+        timer: null,
+        scenarios: [],
+        lastPayload: null,
+    };
 
-        // Top metrics
-        document.getElementById('frame-count').textContent = s.frame_count || 0;
-        document.getElementById('device-count').textContent = s.registered_devices || 0;
-        document.getElementById('subsidence-count').textContent = s.subsidence_points || 0;
-        document.getElementById('map-resolution').textContent = s.map_resolution ? s.map_resolution + 'm' : '--';
+    const $ = (id) => document.getElementById(id);
 
-        // Current pose
-        const pose = s.current_pose || {};
-        document.getElementById('pose-x').textContent = (pose.x || 0).toFixed(3);
-        document.getElementById('pose-y').textContent = (pose.y || 0).toFixed(3);
-        document.getElementById('pose-z').textContent = (pose.z || 0).toFixed(3);
-        document.getElementById('pose-roll').innerHTML = ((pose.roll || 0) * 180 / Math.PI).toFixed(3) + '&deg;';
-        document.getElementById('pose-pitch').innerHTML = ((pose.pitch || 0) * 180 / Math.PI).toFixed(3) + '&deg;';
-        document.getElementById('pose-yaw').innerHTML = ((pose.yaw || 0) * 180 / Math.PI).toFixed(3) + '&deg;';
+    function apiBaseSafe() {
+        return (window.DarkBreakerSDK && DarkBreakerSDK.config && DarkBreakerSDK.config.apiBase) || '';
+    }
 
-        // Stats
-        document.getElementById('pose-history-len').textContent = s.pose_history_length || 0;
-        const mapSize = s.map_size || [];
-        document.getElementById('map-size').textContent = mapSize.length ? mapSize.join(' x ') : '--';
-        document.getElementById('dl-enabled').textContent = s.dl_enabled ? 'Yes' : 'No';
-
-        // Device list
-        const devices = data.devices || {};
-        const deviceList = document.getElementById('device-list');
-        const deviceIds = Object.keys(devices);
-        if (deviceIds.length > 0) {
-            deviceList.innerHTML = '';
-            deviceIds.forEach(function(id) {
-                const dev = devices[id];
-                const loc = dev.location || {};
-                const item = document.createElement('div');
-                item.className = 'device-item';
-                item.innerHTML = '<div><strong>' + id + '</strong> ' +
-                    '<span class="device-type-badge">' + (dev.type || 'unknown') + '</span>' +
-                    '<br><small class="text-secondary">(' +
-                    (loc.x || 0).toFixed(1) + ', ' +
-                    (loc.y || 0).toFixed(1) + ', ' +
-                    (loc.z || 0).toFixed(1) + ')</small></div>';
-                deviceList.appendChild(item);
-            });
+    async function fetchJson(path, options) {
+        const response = await fetch(apiBaseSafe() + path, options);
+        if (!response.ok) {
+            throw new Error(`Request failed: ${path}`);
         }
+        return await response.json();
+    }
 
-        // Subsidence monitoring
-        const subsidencePoints = data.subsidence || {};
-        const subList = document.getElementById('subsidence-list');
-        const subIds = Object.keys(subsidencePoints);
-        if (subIds.length > 0) {
-            subList.innerHTML = '';
-            subIds.forEach(function(id) {
-                const pt = subsidencePoints[id];
-                const sub = pt.subsidence_mm || 0;
-                let cls = 'subsidence-ok';
-                if (Math.abs(sub) >= 10) cls = 'subsidence-alert';
-                else if (Math.abs(sub) >= 5) cls = 'subsidence-warn';
-                const item = document.createElement('div');
-                item.className = 'subsidence-item';
-                item.innerHTML = '<strong>' + id + '</strong> &mdash; ' +
-                    '<span class="subsidence-value ' + cls + '">' + sub.toFixed(2) + ' mm</span>' +
-                    ' <small class="text-secondary">(' +
-                    'initial: ' + (pt.initial_height || 0).toFixed(3) + 'm, ' +
-                    'current: ' + (pt.current_height || 0).toFixed(3) + 'm)</small>';
-                subList.appendChild(item);
-            });
+    function showInlineMessage(targetId, message) {
+        const target = $(targetId);
+        if (!target) return;
+        target.innerHTML = `<div class="empty-state">${message}</div>`;
+    }
+
+    function setMode(mode) {
+        runtime.mode = mode;
+        $('btn-mode-simulated').classList.toggle('active', mode === 'simulated');
+        $('btn-mode-real').classList.toggle('active', mode === 'real_monitor');
+        $('runtime-mode-badge').textContent = mode === 'simulated' ? '仿真调试中' : '真实监测中';
+        $('runtime-mode-badge').className = mode === 'simulated'
+            ? 'mode-badge mode-simulated'
+            : 'mode-badge mode-real';
+        $('scenario-select').disabled = mode !== 'simulated';
+        $('btn-play-sim').disabled = mode !== 'simulated';
+        $('btn-step-sim').disabled = mode !== 'simulated';
+        $('btn-reset-sim').disabled = mode !== 'simulated';
+
+        if (mode === 'real_monitor') {
+            stopPlayback();
+            refreshRealMonitor();
+        } else if (runtime.lastPayload) {
+            renderPayload(runtime.lastPayload);
+        } else {
+            refreshSimulationStatus();
         }
     }
+
+    function togglePlayback() {
+        if (runtime.mode !== 'simulated') return;
+        if (runtime.playing) {
+            stopPlayback();
+            return;
+        }
+        runtime.playing = true;
+        $('btn-play-sim').innerHTML = '<i class="bi bi-pause-circle me-1"></i>暂停仿真';
+        runtime.timer = window.setInterval(() => {
+            stepSimulation().catch(console.error);
+        }, 1300);
+    }
+
+    function stopPlayback() {
+        runtime.playing = false;
+        if (runtime.timer) {
+            window.clearInterval(runtime.timer);
+            runtime.timer = null;
+        }
+        $('btn-play-sim').innerHTML = '<i class="bi bi-play-circle me-1"></i>启动仿真';
+    }
+
+    async function loadScenarios() {
+        const data = await fetchJson('/api/simulator/scenarios');
+        runtime.scenarios = data.scenarios || [];
+        const select = $('scenario-select');
+        select.innerHTML = '';
+        runtime.scenarios.forEach((scenario) => {
+            const opt = document.createElement('option');
+            opt.value = scenario.id;
+            opt.textContent = `${scenario.name} / ${scenario.station_area}`;
+            select.appendChild(opt);
+        });
+        if (runtime.scenarios.length > 0) {
+            await loadScenario(runtime.scenarios[0].id);
+        }
+    }
+
+    async function loadScenario(id) {
+        const payload = await fetchJson(`/api/simulator/load?scenario_id=${encodeURIComponent(id)}`, {
+            method: 'POST',
+        });
+        runtime.lastPayload = payload;
+        renderPayload(payload);
+    }
+
+    async function stepSimulation() {
+        const payload = await fetchJson('/api/simulator/step', { method: 'POST' });
+        runtime.lastPayload = payload;
+        renderPayload(payload);
+    }
+
+    async function refreshSimulationStatus() {
+        const payload = await fetchJson('/api/simulator/status');
+        runtime.lastPayload = payload;
+        renderPayload(payload);
+    }
+
+    async function resetSimulation() {
+        const payload = await fetchJson('/api/simulator/reset', { method: 'POST' });
+        runtime.lastPayload = payload;
+        renderPayload(payload);
+    }
+
+    async function refreshRealMonitor() {
+        const status = await fetchJson('/api/status');
+        renderPayload(normalizeRealPayload(status));
+    }
+
+    function normalizeRealPayload(data) {
+        const pose = data.current_pose || {};
+        return {
+            success: true,
+            mode: 'real_monitor',
+            runtime: {
+                updated_at: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+                description: '真实监测模式只读取插件当前状态，不加载任何 standalone 仿真点云。',
+            },
+            scenario: {
+                id: 'real_monitor',
+                name: '真实监测模式',
+                summary: '当前只展示插件状态快照；等待总 UI 或真实数据源接入。',
+                station_area: '真实工程链路',
+                voltage_level: '--',
+                focus: '不向真实算法回灌仿真结果，只做状态观测。',
+            },
+            status: {
+                frame_count: data.frame_count || 0,
+                registered_devices: data.registered_devices || 0,
+                subsidence_points: data.subsidence_points || 0,
+                map_resolution: data.map_resolution,
+                map_size: data.map_size || [],
+                pose_history_length: data.pose_history_length || 0,
+                current_pose: {
+                    x: pose.x || 0,
+                    y: pose.y || 0,
+                    z: pose.z || 0,
+                    roll: pose.roll || 0,
+                    pitch: pose.pitch || 0,
+                    yaw: pose.yaw || 0,
+                },
+                dl_enabled: !!data.dl_enabled,
+                initialized: !!data.initialized,
+            },
+            latest_result: {
+                processed_points: 0,
+                ground_points: 0,
+                object_points: 0,
+                detected_objects: 0,
+                registration_error: null,
+            },
+            devices: data.devices || {},
+            subsidence: data.subsidence || {},
+            alerts: [],
+            point_cloud: { sensor_points: [] },
+            map_preview: null,
+            sensor_track: [],
+            current_sensor_pose: {
+                x: pose.x || 0,
+                y: pose.y || 0,
+                z: pose.z || 0,
+                yaw: pose.yaw || 0,
+            },
+            history: [],
+        };
+    }
+
+    function renderPayload(payload) {
+        if (!payload || !payload.success) return;
+        const simulated = payload.mode === 'simulated';
+        const status = payload.status || {};
+        const pose = status.current_pose || {};
+        const result = payload.latest_result || {};
+
+        $('runtime-updated-at').textContent = payload.runtime && payload.runtime.updated_at
+            ? `更新时间 ${formatTime(payload.runtime.updated_at)}`
+            : '等待更新';
+        $('isolation-chip-text').textContent = simulated
+            ? '独立仿真链路仅使用 standalone 内部实例推演'
+            : '真实监测模式只读取插件当前状态';
+        $('isolation-note').textContent = payload.runtime && payload.runtime.description
+            ? payload.runtime.description
+            : '等待模式说明';
+
+        $('scene-name').textContent = payload.scenario ? payload.scenario.name : '--';
+        $('scene-area').textContent = payload.scenario ? payload.scenario.station_area : '--';
+        $('scene-voltage').textContent = payload.scenario ? payload.scenario.voltage_level : '--';
+        $('scene-focus').textContent = payload.scenario ? payload.scenario.focus : '--';
+
+        $('metric-frame-count').textContent = status.frame_count || 0;
+        $('metric-device-count').textContent = status.registered_devices || Object.keys(payload.devices || {}).length;
+        $('metric-subsidence-count').textContent = status.subsidence_points || Object.keys(payload.subsidence || {}).length;
+        $('metric-map-resolution').textContent = status.map_resolution ? `${status.map_resolution}m` : '--';
+        $('metric-scene-mode').textContent = simulated
+            ? '仿真模式使用独立插件实例推进'
+            : '真实模式只读当前插件状态';
+        $('metric-frame-hint').textContent = simulated
+            ? `最新场景：${payload.scenario.summary}`
+            : '当前帧数来自真实插件状态快照';
+
+        $('map-caption').textContent = simulated
+            ? `${payload.scenario.station_area} / ${payload.scenario.voltage_level}`
+            : '真实模式下不渲染仿真占据图';
+        $('cloud-caption').textContent = simulated
+            ? `frame ${result.frame_id || 0} / processed ${result.processed_points || 0}`
+            : '真实模式下仅保留空画布占位';
+
+        renderStatusList(status, pose, result);
+        renderDeviceList(payload.devices || {});
+        renderSubsidenceList(payload.subsidence || {}, payload.alerts || []);
+        renderSceneDetail(payload, simulated);
+        drawMap(payload);
+        drawCloud(payload);
+    }
+
+    function renderStatusList(status, pose, result) {
+        const rows = [
+            ['算法姿态', `x=${toFixed(pose.x)} y=${toFixed(pose.y)} z=${toFixed(pose.z)}`],
+            ['姿态角', `roll=${toDeg(pose.roll)} pitch=${toDeg(pose.pitch)} yaw=${toDeg(pose.yaw)}`],
+            ['点云统计', `processed=${result.processed_points || 0} ground=${result.ground_points || 0}`],
+            ['目标聚类', `objects=${result.detected_objects || 0} non_ground=${result.object_points || 0}`],
+            ['配准误差', result.registration_error == null ? '--' : Number(result.registration_error).toFixed(4)],
+            ['轨迹历史', `${status.pose_history_length || 0} 个关键帧 / DL ${status.dl_enabled ? 'on' : 'off'}`],
+        ];
+        $('status-list').innerHTML = rows.map(([name, value]) => (
+            `<div class="status-row"><span class="status-name">${name}</span><span class="status-value">${value}</span></div>`
+        )).join('');
+    }
+
+    function renderDeviceList(devices) {
+        const ids = Object.keys(devices || {});
+        if (!ids.length) {
+            showInlineMessage('device-list', '当前没有挂载到地图的设备锚点。');
+            return;
+        }
+        $('device-list').innerHTML = ids.map((id) => {
+            const device = devices[id];
+            const loc = device.location || {};
+            return `
+                <div class="device-item">
+                    <strong>${id}</strong>
+                    <div class="device-meta">${device.metadata && device.metadata.label ? device.metadata.label : '设备锚点'} / ${device.type || 'unknown'}</div>
+                    <div class="device-meta">(${toFixed(loc.x, 1)}, ${toFixed(loc.y, 1)}, ${toFixed(loc.z, 1)})</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function renderSubsidenceList(subsidence, alerts) {
+        const ids = Object.keys(subsidence || {});
+        if (!ids.length) {
+            showInlineMessage('subsidence-list', '当前没有沉降监测点。');
+        } else {
+            $('subsidence-list').innerHTML = ids.map((id) => {
+                const point = subsidence[id];
+                const sub = Number(point.subsidence_mm || 0);
+                const cls = Math.abs(sub) >= 10 ? 'severity-alert' : Math.abs(sub) >= 5 ? 'severity-warn' : 'severity-ok';
+                return `
+                    <div class="subsidence-item">
+                        <strong>${id}</strong>
+                        <div class="subsidence-meta ${cls}">沉降量 ${sub.toFixed(2)} mm</div>
+                        <div class="subsidence-meta">初始高程 ${toFixed(point.initial_height)} m / 当前 ${toFixed(point.current_height)} m</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        if (!alerts || !alerts.length) {
+            showInlineMessage('alert-list', '当前没有超过阈值的沉降告警。');
+            return;
+        }
+        $('alert-list').innerHTML = alerts.map((alert) => `
+            <div class="alert-item">
+                <strong>${alert.point_id} / ${alert.level === 'alert' ? '告警' : '预警'}</strong>
+                <div class="alert-meta">${alert.message}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderSceneDetail(payload, simulated) {
+        const items = [];
+        if (payload.scenario && payload.scenario.summary) {
+            items.push(`<div><strong>场景摘要：</strong>${payload.scenario.summary}</div>`);
+        }
+        if (payload.runtime && payload.runtime.description) {
+            items.push(`<div><strong>模式说明：</strong>${payload.runtime.description}</div>`);
+        }
+        if (simulated && payload.history && payload.history.length) {
+            const latest = payload.history[payload.history.length - 1];
+            items.push(`<div><strong>最近一帧：</strong>processed ${latest.processed_points || 0} / objects ${latest.detected_objects || 0}</div>`);
+        } else {
+            items.push('<div><strong>真实模式：</strong>真实监测模式只读取插件当前状态，不把仿真结果写回真实建图链路。</div>');
+        }
+        $('scene-detail').innerHTML = items.join('');
+    }
+
+    function drawMap(payload) {
+        const canvas = $('map-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#07111d';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (!payload.map_preview || !payload.map_preview.grid) {
+            drawPlaceholder(ctx, canvas, '真实监测模式只读取插件当前状态，俯视图保持占位。');
+            return;
+        }
+
+        const grid = payload.map_preview.grid;
+        const rows = grid.length;
+        const cols = rows ? grid[0].length : 0;
+        const margin = 36;
+        const drawWidth = canvas.width - margin * 2;
+        const drawHeight = canvas.height - margin * 2;
+
+        ctx.save();
+        ctx.translate(margin, margin);
+        for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+                const value = grid[y][x];
+                if (!value || value < 0.02) continue;
+                ctx.fillStyle = `rgba(101, 200, 255, ${Math.min(0.9, value + 0.05)})`;
+                ctx.fillRect(
+                    (x / Math.max(cols, 1)) * drawWidth,
+                    (y / Math.max(rows, 1)) * drawHeight,
+                    Math.ceil(drawWidth / Math.max(cols, 1)),
+                    Math.ceil(drawHeight / Math.max(rows, 1))
+                );
+            }
+        }
+
+        drawTrack(ctx, drawWidth, drawHeight, payload.map_preview.world_bounds, payload.sensor_track || [], payload.current_sensor_pose || {});
+        drawDeviceAnchors(ctx, drawWidth, drawHeight, payload.map_preview.world_bounds, payload.devices || {});
+        ctx.restore();
+    }
+
+    function drawTrack(ctx, width, height, bounds, track, currentPose) {
+        if (!bounds || !track || !track.length) return;
+        ctx.strokeStyle = 'rgba(67, 240, 213, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        track.forEach((pose, index) => {
+            const point = worldToCanvas(bounds, pose, width, height);
+            if (index === 0) ctx.moveTo(point.x, point.y);
+            else ctx.lineTo(point.x, point.y);
+        });
+        ctx.stroke();
+
+        const current = worldToCanvas(bounds, currentPose, width, height);
+        ctx.fillStyle = '#43f0d5';
+        ctx.beginPath();
+        ctx.arc(current.x, current.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function drawDeviceAnchors(ctx, width, height, bounds, devices) {
+        Object.keys(devices).forEach((id) => {
+            const device = devices[id];
+            const loc = device.location || {};
+            const point = worldToCanvas(bounds, loc, width, height);
+            ctx.fillStyle = '#f9b562';
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#dce9f7';
+            ctx.font = '12px monospace';
+            ctx.fillText(id, point.x + 8, point.y - 6);
+        });
+    }
+
+    function worldToCanvas(bounds, point, width, height) {
+        const minX = bounds.min_x;
+        const maxX = bounds.max_x;
+        const minY = bounds.min_y;
+        const maxY = bounds.max_y;
+        return {
+            x: ((point.x - minX) / Math.max(maxX - minX, 1e-6)) * width,
+            y: height - ((point.y - minY) / Math.max(maxY - minY, 1e-6)) * height,
+        };
+    }
+
+    function drawCloud(payload) {
+        const canvas = $('cloud-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#07111d';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const points = payload.point_cloud && payload.point_cloud.sensor_points ? payload.point_cloud.sensor_points : [];
+        if (!points.length) {
+            drawPlaceholder(ctx, canvas, '真实监测模式只读取插件当前状态，不注入仿真点云。');
+            return;
+        }
+
+        const xs = points.map((pt) => pt[0]);
+        const zs = points.map((pt) => pt[2]);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minZ = Math.min(...zs);
+        const maxZ = Math.max(...zs);
+
+        points.forEach((pt) => {
+            const x = 48 + ((pt[0] - minX) / Math.max(maxX - minX, 1e-6)) * (canvas.width - 96);
+            const y = canvas.height - 42 - ((pt[2] - minZ) / Math.max(maxZ - minZ, 1e-6)) * (canvas.height - 84);
+            const alpha = 0.25 + Math.min(0.65, Math.abs(pt[1]) / 24);
+            ctx.fillStyle = `rgba(101, 200, 255, ${alpha})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 2.1, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.fillStyle = 'rgba(220, 233, 247, 0.72)';
+        ctx.font = '12px monospace';
+        ctx.fillText('x-z 局部截面 / 颜色随横向偏移增强', 20, 24);
+    }
+
+    function drawPlaceholder(ctx, canvas, message) {
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.84)';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+        ctx.textAlign = 'start';
+    }
+
+    function toFixed(value, digits = 3) {
+        return Number(value || 0).toFixed(digits);
+    }
+
+    function toDeg(value) {
+        return `${(Number(value || 0) * 180 / Math.PI).toFixed(2)}°`;
+    }
+
+    function formatTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleTimeString('zh-CN', { hour12: false });
+    }
+
+    window.updateDashboard = function(data) {
+        if (runtime.mode !== 'real_monitor') return;
+        renderPayload(normalizeRealPayload(data));
+    };
+
+    $('btn-mode-simulated').addEventListener('click', () => setMode('simulated'));
+    $('btn-mode-real').addEventListener('click', () => setMode('real_monitor'));
+    $('btn-play-sim').addEventListener('click', togglePlayback);
+    $('btn-step-sim').addEventListener('click', () => stepSimulation().catch(console.error));
+    $('btn-reset-sim').addEventListener('click', () => resetSimulation().catch(console.error));
+    $('scenario-select').addEventListener('change', (event) => {
+        loadScenario(event.target.value).catch(console.error);
+    });
+
+    loadScenarios().catch((error) => {
+        console.error(error);
+        showInlineMessage('scene-detail', '独立仿真场景加载失败，请查看控制台日志。');
+    });
+})();
 </script>
 {% endblock %}

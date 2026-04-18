@@ -1,0 +1,29 @@
+[run]
+source = .
+omit =
+    */tests/*
+    */__pycache__/*
+    */venv/*
+    */.venv/*
+    */demo/*
+    */models/*
+    */.agent_skills/*
+    */.claude/*
+    run_standalone.py
+    __main__.py
+    train.py
+    scripts/*
+    api_integration.py
+    standalone/app.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+fail_under = 70
+show_missing = true

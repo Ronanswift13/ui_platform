@@ -36,7 +36,7 @@ class AudioSessionManager:
 
     def __init__(self, plugin, ws_clients: Optional[List] = None):
         self.plugin = plugin
-        self._ws_clients = ws_clients or []
+        self._ws_clients = ws_clients if ws_clients is not None else []
 
         # Session states (independent)
         self._sim_running = False
@@ -101,6 +101,7 @@ class AudioSessionManager:
                     "audio": audio,
                     "sample_rate": self.plugin.config.sample_rate,
                     "device_id": f"sim_{self._sim_config['voltage_level']}",
+                    "data_source": "simulation",
                 })
 
                 # Add visualization data
@@ -164,6 +165,7 @@ class AudioSessionManager:
                 result = self.plugin.process({
                     "sample_rate": self.plugin.config.sample_rate,
                     "device_id": self._mon_config.get("device_id", "monitor"),
+                    "data_source": "real",
                 })
 
                 result["mode"] = "monitoring"

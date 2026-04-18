@@ -15,6 +15,7 @@
 """
 
 from __future__ import annotations
+import logging
 from pathlib import Path
 from typing import Any, Optional, Dict
 from datetime import datetime
@@ -38,6 +39,27 @@ from darkbreaker_sdk.schemas import (
     ROI,
     BoundingBox,
 )
+
+def _get_model_resolver():
+    """延迟加载 model resolution，避免模块级 import 触发 training → torch 初始化。"""
+    try:
+        from plugins._model_resolution import resolve_plugin_model_config
+        return resolve_plugin_model_config
+    except ImportError:  # pragma: no cover - standalone fallback
+        def _fallback(**kwargs):
+            config = kwargs.get("config") or {}
+            return config, {
+                "enabled": False,
+                "attempted": False,
+                "resolved": False,
+                "error_code": "RESOLVER_IMPORT_FAILED",
+                "error_message": "plugins._model_resolution import failed",
+            }
+        return _fallback
+
+from platform_core.visual_output_protocol import build_visual_meta
+
+logger = logging.getLogger(__name__)
 
 
 def _load_detector_class():
@@ -141,6 +163,7 @@ class SwitchInspectionPlugin(BasePlugin):
         # 性能指标参数
         self.confidence_threshold = 0.6
         self.min_clarity_score = 0.70
+        self._model_resolution: dict[str, Any] = {}
     
     def init(self, config: dict[str, Any]) -> bool:
         """
@@ -153,7 +176,17 @@ class SwitchInspectionPlugin(BasePlugin):
             初始化是否成功
         """
         try:
-            self._config = config
+            resolve_plugin_model_config = _get_model_resolver()
+            resolved_config, self._model_resolution = resolve_plugin_model_config(
+                plugin_id=self.id,
+                plugin_dir=self.plugin_dir,
+                config=config,
+                default_task_type="detection",
+                expected_modality="rgb",
+                top_level_path_keys=("yolov8_model_path",),
+            )
+            self._config = resolved_config
+            config = resolved_config
             
             # 读取配置
             inference_config = config.get("inference", {})
@@ -165,30 +198,50 @@ class SwitchInspectionPlugin(BasePlugin):
             # 创建检测器实例
             SwitchDetector = get_detector_class()
             self._detector = SwitchDetector(config)
+            detector_initialize = getattr(self._detector, "initialize", None)
+            if callable(detector_initialize) and not detector_initialize():
+                logger.info("[%s] detector initialize reported degraded mode", self.id)
             
             # 更新状态
             self.status = PluginStatus.READY
             self._initialized = True
-            
-            print(f"[{self.id}] 插件初始化成功")
-            print(f"[{self.id}] 置信度阈值: {self.confidence_threshold}")
-            print(f"[{self.id}] 最小清晰度: {self.min_clarity_score}")
+            logger.info(
+                "[%s] initialized with confidence_threshold=%s min_clarity_score=%s",
+                self.id,
+                self.confidence_threshold,
+                self.min_clarity_score,
+            )
+            if self._model_resolution.get("resolved"):
+                logger.info(
+                    "[%s] registry resolved %s/%s@%s -> %s (source=%s)",
+                    self.id,
+                    self._model_resolution.get("plugin_id"),
+                    self._model_resolution.get("task_type"),
+                    self._model_resolution.get("version"),
+                    self._model_resolution.get("model_path"),
+                    self._model_resolution.get("source"),
+                )
+            elif self._model_resolution.get("attempted") and self._model_resolution.get("error_code"):
+                logger.warning(
+                    "[%s] registry resolution failed [%s]: %s; keeping configured path",
+                    self.id,
+                    self._model_resolution.get("error_code"),
+                    self._model_resolution.get("error_message"),
+                )
             
             return True
             
         except Exception as e:
             self.status = PluginStatus.ERROR
             self._last_error = str(e)
-            print(f"[{self.id}] 初始化失败: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("[%s] init failed: %s", self.id, e)
             return False
     
     def infer(
         self,
         frame: np.ndarray,
         rois: list[ROI],
-        context: PluginContext,
+        context: Optional[PluginContext],
     ) -> list[RecognitionResult]:
         """
         执行推理
@@ -202,8 +255,15 @@ class SwitchInspectionPlugin(BasePlugin):
             识别结果列表
         """
         if not self._initialized or self._detector is None:
-            print(f"[{self.id}] 插件未初始化")
+            logger.warning("[%s] infer called before initialization", self.id)
             return []
+
+        context = context or PluginContext(
+            task_id="standalone-task",
+            site_id="standalone-site",
+            device_id=self.id,
+            component_id="standalone-component",
+        )
         
         self.status = PluginStatus.RUNNING
         self._last_inference_time = datetime.now()
@@ -226,10 +286,13 @@ class SwitchInspectionPlugin(BasePlugin):
                     continue
                 
                 roi_type = self._get_roi_type(roi)
+                clarity_score: Optional[float] = None
                 
                 # 1. 清晰度评价(对清晰度锚点)
                 if roi_type == "clarity_anchor" or "indicator" in roi_type:
-                    is_clear, clarity_score = self._detector.evaluate_clarity(roi_image)
+                    clarity_result = self._detector.evaluate_clarity(roi_image)
+                    clarity_score = float(getattr(clarity_result, "score", 0.0))
+                    is_clear = clarity_score >= self.min_clarity_score
 
                     if not is_clear:
                         result = RecognitionResult(
@@ -244,10 +307,11 @@ class SwitchInspectionPlugin(BasePlugin):
                             model_version=self.version,
                             code_version=self.code_hash,
                             failure_reason=str(1001),
-                            metadata={
+                            metadata=self._unified_meta({
                                 "clarity_score": clarity_score,
-                                "suggested_action": "REFOCUS_OR_RECAPTURE"
-                            },
+                                "suggested_action": "REFOCUS_OR_RECAPTURE",
+                                "quality_gate_status": "hard_fail",
+                            }),
                         )
                         results.append(result)
                         continue  # 清晰度不足,跳过后续识别
@@ -258,11 +322,11 @@ class SwitchInspectionPlugin(BasePlugin):
 
                     if "indicator" in roi_type:
                         state_result = self._detector.recognize_indicator_state(
-                            roi_image, device_type
+                            roi_image, device_type, clarity_score=clarity_score
                         )
                     else:
                         state_result = self._detector.recognize_linkage_state(
-                            roi_image, device_type
+                            roi_image, device_type, clarity_score=clarity_score
                         )
 
                     if state_result.confidence >= self.confidence_threshold:
@@ -280,8 +344,8 @@ class SwitchInspectionPlugin(BasePlugin):
                             confidence=state_result.confidence,
                             model_version=self.version,
                             code_version=self.code_hash,
-                            failure_reason=state_result.reason_code,
-                            metadata={
+                            failure_reason=str(state_result.reason_code) if state_result.reason_code else None,
+                            metadata=self._unified_meta({
                                 "state": state_result.state,
                                 "device_type": device_type,
                                 "evidence": {
@@ -293,7 +357,7 @@ class SwitchInspectionPlugin(BasePlugin):
                                     "clarity_score": evidence.clarity_score,
                                 },
                                 "debug": state_result.extra,
-                            },
+                            }),
                         )
                         results.append(result)
 
@@ -326,9 +390,10 @@ class SwitchInspectionPlugin(BasePlugin):
                             confidence=gauge_result.confidence,
                             model_version=self.version,
                             code_version=self.code_hash,
-                            metadata={
-                                "unit": gauge_result.unit
-                            },
+                            metadata=self._unified_meta({
+                                "unit": gauge_result.unit,
+                                "task_type": "ocr",
+                            }),
                         )
                         results.append(result)
                     elif gauge_enabled:
@@ -350,7 +415,7 @@ class SwitchInspectionPlugin(BasePlugin):
                         
             except Exception as e:
                 self._error_count += 1
-                print(f"[{self.id}] 处理ROI {roi.id} 时出错: {e}")
+                logger.exception("[%s] failed to process ROI %s: %s", self.id, roi.id, e)
                 continue
         
         # 4. 逻辑校验
@@ -375,17 +440,17 @@ class SwitchInspectionPlugin(BasePlugin):
                 model_version=self.version,
                 code_version=self.code_hash,
                 failure_reason=alarm_info.get("reason_code"),
-                metadata={
+                metadata=self._unified_meta({
                     "rule": rule_name,
                     "rule_id": alarm_info.get("rule_id"),
                     "states": alarm_info.get("states", {}),
-                    "message": description
-                },
+                    "message": description,
+                }),
             )
             results.append(result)
         
         self.status = PluginStatus.READY
-        print(f"[{self.id}] 检测完成，共 {len(results)} 个结果")
+        logger.info("[%s] infer completed with %s results", self.id, len(results))
         
         return results
     
@@ -481,6 +546,7 @@ class SwitchInspectionPlugin(BasePlugin):
                 "error_count": self._error_count,
                 "last_inference": self._last_inference_time.isoformat() if self._last_inference_time else None,
                 "bay_states_count": len(self._bay_states),
+                "model_resolution": dict(self._model_resolution),
             }
         )
 
@@ -583,6 +649,20 @@ class SwitchInspectionPlugin(BasePlugin):
         elif "grounding" in roi_type:
             return "grounding"
         return "breaker"  # 默认
+
+    def _unified_meta(self, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+        """构建统一视觉输出 metadata，合并插件特有字段。"""
+        base = build_visual_meta(
+            plugin_name="switch_inspection",
+            task_type="inspection",
+            modality="visual",
+            runtime_mode="traditional_fallback",
+            algorithm_stage="baseline",
+            quality_gate_status="pass",
+        )
+        if extra:
+            base.update(extra)
+        return base
 
     def _state_to_label(self, device_type: str, state: str) -> str:
         """将状态映射到标准标签"""

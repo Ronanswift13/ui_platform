@@ -1,95 +1,249 @@
 {
-    "id": "acoustic_monitoring",
-    "name": "声学监测",
-    "version": "1.0.0",
-    "description": "基于深度学习的声学异常检测，支持局部放电、电晕放电、接触不良、轴承故障等多种异常类型检测",
-    "author": "AI巡检系统",
-    "category": "outdoor",
-    "enabled": true,
-    
-    "entrypoint": "plugin.py",
-    "plugin_class": "AcousticMonitoringPlugin",
-    
-    "capabilities": [
-        "partial_discharge_detection",
-        "acoustic_monitoring"
-    ],
-    
-    "models_required": [
-        {
-            "model_id": "audio_anomaly_transformer",
-            "model_path": "models/audio/anomaly_transformer.onnx",
-            "description": "Transformer声学异常检测模型",
-            "required": true
+  "id": "acoustic_monitoring",
+  "name": "声学监测",
+  "version": "1.0.0",
+  "description": "基于声学信号特征与模型占位能力的异常检测，支持局部放电、电晕放电、轴承故障和机械异常",
+  "author": "AI巡检系统",
+  "category": "outdoor",
+  "enabled": true,
+  "entrypoint": "plugin.py",
+  "plugin_class": "AcousticMonitoringPlugin",
+  "config_file": "configs/default.yaml",
+  "capabilities": [
+    "partial_discharge_detection",
+    "acoustic_monitoring",
+    "anomaly_detection"
+  ],
+  "domain_capabilities": [
+    "sensor_input",
+    "time_series_monitoring",
+    "standard_alarm_output"
+  ],
+  "models_required": [
+    {
+      "model_id": "audio_anomaly_transformer",
+      "model_path": "models/audio/anomaly_transformer.onnx",
+      "description": "Transformer声学异常检测模型",
+      "required": false
+    },
+    {
+      "model_id": "ultrasonic_pd_detector",
+      "model_path": "models/audio/ultrasonic_pd.onnx",
+      "description": "超声波局部放电检测模型",
+      "required": false
+    }
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "device_id": {
+        "type": "string"
+      },
+      "timestamp": {
+        "oneOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string",
+            "format": "date-time"
+          }
+        ]
+      },
+      "audio_buffer": {
+        "type": "array",
+        "items": {
+          "type": "number"
         },
-        {
-            "model_id": "ultrasonic_pd_detector",
-            "model_path": "models/audio/ultrasonic_pd.onnx",
-            "description": "超声波局部放电检测模型",
-            "required": false
-        }
-    ],
-    
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "audio": {
-                "type": "array",
-                "description": "音频波形数据"
-            },
-            "sample_rate": {
-                "type": "integer",
-                "default": 16000,
-                "description": "采样率"
-            },
-            "device_id": {
-                "type": "string",
-                "description": "设备ID"
-            },
-            "roi_id": {
-                "type": "string",
-                "description": "ROI标识"
-            }
+        "description": "统一声学输入壳"
+      },
+      "audio": {
+        "type": "array",
+        "items": {
+          "type": "number"
         },
-        "required": ["audio"]
-    },
-    
-    "output_schema": {
+        "description": "兼容旧入口的音频波形数据"
+      },
+      "sampled_sequence": {
+        "type": "array",
+        "description": "采样序列，元素可为数值或 {value,timestamp}"
+      },
+      "sensor_window": {
         "type": "object",
-        "properties": {
-            "success": {"type": "boolean"},
-            "anomaly_detected": {"type": "boolean"},
-            "anomaly_type": {"type": "string"},
-            "anomaly_score": {"type": "number"},
-            "confidence": {"type": "number"},
-            "severity": {"type": "string"},
-            "alarms": {"type": "array"}
-        }
+        "description": "窗口化音频输入，包含 samples/values/audio_buffer"
+      },
+      "structured_timeseries": {
+        "type": "object",
+        "description": "结构化时序输入，variables 中包含 audio/amplitude/waveform"
+      },
+      "sample_rate": {
+        "type": "integer",
+        "default": 16000
+      },
+      "context": {
+        "type": "object"
+      }
     },
-    
-    "default_config": {
-        "sample_rate": 16000,
-        "audio_duration": 2.0,
-        "n_mels": 128,
-        "n_fft": 2048,
-        "hop_length": 512,
-        "anomaly_threshold": 0.5,
-        "alarm_accumulation_count": 3
-    },
-    
-    "supported_voltage_levels": ["all"],
-    
-    "hardware_requirements": {
-        "microphone": true,
-        "min_sample_rate": 16000,
-        "recommended_sample_rate": 48000,
-        "ultrasonic_sample_rate": 192000
-    },
-    
-    "dependencies": [
-        "numpy",
-        "onnxruntime"
+    "required": [
+      "device_id"
     ],
-    
-    "tags": ["acoustic", "monitoring", "anomaly_detection", "partial_discharge", "deep_learning"]
+    "anyOf": [
+      {
+        "required": [
+          "audio_buffer"
+        ]
+      },
+      {
+        "required": [
+          "audio"
+        ]
+      },
+      {
+        "required": [
+          "sampled_sequence"
+        ]
+      },
+      {
+        "required": [
+          "sensor_window"
+        ]
+      },
+      {
+        "required": [
+          "structured_timeseries"
+        ]
+      }
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "label": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "warning",
+          "error",
+          "partial_discharge",
+          "corona_discharge",
+          "bearing_fault",
+          "mechanical_fault"
+        ]
+      },
+      "value": {
+        "type": "number"
+      },
+      "confidence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "results": {
+        "type": "array"
+      },
+      "alarms": {
+        "type": "array"
+      },
+      "plugin_name": {
+        "type": "string"
+      },
+      "task_type": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "object"
+      },
+      "anomaly_events": {
+        "type": "array"
+      },
+      "abnormal_intervals": {
+        "type": "array"
+      },
+      "severity": {
+        "type": "string"
+      },
+      "reason_codes": {
+        "type": "array"
+      },
+      "recommended_actions": {
+        "type": "array"
+      },
+      "trend_diagnosis": {
+        "type": "object"
+      },
+      "evidence": {
+        "type": "array"
+      },
+      "review_required": {
+        "type": "boolean"
+      },
+      "model_info": {
+        "type": "object"
+      },
+      "placeholders": {
+        "type": "object"
+      },
+      "input_protocol": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "success",
+      "status",
+      "label",
+      "value",
+      "confidence",
+      "metadata",
+      "summary",
+      "anomaly_events",
+      "abnormal_intervals",
+      "trend_diagnosis",
+      "reason_codes",
+      "recommended_actions",
+      "evidence",
+      "model_info",
+      "placeholders"
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "required": [
+      "sampling",
+      "window",
+      "thresholds",
+      "runtime",
+      "model",
+      "alarm_rules",
+      "upgrade_placeholders"
+    ]
+  },
+  "supported_voltage_levels": [
+    "all"
+  ],
+  "hardware_requirements": {
+    "microphone": false,
+    "min_sample_rate": 16000,
+    "recommended_sample_rate": 48000,
+    "ultrasonic_sample_rate": 192000,
+    "smoke_uses_simulated_data": true
+  },
+  "dependencies": [
+    "numpy"
+  ],
+  "tags": [
+    "acoustic",
+    "monitoring",
+    "anomaly_detection",
+    "partial_discharge",
+    "timeseries"
+  ]
 }

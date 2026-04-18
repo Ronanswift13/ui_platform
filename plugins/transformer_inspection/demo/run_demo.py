@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import numpy as np
 from plugins.transformer_inspection.plugin import TransformerInspectionPlugin
 from darkbreaker_sdk.interfaces import PluginContext
-from darkbreaker_sdk.schemas import ROI, BoundingBox
+from darkbreaker_sdk.schemas import BoundingBox, ROI, ROIType
 
 
 def main():
@@ -37,7 +37,9 @@ def main():
 
     # 3. Test inference with dummy frame
     print("\n[3] Running inference with dummy frame...")
-    dummy_frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    dummy_frame = np.full((480, 640, 3), 255, dtype=np.uint8)
+    dummy_frame[80:220, 60:220] = [20, 20, 20]
+    dummy_frame[120:360, 380:540] = [255, 0, 0]
 
     context = PluginContext(
         task_id="demo-task-001",
@@ -49,10 +51,18 @@ def main():
     rois = [
         ROI(
             id="roi-1",
-            name="transformer_body",
+            name="radiator",
             component_id="transformer-01",
-            bbox=BoundingBox(x=0.1, y=0.1, width=0.8, height=0.8),
-        )
+            roi_type=ROIType.DEFECT,
+            bbox=BoundingBox(x=0.0, y=0.0, width=0.6, height=1.0),
+        ),
+        ROI(
+            id="roi-2",
+            name="breather",
+            component_id="transformer-01",
+            roi_type=ROIType.STATE,
+            bbox=BoundingBox(x=0.55, y=0.2, width=0.3, height=0.6),
+        ),
     ]
 
     results = plugin.infer(frame=dummy_frame, rois=rois, context=context)

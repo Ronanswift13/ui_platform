@@ -1,0 +1,74 @@
+{
+  "name": "multimodal_fusion_sparse_aligned",
+  "plugin_id": "multimodal_fusion",
+  "task_type": "multimodal_feature_fusion",
+  "version": "1.0.0",
+  "format": "multimodal_aligned",
+  "input_modality": "multimodal",
+  "num_samples": 2,
+  "fusion_strategy": "feature_level",
+  "supported_modalities": [
+    "visual",
+    "thermal",
+    "acoustic",
+    "gas",
+    "hyperspectral"
+  ],
+  "required_modalities": [
+    "visual",
+    "thermal"
+  ],
+  "missing_modality_policy": "mask_and_gate",
+  "alignment_tolerance_ms": 5000,
+  "classes": [
+    "normal",
+    "attention",
+    "warning",
+    "alarm",
+    "critical"
+  ],
+  "multimodal_schema": {
+    "schema_version": "1.0.0",
+    "supported_modalities": [
+      "visual",
+      "thermal",
+      "acoustic",
+      "gas",
+      "hyperspectral"
+    ],
+    "required_modalities": [
+      "visual",
+      "thermal"
+    ],
+    "fusion_strategy": "feature_level",
+    "missing_modality_policy": "mask_and_gate",
+    "alignment_tolerance_ms": 5000,
+    "runtime_mode": "rule_model_hybrid",
+    "modality_specs": [
+      {"modality": "visual", "path": "visual", "format": "json", "is_required": true, "feature_dim": 512, "plugin_dependency": "transformer_monitoring"},
+      {"modality": "thermal", "path": "thermal", "format": "json", "is_required": true, "feature_dim": 256, "plugin_dependency": "transformer_monitoring"},
+      {"modality": "acoustic", "path": "acoustic", "format": "json", "feature_dim": 256, "plugin_dependency": "acoustic_monitoring"},
+      {"modality": "gas", "path": "gas", "format": "json", "feature_dim": 64, "plugin_dependency": "gas_detection"},
+      {"modality": "hyperspectral", "path": "hyperspectral", "format": "json", "feature_dim": 224, "plugin_dependency": "hyperspectral_detection"}
+    ],
+    "diagnostic_rule_pack": {
+      "path": "metadata/diagnostic_rules.json",
+      "version": "2026.04",
+      "source": "plugin_manifest"
+    }
+  },
+  "diagnosis_target_schema": {
+    "outputs": [
+      {"name": "overall_status", "type": "classification", "classes": ["normal", "attention", "warning", "alarm", "critical"]},
+      {"name": "confidence", "type": "confidence"},
+      {"name": "detections", "type": "detection_list"},
+      {"name": "modality_contributions", "type": "attribution"},
+      {"name": "diagnostic_report", "type": "structured_report"}
+    ]
+  },
+  "diagnostic_rule_pack": {
+    "path": "metadata/diagnostic_rules.json",
+    "version": "2026.04",
+    "source": "plugin_manifest"
+  }
+}

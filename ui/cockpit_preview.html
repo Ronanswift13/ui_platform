@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主控驾驶舱 - 输变电监测平台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/main.css" rel="stylesheet">
+    
+<link rel="stylesheet" href="/static/css/cockpit.css">
+
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-lightning-charge"></i>
+                输变电激光星芒监测平台
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <!-- 主控驾驶舱 (V4.0新增) -->
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/cockpit">
+                            <i class="bi bi-grid-3x3-gap-fill"></i> 主控驾驶舱
+                        </a>
+                    </li>
+                    <!-- 室外监测中心 (V3.5重组 - 融合高级监测) -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/outdoor">
+                            <i class="bi bi-sun"></i> 室外监测中心
+                        </a>
+                    </li>
+                    <!-- 室内监测中心 (V3.5重组 - 原室内围栏升级) -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/indoor">
+                            <i class="bi bi-building"></i> 室内监测中心
+                        </a>
+                    </li>
+                    <!-- 回放 -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/replay">
+                            <i class="bi bi-play-circle"></i> 回放
+                        </a>
+                    </li>
+                    <!-- 模型训练 -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/training">
+                            <i class="bi bi-cpu"></i> 模型训练
+                        </a>
+                    </li>
+                    <!-- 数据导入 (V3.0新增) -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/data-import">
+                            <i class="bi bi-cloud-upload"></i> 数据导入
+                        </a>
+                    </li>
+                    <!-- 平台架构 (V3.0新增) -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle "
+                           href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-rocket-takeoff"></i> 平台架构
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li class="dropdown-header text-info"><i class="bi bi-cpu"></i> AI模型架构</li>
+                            <li><a class="dropdown-item" href="/iteration/point-cloud"><i class="bi bi-box-seam"></i> 3D点云处理</a></li>
+                            <li><a class="dropdown-item" href="/iteration/temporal"><i class="bi bi-clock-history"></i> 时序分析引擎</a></li>
+                            <li><a class="dropdown-item" href="/iteration/bird-risk"><i class="bi bi-exclamation-triangle"></i> 鸟类风险预测</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-header text-info"><i class="bi bi-gear-wide-connected"></i> 平台服务</li>
+                            <li><a class="dropdown-item" href="/iteration/mlops"><i class="bi bi-graph-up-arrow"></i> MLOps流水线</a></li>
+                            <li><a class="dropdown-item" href="/iteration/microservice"><i class="bi bi-diagram-3"></i> 微服务架构</a></li>
+                            <li><a class="dropdown-item" href="/iteration/monitoring"><i class="bi bi-activity"></i> 系统监控</a></li>
+                        </ul>
+                    </li>
+                    <!-- 插件管理 -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/plugins">
+                            <i class="bi bi-puzzle"></i> 插件管理
+                        </a>
+                    </li>
+                    <!-- 系统设置 -->
+                    <li class="nav-item">
+                        <a class="nav-link " href="/settings">
+                            <i class="bi bi-gear"></i> 系统设置
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <span class="nav-link text-light">
+                            <i class="bi bi-circle-fill text-success"></i> 系统正常
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="container-fluid mt-3">
+        
+<div class="cockpit" id="cockpit-app">
+
+    <!-- ====== 顶部标题栏 ====== -->
+    <header class="cockpit-header">
+        <div class="header-left">
+            <i class="bi bi-lightning-charge-fill header-logo"></i>
+            <h1 class="header-title">输变电激光星芒监测平台</h1>
+            <span class="header-subtitle">主控驾驶舱</span>
+        </div>
+        <div class="header-center">
+            <div class="header-env">
+                <span class="env-item"><i class="bi bi-geo-alt"></i> <span id="station-name">变电站</span></span>
+                <span class="env-separator">|</span>
+                <span class="env-item"><i class="bi bi-thermometer-half"></i> <span id="env-temp">--</span>°C</span>
+                <span class="env-item"><i class="bi bi-moisture"></i> <span id="env-humidity">--</span>%</span>
+                <span class="env-item"><i class="bi bi-wind"></i> <span id="env-wind">--</span>m/s</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="header-datetime">
+                <span class="datetime-date" id="header-date"></span>
+                <span class="datetime-time" id="header-time"></span>
+            </div>
+            <div class="header-status">
+                <span class="status-badge status-online" id="sys-status">
+                    <i class="bi bi-circle-fill"></i> 系统正常
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ====== 左侧导航栏 ====== -->
+    <aside class="cockpit-sidebar" id="cockpit-sidebar">
+        <div class="sidebar-section">
+            <div class="sidebar-section-title" data-toggle="outdoor-nav">
+                <i class="bi bi-sun"></i> 室外监测
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+            <div class="sidebar-nav" id="outdoor-nav">
+                <a class="sidebar-item" href="/outdoor" data-plugin="transformer_inspection">
+                    <i class="bi bi-box"></i>
+                    <span>主变巡视</span>
+                    <span class="sidebar-badge" data-alarm="transformer_inspection">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="switch_inspection">
+                    <i class="bi bi-toggle-on"></i>
+                    <span>开关巡视</span>
+                    <span class="sidebar-badge" data-alarm="switch_inspection">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="busbar_inspection">
+                    <i class="bi bi-diagram-3"></i>
+                    <span>母线巡视</span>
+                    <span class="sidebar-badge" data-alarm="busbar_inspection">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="capacitor_inspection">
+                    <i class="bi bi-battery-charging"></i>
+                    <span>电容器巡视</span>
+                    <span class="sidebar-badge" data-alarm="capacitor_inspection">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="bird_monitoring">
+                    <i class="bi bi-feather"></i>
+                    <span>鸟类监控</span>
+                    <span class="sidebar-badge" data-alarm="bird_monitoring">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="acoustic_monitoring">
+                    <i class="bi bi-soundwave"></i>
+                    <span>声学监测</span>
+                    <span class="sidebar-badge" data-alarm="acoustic_monitoring">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="gas_detection">
+                    <i class="bi bi-cloud-haze2"></i>
+                    <span>气体检测</span>
+                    <span class="sidebar-badge" data-alarm="gas_detection">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="hyperspectral_detection">
+                    <i class="bi bi-rainbow"></i>
+                    <span>高光谱检测</span>
+                    <span class="sidebar-badge" data-alarm="hyperspectral_detection">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="slam_mapping">
+                    <i class="bi bi-map"></i>
+                    <span>SLAM建图</span>
+                    <span class="sidebar-badge" data-alarm="slam_mapping">0</span>
+                </a>
+                <a class="sidebar-item" href="/outdoor" data-plugin="multimodal_fusion">
+                    <i class="bi bi-diagram-3-fill"></i>
+                    <span>多模态融合</span>
+                    <span class="sidebar-badge" data-alarm="multimodal_fusion">0</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title" data-toggle="indoor-nav">
+                <i class="bi bi-building"></i> 室内监测
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+            <div class="sidebar-nav" id="indoor-nav">
+                <a class="sidebar-item" href="/indoor" data-plugin="indoor_fence">
+                    <i class="bi bi-shield-shaded"></i>
+                    <span>电子围栏</span>
+                    <span class="sidebar-badge" data-alarm="indoor_fence">0</span>
+                </a>
+                <a class="sidebar-item" href="/indoor" data-plugin="animal_detection">
+                    <i class="bi bi-bug"></i>
+                    <span>动物入侵</span>
+                    <span class="sidebar-badge" data-alarm="animal_detection">0</span>
+                </a>
+                <a class="sidebar-item" href="/indoor" data-plugin="temperature_monitoring">
+                    <i class="bi bi-thermometer-sun"></i>
+                    <span>温度监测</span>
+                    <span class="sidebar-badge" data-alarm="temperature_monitoring">0</span>
+                </a>
+                <a class="sidebar-item" href="/indoor" data-plugin="device_monitoring">
+                    <i class="bi bi-hdd-rack"></i>
+                    <span>设备监测</span>
+                    <span class="sidebar-badge" data-alarm="device_monitoring">0</span>
+                </a>
+                <a class="sidebar-item" href="/indoor" data-plugin="fire_detection">
+                    <i class="bi bi-fire"></i>
+                    <span>消防监测</span>
+                    <span class="sidebar-badge" data-alarm="fire_detection">0</span>
+                </a>
+                <a class="sidebar-item" href="/indoor" data-plugin="meter_reading">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>表计读数</span>
+                    <span class="sidebar-badge" data-alarm="meter_reading">0</span>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ====== 主内容区域 ====== -->
+    <main class="cockpit-main">
+
+        <!-- 第一行: 核心统计卡片 -->
+        <div class="stats-row">
+            <!-- 插件状态总览 -->
+            <div class="stat-card stat-card-lg">
+                <div class="stat-card-header">
+                    <i class="bi bi-puzzle-fill"></i>
+                    <span>插件状态</span>
+                </div>
+                <div class="stat-card-body">
+                    <div class="plugin-status-chart">
+                        <canvas id="plugin-status-chart" width="120" height="120"></canvas>
+                        <div class="plugin-status-center">
+                            <span class="plugin-total" id="plugin-total">0</span>
+                            <span class="plugin-total-label">插件总数</span>
+                        </div>
+                    </div>
+                    <div class="plugin-status-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot legend-online"></span>
+                            <span>在线</span>
+                            <strong id="plugin-online">0</strong>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot legend-offline"></span>
+                            <span>离线</span>
+                            <strong id="plugin-offline">0</strong>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot legend-error"></span>
+                            <span>异常</span>
+                            <strong id="plugin-error">0</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 今日告警 -->
+            <div class="stat-card stat-card-highlight">
+                <div class="stat-card-header">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>今日告警</span>
+                </div>
+                <div class="stat-card-body stat-card-center">
+                    <div class="stat-big-number" id="today-alarm-total">0</div>
+                    <div class="stat-sub-row">
+                        <div class="stat-sub-item">
+                            <span class="sub-label">自动告警</span>
+                            <span class="sub-value" id="alarm-auto">0</span>
+                        </div>
+                        <div class="stat-sub-item">
+                            <span class="sub-label">已处理</span>
+                            <span class="sub-value text-success" id="alarm-handled">0</span>
+                        </div>
+                        <div class="stat-sub-item">
+                            <span class="sub-label">未处理</span>
+                            <span class="sub-value text-danger" id="alarm-pending">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 今日检测 -->
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <i class="bi bi-camera-fill"></i>
+                    <span>今日检测</span>
+                </div>
+                <div class="stat-card-body stat-card-center">
+                    <div class="stat-big-number stat-number-blue" id="today-detection-total">0</div>
+                    <div class="stat-sub-row">
+                        <div class="stat-sub-item">
+                            <span class="sub-label">正常</span>
+                            <span class="sub-value text-success" id="detect-normal">0</span>
+                        </div>
+                        <div class="stat-sub-item">
+                            <span class="sub-label">异常</span>
+                            <span class="sub-value text-warning" id="detect-abnormal">0</span>
+                        </div>
+                        <div class="stat-sub-item">
+                            <span class="sub-label">严重</span>
+                            <span class="sub-value text-danger" id="detect-critical">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 设备在线率 -->
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <i class="bi bi-hdd-network-fill"></i>
+                    <span>设备在线率</span>
+                </div>
+                <div class="stat-card-body stat-card-center">
+                    <div class="stat-big-number stat-number-green" id="device-online-rate">--%</div>
+                    <div class="stat-sub-row">
+                        <div class="stat-sub-item">
+                            <span class="sub-label">在线</span>
+                            <strong id="device-online">0</strong>
+                        </div>
+                        <div class="stat-sub-item">
+                            <span class="sub-label">离线</span>
+                            <strong id="device-offline-count">0</strong>
+                        </div>
+                        <div class="stat-sub-item">
+                            <span class="sub-label">总设备</span>
+                            <strong id="device-total">0</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二行: 图表区域 -->
+        <div class="charts-row">
+            <!-- 插件告警分布 (柱状图) -->
+            <div class="chart-panel">
+                <div class="chart-panel-header">
+                    <span class="chart-title"><i class="bi bi-bar-chart-fill"></i> 插件告警分布</span>
+                    <div class="chart-actions">
+                        <select class="chart-filter" id="alarm-chart-period">
+                            <option value="today">今日</option>
+                            <option value="week">本周</option>
+                            <option value="month">本月</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="alarm-distribution-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- 告警时间趋势 (折线图) -->
+            <div class="chart-panel">
+                <div class="chart-panel-header">
+                    <span class="chart-title"><i class="bi bi-graph-up"></i> 告警时间趋势</span>
+                    <span class="chart-subtitle">最近24小时</span>
+                </div>
+                <div class="chart-body">
+                    <canvas id="alarm-trend-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三行: 插件健康度 + 最近告警 -->
+        <div class="bottom-row">
+            <!-- 插件健康度矩阵 -->
+            <div class="health-matrix-panel">
+                <div class="chart-panel-header">
+                    <span class="chart-title"><i class="bi bi-heart-pulse-fill"></i> 插件健康度</span>
+                    <a href="/plugins" class="chart-link">管理 <i class="bi bi-arrow-right"></i></a>
+                </div>
+                <div class="health-matrix" id="health-matrix">
+                    <!-- 由JS动态生成 -->
+                    <div class="health-matrix-loading">
+                        <div class="spinner-border spinner-border-sm text-info"></div>
+                        <span>加载插件状态...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 最近告警图片 -->
+            <div class="recent-alarms-panel">
+                <div class="chart-panel-header">
+                    <span class="chart-title"><i class="bi bi-images"></i> 最近告警图片</span>
+                    <a href="#" class="chart-link" id="view-all-alarms">详情 <i class="bi bi-arrow-right-short"></i></a>
+                </div>
+                <div class="recent-alarms-grid" id="recent-alarms-grid">
+                    <!-- 由JS动态生成 -->
+                    <div class="recent-alarms-empty">
+                        <i class="bi bi-shield-check"></i>
+                        <span>暂无告警图片</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ====== 右侧面板 ====== -->
+    <aside class="cockpit-right-panel">
+        <!-- 实时监测数据 -->
+        <div class="right-section">
+            <div class="right-section-title">
+                <i class="bi bi-broadcast"></i> 实时监测数据
+            </div>
+            <div class="monitor-summary">
+                <div class="monitor-item">
+                    <div class="monitor-icon monitor-icon-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                    </div>
+                    <div class="monitor-info">
+                        <span class="monitor-label">预警数量</span>
+                        <span class="monitor-value" id="rt-warning-count">0</span>
+                        <span class="monitor-unit">个</span>
+                    </div>
+                </div>
+                <div class="monitor-item">
+                    <div class="monitor-icon monitor-icon-danger">
+                        <i class="bi bi-gear-wide-connected"></i>
+                    </div>
+                    <div class="monitor-info">
+                        <span class="monitor-label">正在处置</span>
+                        <span class="monitor-value" id="rt-handling-count">0</span>
+                        <span class="monitor-unit">单</span>
+                    </div>
+                </div>
+                <div class="monitor-item">
+                    <div class="monitor-icon monitor-icon-success">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="monitor-info">
+                        <span class="monitor-label">处置完毕</span>
+                        <span class="monitor-value" id="rt-resolved-count">0</span>
+                        <span class="monitor-unit">单</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 实时告警列表 -->
+        <div class="right-section right-section-flex">
+            <div class="right-section-title">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-bell-fill"></i> 实时告警
+                    <span class="rt-alarm-badge" id="rt-alarm-badge">0</span>
+                </div>
+                <label class="rt-alarm-toggle">
+                    <span>声音</span>
+                    <input type="checkbox" id="alarm-sound-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="rt-alarm-list" id="rt-alarm-list">
+                <!-- 由JS动态生成 -->
+                <div class="rt-alarm-empty">
+                    <i class="bi bi-shield-check"></i>
+                    <span>暂无实时告警</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 电压等级在线率 -->
+        <div class="right-section">
+            <div class="right-section-title">
+                <i class="bi bi-lightning-charge"></i> 电压等级在线率
+            </div>
+            <div class="voltage-rates" id="voltage-rates">
+                <div class="voltage-rate-item">
+                    <span class="voltage-label">500kV</span>
+                    <div class="voltage-bar-wrap">
+                        <div class="voltage-bar" style="width: 100%"></div>
+                    </div>
+                    <span class="voltage-pct">100%</span>
+                    <span class="voltage-detail">0/0</span>
+                </div>
+                <div class="voltage-rate-item">
+                    <span class="voltage-label">220kV</span>
+                    <div class="voltage-bar-wrap">
+                        <div class="voltage-bar" style="width: 100%"></div>
+                    </div>
+                    <span class="voltage-pct">100%</span>
+                    <span class="voltage-detail">0/0</span>
+                </div>
+                <div class="voltage-rate-item">
+                    <span class="voltage-label">110kV</span>
+                    <div class="voltage-bar-wrap">
+                        <div class="voltage-bar" style="width: 100%"></div>
+                    </div>
+                    <span class="voltage-pct">100%</span>
+                    <span class="voltage-detail">0/0</span>
+                </div>
+                <div class="voltage-rate-item">
+                    <span class="voltage-label">35kV</span>
+                    <div class="voltage-bar-wrap">
+                        <div class="voltage-bar" style="width: 100%"></div>
+                    </div>
+                    <span class="voltage-pct">100%</span>
+                    <span class="voltage-detail">0/0</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ====== 底部状态栏 ====== -->
+    <footer class="cockpit-footer">
+        <div class="footer-left">
+            <span class="footer-item">
+                <span class="footer-dot footer-dot-ok"></span>
+                WebSocket: <span id="ws-status">已连接</span>
+            </span>
+            <span class="footer-item">
+                <i class="bi bi-puzzle"></i> 插件: <span id="footer-plugin-count">0</span> 个已加载
+            </span>
+        </div>
+        <div class="footer-center">
+            <span class="footer-item">
+                <i class="bi bi-clock"></i> <span id="footer-time"></span>
+            </span>
+        </div>
+        <div class="footer-right">
+            <span class="footer-item">
+                FPS: <span class="footer-value" id="footer-fps">--</span>
+            </span>
+            <span class="footer-item">
+                延迟: <span class="footer-value" id="footer-latency">--</span>ms
+            </span>
+            <span class="footer-item">
+                GPU: <span class="footer-value" id="footer-gpu">--%</span>
+            </span>
+            <span class="footer-item">
+                版本 4.0.0
+            </span>
+        </div>
+    </footer>
+</div>
+
+    </div>
+
+    <!-- 底部状态栏 -->
+    <footer class="footer mt-auto py-2 bg-light fixed-bottom">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-4">
+                    <small class="text-muted">
+                        <i class="bi bi-hdd"></i> 插件: <span id="plugin-count">0</span> 个已加载
+                    </small>
+                </div>
+                <div class="col-md-4 text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> <span id="current-time"></span>
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    <small class="text-muted">
+                        版本 4.0.0
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/static/js/cockpit.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        CockpitDashboard.init();
+    });
+    window.addEventListener('beforeunload', function() {
+        CockpitDashboard.destroy();
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>训练调试平台 - DarkBreaker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link href="/static/css/standalone.css" rel="stylesheet">
+    <style>
+        :root {
+            --panel-bg: #1e293b;
+            --bg: #0f172a;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --sidebar-width: 280px;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ─────────────────────────────────────────── */
+        #platform-sidebar {
+            position: fixed; top: 56px; left: 0; bottom: 28px;
+            width: var(--sidebar-width);
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto; z-index: 1020;
+            transition: transform 0.25s ease;
+        }
+        #platform-sidebar.collapsed { transform: translateX(calc(-1 * var(--sidebar-width))); }
+        .sidebar-section {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-section-title {
+            font-size: 0.7rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--text-secondary); margin-bottom: 0.5rem;
+            display: flex; align-items: center; gap: 0.4rem;
+        }
+        #platform-sidebar .form-select,
+        #platform-sidebar .form-control {
+            background-color: var(--bg); border-color: var(--border-color);
+            color: var(--text-primary); font-size: 0.82rem; padding: 0.3rem 0.5rem;
+        }
+
+        /* ── Main wrapper ────────────────────────────────────── */
+        #main-wrapper {
+            margin-left: var(--sidebar-width);
+            transition: margin-left 0.25s ease;
+            min-height: calc(100vh - 56px - 28px);
+            padding: 1rem;
+        }
+        #main-wrapper.sidebar-collapsed { margin-left: 0; }
+
+        /* ── Panel card ──────────────────────────────────────── */
+        .panel {
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 1rem; margin-bottom: 1rem;
+        }
+        .panel-title {
+            font-size: 0.82rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--text-secondary);
+            margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.4rem;
+        }
+
+        /* ── Metric cards ────────────────────────────────────── */
+        .metric-card {
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 0.8rem 1rem; text-align: center;
+        }
+        .metric-value { font-size: 1.6rem; font-weight: 700; }
+        .metric-label { font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem; }
+
+        /* ── Tab navigation ──────────────────────────────────── */
+        .nav-tabs .nav-link {
+            color: var(--text-secondary); border: none; font-size: 0.85rem;
+            padding: 0.5rem 1rem; border-radius: 6px 6px 0 0;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--text-primary); background: var(--panel-bg);
+            border-bottom: 2px solid var(--accent);
+        }
+        .nav-tabs .nav-link:hover { color: var(--text-primary); }
+
+        /* ── Upload zone ─────────────────────────────────────── */
+        .upload-zone {
+            border: 2px dashed var(--border-color); border-radius: 10px;
+            padding: 2rem; text-align: center; cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(59,130,246,0.05);
+        }
+        .upload-zone i { font-size: 2.5rem; color: var(--accent); }
+
+        /* ── Progress items ──────────────────────────────────── */
+        .task-item {
+            background: var(--bg); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 0.5rem;
+        }
+        .task-item .badge { font-size: 0.68rem; }
+
+        /* ── Upload record row ───────────────────────────────── */
+        .record-row {
+            background: var(--bg); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem;
+            font-size: 0.82rem; display: flex; align-items: center; gap: 0.6rem;
+        }
+
+        /* ── Skill card ──────────────────────────────────────── */
+        .skill-card {
+            background: var(--bg); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 0.6rem 0.8rem; margin-bottom: 0.4rem;
+            cursor: pointer; transition: border-color 0.15s;
+        }
+        .skill-card:hover { border-color: var(--accent); }
+        .skill-card.active { border-color: var(--accent); background: rgba(59,130,246,0.06); }
+
+        /* ── Markdown viewer ─────────────────────────────────── */
+        .md-viewer {
+            background: var(--bg); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 1rem; max-height: 500px;
+            overflow-y: auto; font-size: 0.82rem; line-height: 1.6;
+            white-space: pre-wrap; font-family: 'SFMono-Regular', Consolas, monospace;
+        }
+
+        /* ── Status bar ──────────────────────────────────────── */
+        #status-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            height: 28px; background: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex; align-items: center; padding: 0 1rem;
+            font-size: 0.72rem; color: var(--text-secondary); z-index: 1030;
+        }
+
+        /* ── Plugin chip ─────────────────────────────────────── */
+        .plugin-chip {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.72rem;
+            background: rgba(59,130,246,0.12); color: var(--accent); margin: 0.1rem;
+        }
+
+        /* ── Responsive ──────────────────────────────────────── */
+        @media (max-width: 992px) {
+            #platform-sidebar { transform: translateX(calc(-1 * var(--sidebar-width))); }
+            #platform-sidebar.mobile-open { transform: translateX(0); }
+            #main-wrapper { margin-left: 0; }
+        }
+
+        /* ── Custom scrollbar ────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     Top Navbar
+     ═══════════════════════════════════════════════════════ -->
+<nav class="navbar navbar-dark sticky-top" style="background-color: var(--panel-bg); border-bottom: 1px solid var(--border-color); height: 56px; z-index: 1030;">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center gap-2">
+            <button id="btn-sidebar-toggle" type="button" title="Toggle sidebar"
+                    style="background:none;border:none;color:var(--text-secondary);font-size:1.2rem;padding:0.25rem 0.5rem;">
+                <i class="bi bi-layout-sidebar-inset"></i>
+            </button>
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-gpu-card text-warning me-2"></i>训练调试平台
+            </span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span id="ws-status" class="badge bg-secondary"><i class="bi bi-circle-fill me-1"></i>未连接</span>
+            <span class="text-secondary small">Training Debug v1.0</span>
+        </div>
+    </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════
+     Left Sidebar
+     ═══════════════════════════════════════════════════════ -->
+<aside id="platform-sidebar">
+    <!-- 电压等级 -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-title"><i class="bi bi-lightning"></i> 电压等级</div>
+        <select id="sel-voltage" class="form-select form-select-sm">
+            <option value="">-- 全部 --</option>
+            <option value="UHV_1000kV_AC">特高压 1000kV 交流</option>
+            <option value="EHV_500kV">超高压 500kV</option>
+            <option value="EHV_330kV">超高压 330kV</option>
+            <option value="HV_220kV" selected>高压 220kV</option>
+            <option value="HV_110kV">高压 110kV</option>
+            <option value="MV_35kV">中压 35kV</option>
+            <option value="LV_10kV">低压 10kV</option>
+        </select>
+    </div>
+
+    <!-- 插件选择 -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-title"><i class="bi bi-puzzle"></i> 目标插件</div>
+        <select id="sel-plugin" class="form-select form-select-sm">
+            <option value="">-- 全部 --</option>
+        </select>
+        <div id="plugin-classes" class="mt-2" style="max-height:120px;overflow-y:auto;"></div>
+    </div>
+
+    <!-- 训练参数 -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-title"><i class="bi bi-sliders"></i> 训练参数</div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size:0.78rem;color:var(--text-secondary);">Epochs</label>
+            <input type="number" class="form-control form-control-sm" id="cfg-epochs" value="100" min="1" max="1000">
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size:0.78rem;color:var(--text-secondary);">Batch Size</label>
+            <select id="cfg-batch" class="form-select form-select-sm">
+                <option value="4">4</option>
+                <option value="8">8</option>
+                <option value="16" selected>16</option>
+                <option value="32">32</option>
+                <option value="64">64</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <label class="form-label" style="font-size:0.78rem;color:var(--text-secondary);">模型尺寸</label>
+            <select id="cfg-model-size" class="form-select form-select-sm">
+                <option value="yolov8n">YOLOv8n (Nano)</option>
+                <option value="yolov8s" selected>YOLOv8s (Small)</option>
+                <option value="yolov8m">YOLOv8m (Medium)</option>
+                <option value="yolov8l">YOLOv8l (Large)</option>
+                <option value="yolov8x">YOLOv8x (XLarge)</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-title"><i class="bi bi-play-circle"></i> 快速操作</div>
+        <button class="btn btn-sm btn-primary w-100 mb-2" onclick="startTraining()">
+            <i class="bi bi-play-fill me-1"></i>启动训练
+        </button>
+        <button class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="refreshAll()">
+            <i class="bi bi-arrow-clockwise me-1"></i>刷新状态
+        </button>
+    </div>
+
+    <!-- 数据概览 -->
+    <div class="sidebar-section">
+        <div class="sidebar-section-title"><i class="bi bi-database"></i> 数据概览</div>
+        <div id="sidebar-data-summary" style="font-size:0.78rem;">
+            <div class="d-flex justify-content-between"><span class="text-secondary">Raw</span><span id="data-raw-count">-</span></div>
+            <div class="d-flex justify-content-between"><span class="text-secondary">Processed</span><span id="data-proc-count">-</span></div>
+            <div class="d-flex justify-content-between"><span class="text-secondary">Augmented</span><span id="data-aug-count">-</span></div>
+        </div>
+    </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════
+     Main Content
+     ═══════════════════════════════════════════════════════ -->
+<div id="main-wrapper">
+
+    <!-- Top Metrics -->
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="metric-card">
+                <div class="metric-value text-info" id="m-total-uploads">0</div>
+                <div class="metric-label">上传批次</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card">
+                <div class="metric-value text-success" id="m-total-files">0</div>
+                <div class="metric-label">文件总量</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card">
+                <div class="metric-value text-warning" id="m-active-tasks">0</div>
+                <div class="metric-label">训练任务</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="metric-card">
+                <div class="metric-value text-danger" id="m-total-size">0 MB</div>
+                <div class="metric-label">数据总量</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs mb-0" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-upload" type="button">
+                <i class="bi bi-cloud-upload me-1"></i>数据上传
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-training" type="button">
+                <i class="bi bi-graph-up me-1"></i>训练进度
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-batches" type="button">
+                <i class="bi bi-collection me-1"></i>批次管理
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-plugins" type="button">
+                <i class="bi bi-puzzle me-1"></i>插件映射
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-skills" type="button">
+                <i class="bi bi-book me-1"></i>Agent Skills
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-project" type="button">
+                <i class="bi bi-card-heading me-1"></i>Project Card
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- ═══════ Tab: 数据上传 ═══════ -->
+        <div class="tab-pane fade show active" id="tab-upload">
+            <div class="row g-3 mt-0">
+                <div class="col-lg-7">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-cloud-arrow-up"></i> 上传训练数据</div>
+
+                        <!-- 上传配置 -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" style="font-size:0.78rem;">电压等级</label>
+                                <select id="upload-voltage" class="form-select form-select-sm">
+                                    <option value="HV_220kV">高压 220kV</option>
+                                    <option value="HV_110kV">高压 110kV</option>
+                                    <option value="EHV_500kV">超高压 500kV</option>
+                                    <option value="EHV_330kV">超高压 330kV</option>
+                                    <option value="MV_35kV">中压 35kV</option>
+                                    <option value="LV_10kV">低压 10kV</option>
+                                    <option value="UHV_1000kV_AC">特高压 1000kV</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" style="font-size:0.78rem;">目标插件</label>
+                                <select id="upload-plugins" class="form-select form-select-sm">
+                                    <!-- 动态填充 -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 拖拽上传区 -->
+                        <div id="drop-zone" class="upload-zone" onclick="document.getElementById('file-input').click()">
+                            <input type="file" id="file-input" multiple hidden
+                                   accept=".jpg,.jpeg,.png,.bmp,.tif,.tiff,.txt,.xml,.json,.csv,.yaml,.yml,.zip,.tar,.gz,.mp4,.avi,.wav,.mp3">
+                            <i class="bi bi-cloud-arrow-up d-block mb-2"></i>
+                            <div>拖拽文件到此处或 <span class="text-info">点击选择</span></div>
+                            <div class="text-secondary mt-1" style="font-size:0.75rem;">
+                                支持: 图片 / 视频 / 音频 / 标注文件 / 压缩包，推荐上传单个 zip 或 tar.gz
+                            </div>
+                        </div>
+
+                        <!-- 待上传文件列表 -->
+                        <div id="file-list" class="mt-3" style="max-height:200px;overflow-y:auto;"></div>
+
+                        <!-- 上传按钮 -->
+                        <div class="d-flex gap-2 mt-3">
+                            <button id="btn-upload" class="btn btn-primary btn-sm" onclick="uploadFiles()" disabled>
+                                <i class="bi bi-upload me-1"></i>开始上传 <span id="upload-count-badge"></span>
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="clearFiles()">
+                                <i class="bi bi-x-circle me-1"></i>清空
+                            </button>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="upload-auto-standardize" checked>
+                            <label class="form-check-label text-secondary" for="upload-auto-standardize" style="font-size:0.76rem;">
+                                上传后自动标准化到训练可用结构
+                            </label>
+                        </div>
+
+                        <!-- 上传进度 -->
+                        <div id="upload-progress" class="mt-3" style="display:none;">
+                            <div class="progress" style="height:6px;background:var(--bg);">
+                                <div id="upload-progress-bar" class="progress-bar bg-info" style="width:0%"></div>
+                            </div>
+                            <div id="upload-status-text" class="text-secondary mt-1" style="font-size:0.75rem;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-5">
+                    <!-- 验证结果 -->
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-check-circle"></i> 上传验证</div>
+                        <div id="validation-result">
+                            <div class="text-secondary" style="font-size:0.82rem;">选择文件后自动验证</div>
+                        </div>
+                    </div>
+
+                    <!-- 支持的格式 -->
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-file-earmark"></i> 支持的格式</div>
+                        <div style="font-size:0.78rem;">
+                            <div class="mb-1"><span class="text-info">图像:</span> jpg, png, bmp, tif, webp</div>
+                            <div class="mb-1"><span class="text-info">视频:</span> mp4, avi, mov, mkv</div>
+                            <div class="mb-1"><span class="text-info">音频:</span> mp3, wav, flac, aac</div>
+                            <div class="mb-1"><span class="text-info">标注:</span> txt, xml, json, csv, yaml</div>
+                            <div><span class="text-info">压缩包:</span> zip, tar, gz</div>
+                        </div>
+                    </div>
+
+                    <!-- 数据目录结构 -->
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-folder2-open"></i> 数据路径</div>
+                        <div style="font-size:0.75rem;font-family:monospace;">
+                            <div>training/data/raw/<span class="text-warning">{voltage}</span>/{upload_id}/</div>
+                            <div>training/data/processed/<span class="text-warning">{voltage}</span>/<span class="text-info">{plugin}</span>/</div>
+                            <div class="text-secondary mt-1">└── images/{train,val,test}/</div>
+                            <div class="text-secondary">└── labels/{train,val,test}/</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Tab: 训练进度 ═══════ -->
+        <div class="tab-pane fade" id="tab-training">
+            <div class="row g-3 mt-0">
+                <div class="col-lg-8">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-cpu"></i> 训练任务</div>
+                        <div id="training-tasks-list">
+                            <div class="text-secondary" style="font-size:0.82rem;">暂无训练任务</div>
+                        </div>
+                    </div>
+
+                    <!-- 训练曲线 -->
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-graph-up-arrow"></i> 训练曲线</div>
+                        <canvas id="chart-training" height="200"></canvas>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <!-- 已完成模型 -->
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-box-seam"></i> 已完成模型</div>
+                        <div id="completed-models-list">
+                            <div class="text-secondary" style="font-size:0.82rem;">暂无已训练模型</div>
+                        </div>
+                    </div>
+
+                    <!-- 数据集状态 -->
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-pie-chart"></i> 数据集分布</div>
+                        <canvas id="chart-dataset" height="180"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Tab: 批次管理 ═══════ -->
+        <div class="tab-pane fade" id="tab-batches">
+            <div class="row g-3 mt-0">
+                <div class="col-lg-7">
+                    <div class="panel">
+                        <div class="panel-title d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-collection"></i> 上传批次记录</span>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadUploadRecords()">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                        <div id="batch-records-list">
+                            <div class="text-secondary" style="font-size:0.82rem;">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-card-list"></i> 批次详情</div>
+                        <div id="batch-detail-panel">
+                            <div class="text-secondary" style="font-size:0.82rem;">选择左侧批次查看详情</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Tab: 插件映射 ═══════ -->
+        <div class="tab-pane fade" id="tab-plugins">
+            <div class="row g-3 mt-0">
+                <div class="col-lg-6">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-diagram-3"></i> 插件训练类型映射</div>
+                        <div id="plugin-mapping-list">
+                            <div class="text-secondary" style="font-size:0.82rem;">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-tags"></i> 插件检测类别</div>
+                        <div id="plugin-classes-detail" style="max-height:500px;overflow-y:auto;">
+                            {% for plugin_id, classes in plugin_classes.items() %}
+                            <div class="mb-2">
+                                <div class="fw-bold" style="font-size:0.82rem;">{{ plugin_id }}</div>
+                                <div>
+                                    {% for cls in classes %}
+                                    <span class="plugin-chip">{{ cls }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Tab: Agent Skills ═══════ -->
+        <div class="tab-pane fade" id="tab-skills">
+            <div class="row g-3 mt-0">
+                <div class="col-md-4">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-journal-code"></i> Skills 列表</div>
+                        <div id="skills-list"></div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="panel">
+                        <div class="panel-title"><i class="bi bi-eye"></i> <span id="skill-viewer-title">选择一个 Skill 查看</span></div>
+                        <div id="skill-viewer" class="md-viewer">
+                            <span class="text-secondary">点击左侧列表查看详情</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ Tab: Project Card ═══════ -->
+        <div class="tab-pane fade" id="tab-project">
+            <div class="panel mt-3">
+                <div class="panel-title"><i class="bi bi-card-heading"></i> PROJECT_CARD.md</div>
+                <div id="project-card-viewer" class="md-viewer" style="max-height:700px;">
+                    <span class="text-secondary">加载中...</span>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /tab-content -->
+</div><!-- /main-wrapper -->
+
+<!-- Status Bar -->
+<div id="status-bar">
+    <span id="status-msg">就绪</span>
+    <span class="ms-auto" id="status-time"></span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     Scripts
+     ═══════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ============================================================
+// 状态变量
+// ============================================================
+let selectedFiles = [];
+let wsConnection = null;
+let trainingChart = null;
+let datasetChart = null;
+let autoRefreshTimer = null;
+let currentBatchId = null;
+
+// ============================================================
+// 初始化
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+    initSidebar();
+    initDropZone();
+    loadPluginTypes();
+    loadDataOverview();
+    loadUploadStats();
+    loadUploadRecords();
+    loadAgentSkills();
+    loadProjectCard();
+    loadPluginMapping();
+    loadTrainingTasks();
+    initCharts();
+    connectWS();
+
+    // 自动刷新 (3秒)
+    autoRefreshTimer = setInterval(() => {
+        loadTrainingTasks();
+        loadUploadStats();
+        loadUploadRecords(true);
+    }, 3000);
+
+    // 时钟
+    setInterval(() => {
+        document.getElementById('status-time').textContent = new Date().toLocaleTimeString('zh-CN');
+    }, 1000);
+});
+
+// ============================================================
+// Sidebar
+// ============================================================
+function initSidebar() {
+    document.getElementById('btn-sidebar-toggle').addEventListener('click', () => {
+        document.getElementById('platform-sidebar').classList.toggle('collapsed');
+        document.getElementById('main-wrapper').classList.toggle('sidebar-collapsed');
+    });
+
+    // 插件选择联动显示类别
+    document.getElementById('sel-plugin').addEventListener('change', (e) => {
+        const pluginId = e.target.value;
+        const container = document.getElementById('plugin-classes');
+        if (!pluginId) { container.innerHTML = ''; return; }
+        const classes = window._pluginClasses?.[pluginId] || [];
+        container.innerHTML = classes.map(c => `<span class="plugin-chip">${c}</span>`).join('');
+    });
+}
+
+// ============================================================
+// 插件类型加载
+// ============================================================
+async function loadPluginTypes() {
+    try {
+        const res = await fetch('/api/training/data/plugin-types');
+        const data = await res.json();
+        if (!data.success) return;
+
+        // 侧边栏选择
+        const selPlugin = document.getElementById('sel-plugin');
+        const uploadPlugins = document.getElementById('upload-plugins');
+
+        data.plugins.forEach(p => {
+            selPlugin.innerHTML += `<option value="${p.id}">${p.name} (${p.classes}类)</option>`;
+            uploadPlugins.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+        });
+
+        // 缓存类别
+        window._pluginClasses = {};
+        const pluginClasses = {{ plugin_classes | tojson }};
+        window._pluginClasses = pluginClasses;
+    } catch (e) {
+        console.error('加载插件类型失败:', e);
+    }
+}
+
+// ============================================================
+// 数据概览
+// ============================================================
+async function loadDataOverview() {
+    try {
+        const res = await fetch('/api/data-overview');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const ov = data.overview;
+        const sum = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
+        document.getElementById('data-raw-count').textContent = sum(ov.raw) + ' 文件';
+        document.getElementById('data-proc-count').textContent = sum(ov.processed) + ' 文件';
+        document.getElementById('data-aug-count').textContent = sum(ov.augmented) + ' 文件';
+    } catch (e) {
+        console.error('加载数据概览失败:', e);
+    }
+}
+
+// ============================================================
+// 上传统计
+// ============================================================
+async function loadUploadStats() {
+    try {
+        const res = await fetch('/api/training/data/stats');
+        const data = await res.json();
+        if (!data.success) return;
+        const s = data.stats;
+
+        document.getElementById('m-total-uploads').textContent = s.total_uploads;
+        document.getElementById('m-total-files').textContent = s.total_files;
+        document.getElementById('m-total-size').textContent = s.total_size_mb + ' MB';
+    } catch (e) {}
+}
+
+// ============================================================
+// 拖拽上传区
+// ============================================================
+function initDropZone() {
+    const zone = document.getElementById('drop-zone');
+    const input = document.getElementById('file-input');
+
+    ['dragenter', 'dragover'].forEach(evt => {
+        zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.remove('dragover'); });
+    });
+
+    zone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer.files);
+        addFiles(files);
+    });
+
+    input.addEventListener('change', (e) => {
+        addFiles(Array.from(e.target.files));
+        e.target.value = '';
+    });
+}
+
+function addFiles(files) {
+    selectedFiles = selectedFiles.concat(files);
+    renderFileList();
+    validateFiles();
+}
+
+function clearFiles() {
+    selectedFiles = [];
+    renderFileList();
+    document.getElementById('validation-result').innerHTML =
+        '<div class="text-secondary" style="font-size:0.82rem;">选择文件后自动验证</div>';
+}
+
+function renderFileList() {
+    const container = document.getElementById('file-list');
+    const btn = document.getElementById('btn-upload');
+    const badge = document.getElementById('upload-count-badge');
+
+    if (selectedFiles.length === 0) {
+        container.innerHTML = '';
+        btn.disabled = true;
+        badge.textContent = '';
+        return;
+    }
+
+    btn.disabled = false;
+    badge.textContent = `(${selectedFiles.length})`;
+
+    const html = selectedFiles.map((f, i) => {
+        const sizeKB = (f.size / 1024).toFixed(1);
+        const ext = f.name.split('.').pop().toLowerCase();
+        let icon = 'bi-file-earmark';
+        if (['jpg','jpeg','png','bmp','tif','tiff','webp'].includes(ext)) icon = 'bi-file-image';
+        else if (['mp4','avi','mov','mkv'].includes(ext)) icon = 'bi-file-play';
+        else if (['mp3','wav','flac'].includes(ext)) icon = 'bi-file-music';
+        else if (['txt','xml','json','csv','yaml','yml'].includes(ext)) icon = 'bi-file-code';
+        else if (['zip','tar','gz','tgz'].includes(ext)) icon = 'bi-file-zip';
+
+        return `<div class="record-row">
+            <i class="bi ${icon} text-info"></i>
+            <span class="flex-grow-1 text-truncate" style="font-size:0.78rem;">${f.name}</span>
+            <span class="text-secondary" style="font-size:0.72rem;">${sizeKB} KB</span>
+            <button class="btn btn-sm p-0 text-secondary" onclick="removeFile(${i})" title="移除">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>`;
+    }).join('');
+    container.innerHTML = html;
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderFileList();
+}
+
+// ============================================================
+// 文件验证
+// ============================================================
+async function validateFiles() {
+    if (selectedFiles.length === 0) return;
+
+    const voltage = document.getElementById('upload-voltage').value;
+    const pluginSel = document.getElementById('upload-plugins');
+    const plugins = Array.from(pluginSel.selectedOptions).map(o => o.value);
+    if (plugins.length === 0) plugins.push('transformer');
+
+    const filesInfo = selectedFiles.map(f => ({ name: f.name, size: f.size }));
+
+    try {
+        const res = await fetch('/api/training/data/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ voltage_level: voltage, plugins: plugins, files: filesInfo }),
+        });
+        const data = await res.json();
+
+        let html = '';
+        if (data.valid) {
+            html += `<div class="alert alert-success py-1 px-2 mb-2" style="font-size:0.78rem;">
+                <i class="bi bi-check-circle me-1"></i>验证通过</div>`;
+        } else {
+            html += `<div class="alert alert-danger py-1 px-2 mb-2" style="font-size:0.78rem;">
+                <i class="bi bi-exclamation-circle me-1"></i>验证失败</div>`;
+        }
+
+        if (data.summary) {
+            const s = data.summary;
+            html += `<div style="font-size:0.78rem;" class="mb-2">
+                <div>电压等级: <span class="text-warning">${s.voltage_level}</span></div>
+                <div>插件: ${s.plugins.map(p => `<span class="plugin-chip">${p}</span>`).join(' ')}</div>
+                <div class="mt-1">图像: ${s.image_count} | 视频: ${s.video_count} | 标注: ${s.label_count}</div>
+                <div>总大小: ${s.total_size_mb} MB</div>
+            </div>`;
+        }
+
+        if (data.warnings?.length > 0) {
+            html += data.warnings.map(w =>
+                `<div class="text-warning" style="font-size:0.72rem;"><i class="bi bi-exclamation-triangle me-1"></i>${w}</div>`
+            ).join('');
+        }
+        if (data.errors?.length > 0) {
+            html += data.errors.map(e =>
+                `<div class="text-danger" style="font-size:0.72rem;"><i class="bi bi-x-circle me-1"></i>${e}</div>`
+            ).join('');
+        }
+
+        document.getElementById('validation-result').innerHTML = html;
+    } catch (e) {
+        console.error('验证失败:', e);
+    }
+}
+
+// ============================================================
+// 文件上传
+// ============================================================
+async function uploadFiles() {
+    if (selectedFiles.length === 0) return;
+
+    const voltage = document.getElementById('upload-voltage').value;
+    const pluginSel = document.getElementById('upload-plugins');
+    const plugins = Array.from(pluginSel.selectedOptions).map(o => o.value);
+    if (plugins.length === 0) plugins.push('transformer');
+    const autoStandardize = document.getElementById('upload-auto-standardize').checked;
+
+    const formData = new FormData();
+    formData.append('voltage_level', voltage);
+    formData.append('plugins', JSON.stringify(plugins));
+    formData.append('auto_standardize', autoStandardize ? 'true' : 'false');
+    selectedFiles.forEach(f => formData.append('files', f));
+
+    const btn = document.getElementById('btn-upload');
+    const progressDiv = document.getElementById('upload-progress');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const statusText = document.getElementById('upload-status-text');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>上传中...';
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    statusText.textContent = '正在上传...';
+
+    try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/training/data/upload');
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = pct + '%';
+                statusText.textContent = `上传进度: ${pct}% (${(e.loaded/1024/1024).toFixed(1)} / ${(e.total/1024/1024).toFixed(1)} MB)`;
+            }
+        };
+
+        xhr.onload = () => {
+            const data = JSON.parse(xhr.responseText);
+            if (data.success) {
+                progressBar.style.width = '100%';
+                progressBar.classList.replace('bg-info', 'bg-success');
+                statusText.textContent = `上传成功! 已创建批次 ${data.batch_id}，后台正在解包与校验...`;
+                setStatus(`上传完成: ${data.batch_id}`);
+                currentBatchId = data.batch_id;
+                selectedFiles = [];
+                renderFileList();
+                setTimeout(() => {
+                    loadUploadRecords();
+                    loadUploadStats();
+                    loadDataOverview();
+                }, 1000);
+            } else {
+                progressBar.classList.replace('bg-info', 'bg-danger');
+                statusText.textContent = '上传失败: ' + (data.detail || data.message || '未知错误');
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-1"></i>开始上传';
+        };
+
+        xhr.onerror = () => {
+            progressBar.classList.replace('bg-info', 'bg-danger');
+            statusText.textContent = '上传失败: 网络错误';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-1"></i>开始上传';
+        };
+
+        xhr.send(formData);
+    } catch (e) {
+        console.error('上传失败:', e);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload me-1"></i>开始上传';
+    }
+}
+
+// ============================================================
+// 训练任务
+// ============================================================
+async function loadTrainingTasks() {
+    try {
+        const res = await fetch('/api/training/tasks');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const tasks = data.tasks || [];
+        const container = document.getElementById('training-tasks-list');
+
+        // 更新 metric
+        const active = tasks.filter(t => t.status === 'training' || t.status === 'preparing').length;
+        document.getElementById('m-active-tasks').textContent = tasks.length;
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<div class="text-secondary" style="font-size:0.82rem;">暂无训练任务</div>';
+            return;
+        }
+
+        container.innerHTML = tasks.map(t => {
+            const statusColors = {
+                idle: 'secondary', preparing: 'info', training: 'primary',
+                evaluating: 'warning', completed: 'success', failed: 'danger', cancelled: 'secondary'
+            };
+            const color = statusColors[t.status] || 'secondary';
+            const pct = t.progress?.toFixed(1) || '0.0';
+
+            return `<div class="task-item">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <div>
+                        <span class="fw-bold" style="font-size:0.85rem;">${t.plugin}</span>
+                        <span class="text-secondary ms-2" style="font-size:0.72rem;">${t.voltage_level}</span>
+                    </div>
+                    <span class="badge bg-${color}">${t.status}</span>
+                </div>
+                <div class="progress mb-1" style="height:4px;background:var(--bg);">
+                    <div class="progress-bar bg-${color}" style="width:${pct}%"></div>
+                </div>
+                <div class="d-flex justify-content-between" style="font-size:0.72rem;">
+                    <span class="text-secondary">${t.message || ''}</span>
+                    <span>Epoch ${t.current_epoch}/${t.total_epochs} | mAP50: ${t.best_map50?.toFixed(4) || '-'}</span>
+                </div>
+                <div class="d-flex gap-1 mt-1">
+                    ${t.status === 'training' ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:0.7rem;" onclick="cancelTraining('${t.task_id}')">取消</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+
+        // 更新图表数据
+        updateTrainingChart(tasks);
+    } catch (e) {}
+}
+
+async function startTraining() {
+    const voltage = document.getElementById('sel-voltage').value || 'HV_220kV';
+    const plugin = document.getElementById('sel-plugin').value;
+    if (!plugin) {
+        alert('请先选择目标插件');
+        return;
+    }
+
+    const epochs = parseInt(document.getElementById('cfg-epochs').value) || 100;
+    const batchSize = parseInt(document.getElementById('cfg-batch').value) || 16;
+
+    try {
+        const res = await fetch('/api/training/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                voltage_level: voltage,
+                plugin: plugin,
+                epochs: epochs,
+                batch_size: batchSize,
+            }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            setStatus(`训练已启动: ${data.task_id}`);
+            loadTrainingTasks();
+        } else {
+            alert('启动失败: ' + data.message);
+        }
+    } catch (e) {
+        alert('启动训练失败: ' + e.message);
+    }
+}
+
+async function cancelTraining(taskId) {
+    if (!confirm('确认取消训练?')) return;
+    try {
+        await fetch(`/api/training/cancel/${taskId}`, { method: 'POST' });
+        loadTrainingTasks();
+    } catch (e) {}
+}
+
+// ============================================================
+// 批次管理
+// ============================================================
+function getBatchStatusMeta(status) {
+    const mapping = {
+        uploaded: { color: 'info', label: '已上传' },
+        unpacking: { color: 'warning', label: '解包中' },
+        validating: { color: 'primary', label: '校验中' },
+        validation_failed: { color: 'danger', label: '校验失败' },
+        standardized: { color: 'secondary', label: '已标准化' },
+        ready_for_training: { color: 'success', label: '可训练' },
+        training: { color: 'primary', label: '训练中' },
+        completed: { color: 'success', label: '已完成' },
+        failed: { color: 'danger', label: '失败' },
+    };
+    return mapping[status] || { color: 'secondary', label: status || 'unknown' };
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function summarizeValidation(record) {
+    const report = record.validation_report || {};
+    const manifest = report.manifest || {};
+    const labels = report.labels || {};
+    const files = report.files || {};
+    return `
+        <div class="d-flex gap-3 flex-wrap mt-2" style="font-size:0.72rem;">
+            <span><i class="bi bi-file-earmark-check text-info me-1"></i>Manifest ${manifest.valid ? '通过' : '失败'}</span>
+            <span><i class="bi bi-tags text-warning me-1"></i>标签 ${labels.valid ? '通过' : '异常'}</span>
+            <span><i class="bi bi-images me-1"></i>${files.images || 0} 图像</span>
+            <span><i class="bi bi-journal-code me-1"></i>${files.labels || 0} 标注</span>
+        </div>
+    `;
+}
+
+async function loadUploadRecords(silent = false) {
+    try {
+        const res = await fetch('/api/training/data/list');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const container = document.getElementById('batch-records-list');
+        const records = data.records || [];
+
+        if (records.length === 0) {
+            container.innerHTML = '<div class="text-secondary" style="font-size:0.82rem;">暂无上传记录</div>';
+            document.getElementById('batch-detail-panel').innerHTML =
+                '<div class="text-secondary" style="font-size:0.82rem;">选择左侧批次查看详情</div>';
+            return;
+        }
+
+        if (!currentBatchId || !records.some(r => (r.batch_id || r.id) === currentBatchId)) {
+            currentBatchId = records[0].batch_id || records[0].id;
+        }
+
+        container.innerHTML = records.map(r => {
+            const batchId = r.batch_id || r.id;
+            const meta = getBatchStatusMeta(r.status);
+            const date = new Date(r.created_at).toLocaleString('zh-CN');
+            const sizeBytes = r.validation_report?.files?.total_size_bytes || 0;
+            const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(2);
+            const canStandardize = r.status === 'uploaded' && r.validation_report?.valid && !r.standardized_path;
+            const canDelete = ['validation_failed', 'failed'].includes(r.status);
+            const activeStyle = currentBatchId === batchId ? 'border:1px solid rgba(56,189,248,0.5);' : '';
+            return `<div class="task-item">
+                <div style="${activeStyle}padding:0.2rem;border-radius:12px;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-bold" style="font-size:0.82rem;">${batchId}</span>
+                        <span class="badge bg-${meta.color} ms-2">${meta.label}</span>
+                    </div>
+                    <span class="text-secondary" style="font-size:0.72rem;">${date}</span>
+                </div>
+                <div class="d-flex gap-3 mt-1" style="font-size:0.75rem;">
+                    <span><i class="bi bi-folder2-open text-info me-1"></i>${escapeHtml(r.dataset_name || batchId)}</span>
+                    <span><i class="bi bi-lightning text-warning me-1"></i>${escapeHtml(r.voltage_level || '-')}</span>
+                    <span><i class="bi bi-puzzle text-info me-1"></i>${escapeHtml(r.plugin_id || '-')}</span>
+                    <span><i class="bi bi-diagram-2 me-1"></i>${escapeHtml(r.task_type || '-')}</span>
+                </div>
+                <div class="d-flex gap-3 mt-1" style="font-size:0.75rem;">
+                    <span><i class="bi bi-file-earmark me-1"></i>${r.validation_report?.files?.total_files || 0} 文件</span>
+                    <span><i class="bi bi-hdd me-1"></i>${sizeMB} MB</span>
+                    <span><i class="bi bi-speedometer2 me-1"></i>${Math.round(r.progress || 0)}%</span>
+                </div>
+                ${summarizeValidation(r)}
+                <div style="font-size:0.72rem;" class="text-secondary mt-1">
+                    ${escapeHtml(r.message || '')}
+                </div>
+                <div class="d-flex gap-1 mt-1">
+                    <button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:0.7rem;"
+                            onclick="viewBatchDetail('${batchId}')">详情</button>
+                    ${canStandardize ? `<button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size:0.7rem;" onclick="standardizeBatch('${batchId}')">标准化</button>` : ''}
+                    ${canDelete ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:0.7rem;" onclick="deleteRecord('${batchId}')">软删除</button>` : ''}
+                </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        if (!silent && currentBatchId) {
+            viewBatchDetail(currentBatchId, true);
+        }
+    } catch (e) {
+        console.error('加载上传记录失败:', e);
+    }
+}
+
+function renderBatchDetail(record) {
+    const container = document.getElementById('batch-detail-panel');
+    const meta = getBatchStatusMeta(record.status);
+    const report = record.validation_report || {};
+    const manifest = report.manifest || {};
+    const labels = report.labels || {};
+    const files = report.files || {};
+    const standardization = report.standardization || {};
+    const manifestErrors = (manifest.errors || []).slice(0, 8);
+    const labelErrors = (labels.errors || []).slice(0, 8);
+    const warnings = [
+        ...(manifest.warnings || []),
+        ...(labels.warnings || []),
+    ].slice(0, 8);
+
+    container.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <div class="fw-bold" style="font-size:0.86rem;">${escapeHtml(record.dataset_name || record.batch_id)}</div>
+                <div class="text-secondary" style="font-size:0.72rem;">${escapeHtml(record.batch_id)}</div>
+            </div>
+            <span class="badge bg-${meta.color}">${meta.label}</span>
+        </div>
+        <div style="font-size:0.76rem;" class="mb-2">
+            <div>plugin_id: <span class="text-info">${escapeHtml(record.plugin_id || '-')}</span></div>
+            <div>task_type: <span class="text-warning">${escapeHtml(record.task_type || '-')}</span></div>
+            <div>voltage: <span class="text-secondary">${escapeHtml(record.voltage_level || '-')}</span></div>
+            <div>progress: ${Math.round(record.progress || 0)}%</div>
+        </div>
+        <div class="mb-2" style="font-size:0.74rem;">
+            <div class="fw-bold mb-1">路径</div>
+            <div class="text-secondary text-break">incoming: ${escapeHtml(record.upload_path || '-')}</div>
+            <div class="text-secondary text-break mt-1">staging: ${escapeHtml(record.unpack_path || '-')}</div>
+            ${record.standardized_path ? `<div class="text-secondary text-break mt-1">standardized: ${escapeHtml(record.standardized_path)}</div>` : ''}
+            ${record.compat_data_yaml ? `<div class="text-secondary text-break mt-1">data.yaml: ${escapeHtml(record.compat_data_yaml)}</div>` : ''}
+        </div>
+        <div class="mb-2" style="font-size:0.74rem;">
+            <div class="fw-bold mb-1">校验摘要</div>
+            <div>Manifest: <span class="${manifest.valid ? 'text-success' : 'text-danger'}">${manifest.valid ? '通过' : '失败'}</span></div>
+            <div>标签: <span class="${labels.valid ? 'text-success' : 'text-danger'}">${labels.valid ? '通过' : '失败'}</span></div>
+            <div>文件: ${files.total_files || 0} 个 | 图像 ${files.images || 0} | 标注 ${files.labels || 0}</div>
+        </div>
+        ${standardization.mode ? `<div class="mb-2" style="font-size:0.74rem;">
+            <div class="fw-bold mb-1">标准化</div>
+            <div>mode: ${escapeHtml(standardization.mode)}</div>
+            <div>${escapeHtml(standardization.message || '')}</div>
+            ${standardization.split_counts ? `<div class="mt-1">train ${standardization.split_counts.train || 0} / val ${standardization.split_counts.val || 0} / test ${standardization.split_counts.test || 0}</div>` : ''}
+        </div>` : ''}
+        ${manifestErrors.length > 0 ? `<div class="mb-2" style="font-size:0.73rem;">
+            <div class="fw-bold text-danger mb-1">Manifest 错误</div>
+            ${manifestErrors.map(item => `<div class="text-danger">• ${escapeHtml(item)}</div>`).join('')}
+        </div>` : ''}
+        ${labelErrors.length > 0 ? `<div class="mb-2" style="font-size:0.73rem;">
+            <div class="fw-bold text-danger mb-1">标签错误</div>
+            ${labelErrors.map(item => `<div class="text-danger">• ${escapeHtml(item)}</div>`).join('')}
+        </div>` : ''}
+        ${warnings.length > 0 ? `<div class="mb-2" style="font-size:0.73rem;">
+            <div class="fw-bold text-warning mb-1">警告</div>
+            ${warnings.map(item => `<div class="text-warning">• ${escapeHtml(item)}</div>`).join('')}
+        </div>` : ''}
+        <div style="font-size:0.72rem;" class="text-secondary">${escapeHtml(record.message || '')}</div>
+    `;
+}
+
+async function viewBatchDetail(id, silent = false) {
+    try {
+        const res = await fetch(`/api/training/data/record/${id}`);
+        const data = await res.json();
+        if (!data.success) return;
+        currentBatchId = id;
+        renderBatchDetail(data.record);
+        if (!silent) {
+            loadUploadRecords(true);
+        }
+    } catch (e) {
+        console.error('加载批次详情失败:', e);
+    }
+}
+
+async function standardizeBatch(id) {
+    try {
+        const res = await fetch(`/api/training/data/standardize/${id}`, { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) {
+            alert('标准化失败: ' + (data.detail || data.message || '未知错误'));
+            return;
+        }
+        currentBatchId = id;
+        setStatus(`批次已标准化: ${id}`);
+        loadUploadRecords();
+        loadUploadStats();
+        loadDataOverview();
+        loadTrainingTasks();
+    } catch (e) {
+        alert('标准化失败: ' + e.message);
+    }
+}
+
+async function deleteRecord(id) {
+    if (!confirm(`确认软删除失败批次 ${id}？可选同时清理该批次文件。`)) return;
+    try {
+        await fetch(`/api/training/data/record/${id}?delete_files=true`, { method: 'DELETE' });
+        if (currentBatchId === id) {
+            currentBatchId = null;
+        }
+        loadUploadRecords();
+        loadUploadStats();
+        loadDataOverview();
+    } catch (e) {}
+}
+
+// ============================================================
+// Agent Skills
+// ============================================================
+async function loadAgentSkills() {
+    try {
+        const res = await fetch('/api/agent-skills');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const container = document.getElementById('skills-list');
+        container.innerHTML = data.skills.map(s =>
+            `<div class="skill-card" onclick="viewSkill('${s.filename}', this)">
+                <div class="fw-bold" style="font-size:0.82rem;">${s.title}</div>
+                <div class="text-secondary" style="font-size:0.72rem;">${s.filename} (${(s.size/1024).toFixed(1)} KB)</div>
+            </div>`
+        ).join('');
+    } catch (e) {}
+}
+
+async function viewSkill(filename, el) {
+    document.querySelectorAll('.skill-card').forEach(c => c.classList.remove('active'));
+    el?.classList.add('active');
+    try {
+        const res = await fetch(`/api/agent-skills/${filename}`);
+        const data = await res.json();
+        if (!data.success) return;
+        document.getElementById('skill-viewer-title').textContent = data.skill.title;
+        document.getElementById('skill-viewer').textContent = data.skill.content;
+    } catch (e) {}
+}
+
+// ============================================================
+// Project Card
+// ============================================================
+async function loadProjectCard() {
+    try {
+        const res = await fetch('/api/project-card');
+        const data = await res.json();
+        if (!data.success) return;
+        const viewer = document.getElementById('project-card-viewer');
+        if (data.exists) {
+            viewer.textContent = data.content;
+        } else {
+            viewer.innerHTML = '<span class="text-secondary">PROJECT_CARD.md 不存在</span>';
+        }
+    } catch (e) {}
+}
+
+// ============================================================
+// Plugin Mapping
+// ============================================================
+async function loadPluginMapping() {
+    try {
+        const res = await fetch('/api/plugin-mapping');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const mapping = data.mapping;
+        const container = document.getElementById('plugin-mapping-list');
+
+        if (!mapping || Object.keys(mapping).length === 0) {
+            container.innerHTML = '<div class="text-secondary" style="font-size:0.82rem;">映射文件为空或不存在</div>';
+            return;
+        }
+
+        // 取 plugins 部分
+        const plugins = mapping.plugins || mapping;
+        container.innerHTML = Object.entries(plugins).map(([id, info]) => {
+            const taskType = info.task_type || info.primary_task || '-';
+            const model = info.model_family || '-';
+            const voltages = (info.voltage_levels || []).join(', ') || '全部';
+
+            return `<div class="task-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold" style="font-size:0.82rem;">${id}</span>
+                    <span class="badge bg-info">${taskType}</span>
+                </div>
+                <div class="d-flex gap-3 mt-1" style="font-size:0.72rem;">
+                    <span>模型: ${model}</span>
+                    <span>适用: ${voltages}</span>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {}
+}
+
+// ============================================================
+// Charts
+// ============================================================
+function initCharts() {
+    const ctx1 = document.getElementById('chart-training')?.getContext('2d');
+    if (ctx1) {
+        trainingChart = new Chart(ctx1, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'mAP50',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    fill: true, tension: 0.3, pointRadius: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                    y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } }, min: 0, max: 1 },
+                },
+                plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+            },
+        });
+    }
+
+    const ctx2 = document.getElementById('chart-dataset')?.getContext('2d');
+    if (ctx2) {
+        datasetChart = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: ['Raw', 'Processed', 'Augmented'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b'],
+                    borderWidth: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } } },
+            },
+        });
+    }
+}
+
+function updateTrainingChart(tasks) {
+    if (!trainingChart) return;
+    // 找到正在训练的任务展示
+    const active = tasks.find(t => t.status === 'training') || tasks[tasks.length - 1];
+    if (!active) return;
+
+    const epoch = active.current_epoch || 0;
+    const map50 = active.best_map50 || 0;
+
+    // 追加数据点 (保留最近 100)
+    const labels = trainingChart.data.labels;
+    const dataset = trainingChart.data.datasets[0].data;
+
+    if (labels.length === 0 || labels[labels.length - 1] !== epoch) {
+        labels.push(epoch);
+        dataset.push(map50);
+        if (labels.length > 100) {
+            labels.shift();
+            dataset.shift();
+        }
+        trainingChart.update('none');
+    }
+}
+
+// ============================================================
+// WebSocket
+// ============================================================
+function connectWS() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${protocol}//${location.host}/ws/training`;
+
+    try {
+        wsConnection = new WebSocket(url);
+        wsConnection.onopen = () => {
+            document.getElementById('ws-status').innerHTML =
+                '<i class="bi bi-circle-fill me-1"></i>已连接';
+            document.getElementById('ws-status').className = 'badge bg-success';
+            // 开始心跳
+            setInterval(() => {
+                if (wsConnection?.readyState === WebSocket.OPEN) {
+                    wsConnection.send(JSON.stringify({ type: 'heartbeat' }));
+                }
+            }, 5000);
+        };
+
+        wsConnection.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'status') {
+                    // 更新数据集图表
+                    if (datasetChart && msg.uploads) {
+                        const ready = msg.uploads.filter(u => ['ready_for_training', 'completed'].includes(u.status)).length;
+                        const processing = msg.uploads.filter(u => ['uploaded', 'unpacking', 'validating', 'standardized', 'training'].includes(u.status)).length;
+                        const failed = msg.uploads.filter(u => ['validation_failed', 'failed'].includes(u.status)).length;
+                        datasetChart.data.datasets[0].data = [processing, ready, failed];
+                        datasetChart.data.labels = ['处理中', '可训练', '失败'];
+                        datasetChart.update('none');
+                    }
+                }
+            } catch (e) {}
+        };
+
+        wsConnection.onclose = () => {
+            document.getElementById('ws-status').innerHTML =
+                '<i class="bi bi-circle-fill me-1"></i>已断开';
+            document.getElementById('ws-status').className = 'badge bg-secondary';
+            // 重连
+            setTimeout(connectWS, 3000);
+        };
+
+        wsConnection.onerror = () => {};
+    } catch (e) {}
+}
+
+// ============================================================
+// 工具函数
+// ============================================================
+function refreshAll() {
+    loadDataOverview();
+    loadUploadStats();
+    loadUploadRecords();
+    loadTrainingTasks();
+    loadPluginMapping();
+    setStatus('已刷新');
+}
+
+function setStatus(msg) {
+    document.getElementById('status-msg').textContent = msg;
+}
+</script>
+
+</body>
+</html>

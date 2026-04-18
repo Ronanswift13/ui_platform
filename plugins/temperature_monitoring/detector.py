@@ -11,6 +11,7 @@ import logging
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
@@ -90,9 +91,13 @@ class TemperatureDetector:
         self.linkage_cfg = config.get("linkage", {})
 
         # 历史缓冲
-        buf_size = config.get("history", {}).get("buffer_size", 3600)
-        self._history: deque = deque(maxlen=buf_size)
+        history_cfg = config.get("history", {})
+        buf_size = history_cfg.get("buffer_size", 3600)
+        self._history_buffer_size = int(buf_size)
+        self.min_rise_interval_seconds = float(history_cfg.get("min_rise_interval_seconds", 15))
+        self._histories: Dict[str, deque] = {}
         self._zone_histories: Dict[str, deque] = {}
+        self._trained_profile: Dict[str, Any] = {}
 
         self._inference_count = 0
         self._initialized = False
@@ -106,12 +111,15 @@ class TemperatureDetector:
         self,
         thermal_frame: Optional[np.ndarray] = None,
         sensor_readings: Optional[List[Dict]] = None,
+        source_key: str = "default",
     ) -> TemperatureResult:
         start = time.time()
         self._inference_count += 1
 
         # 1. 生成/获取温度矩阵
         heatmap = self._get_heatmap(thermal_frame, sensor_readings)
+        input_mode = self._infer_input_mode(thermal_frame, sensor_readings)
+        sample_timestamp = self._resolve_sample_timestamp(sensor_readings)
 
         # 2. 基础统计
         max_t = float(np.max(heatmap))
@@ -122,16 +130,26 @@ class TemperatureDetector:
         hotspots = self._detect_hotspots(heatmap)
 
         # 4. 记录历史
-        self._history.append({"timestamp": time.time(), "max": max_t, "min": min_t, "avg": avg_t})
+        history = self._get_history(source_key)
+        history.append({"timestamp": sample_timestamp, "max": max_t, "min": min_t, "avg": avg_t})
 
         # 5. 趋势分析
-        trend = self._analyze_trend()
+        trend = self._analyze_trend(history)
 
         # 6. 状态评估
         status = self._assess_status(max_t, trend.rise_rate, hotspots)
 
         # 7. 联动事件
         linkage = self._check_linkage(status, hotspots)
+        sensor_summary = self._build_sensor_summary(sensor_readings)
+        zone_summary = self._summarize_zones(heatmap)
+        ai_insight = self._evaluate_ai_insight(
+            heatmap=heatmap,
+            trend=trend,
+            max_temp=max_t,
+            avg_temp=avg_t,
+            zone_summary=zone_summary,
+        )
 
         elapsed = (time.time() - start) * 1000
 
@@ -144,8 +162,42 @@ class TemperatureDetector:
             trend=trend,
             status=status,
             linkage_events=linkage,
-            metadata={"inference_time_ms": round(elapsed, 2), "inference_count": self._inference_count},
+            metadata={
+                "inference_time_ms": round(elapsed, 2),
+                "inference_count": self._inference_count,
+                "input_mode": input_mode,
+                "source_key": source_key,
+                "sensor_summary": sensor_summary,
+                "zone_summary": zone_summary,
+                "ai_insight": ai_insight,
+                "training_enabled": bool(self._trained_profile),
+            },
         )
+
+    @staticmethod
+    def _infer_input_mode(thermal: Optional[np.ndarray], sensors: Optional[List[Dict]]) -> str:
+        if thermal is not None:
+            return "thermal_frame"
+        if sensors:
+            return "sensor_readings"
+        return "simulation"
+
+    @staticmethod
+    def _resolve_sample_timestamp(sensors: Optional[List[Dict]]) -> float:
+        if sensors:
+            timestamps = []
+            for reading in sensors:
+                ts = reading.get("timestamp")
+                if isinstance(ts, (int, float)):
+                    timestamps.append(float(ts))
+            if timestamps:
+                return max(timestamps)
+        return time.time()
+
+    def _get_history(self, source_key: str) -> deque:
+        if source_key not in self._histories:
+            self._histories[source_key] = deque(maxlen=self._history_buffer_size)
+        return self._histories[source_key]
 
     def _get_heatmap(self, thermal: Optional[np.ndarray], sensors: Optional[List[Dict]]) -> np.ndarray:
         if thermal is not None:
@@ -166,18 +218,32 @@ class TemperatureDetector:
         return frame
 
     def _interpolate_sensors(self, readings: List[Dict]) -> np.ndarray:
-        grid = np.full(self.resolution, 25.0, dtype=np.float32)
+        cols = int(self.resolution[0])
+        rows = int(self.resolution[1])
+        grid = np.full((rows, cols), 25.0, dtype=np.float32)
         for r in readings:
             pos = r.get("position", {})
             row = int(pos.get("row", 0))
             col = int(pos.get("col", 0))
-            if 0 <= row < self.resolution[1] and 0 <= col < self.resolution[0]:
+            if 0 <= row < rows and 0 <= col < cols:
                 grid[row, col] = r.get("temperature", 25)
 
         if cv2 is not None:
             interp_map = {"bilinear": cv2.INTER_LINEAR, "bicubic": cv2.INTER_CUBIC, "nearest": cv2.INTER_NEAREST}
             flag = interp_map.get(self.interpolation, cv2.INTER_LINEAR)
             grid = cv2.resize(grid, self.upsample_size, interpolation=flag)
+
+        # Preserve the exact measured sensor temperatures on the upsampled map.
+        target_w = int(grid.shape[1])
+        target_h = int(grid.shape[0])
+        for r in readings:
+            pos = r.get("position", {})
+            row = int(pos.get("row", 0))
+            col = int(pos.get("col", 0))
+            if 0 <= row < rows and 0 <= col < cols:
+                x = min(target_w - 1, max(0, round((col / max(cols - 1, 1)) * (target_w - 1))))
+                y = min(target_h - 1, max(0, round((row / max(rows - 1, 1)) * (target_h - 1))))
+                grid[y, x] = max(float(grid[y, x]), float(r.get("temperature", 25)))
         return grid
 
     def _simulate_heatmap(self) -> np.ndarray:
@@ -259,8 +325,8 @@ class TemperatureDetector:
                 return z["zone_id"], z.get("zone_name", "")
         return "", ""
 
-    def _analyze_trend(self) -> TempTrend:
-        hist = list(self._history)
+    def _analyze_trend(self, history: deque) -> TempTrend:
+        hist = list(history)
         current = hist[-1]["avg"] if hist else 25.0
 
         avg_1m = self._avg_last(hist, 60)
@@ -284,15 +350,17 @@ class TemperatureDetector:
         vals = [h["avg"] for h in hist if h["timestamp"] >= cutoff]
         return float(np.mean(vals)) if vals else hist[-1]["avg"]
 
-    @staticmethod
-    def _calc_rise_rate(hist: List[Dict], seconds: float) -> float:
+    def _calc_rise_rate(self, hist: List[Dict], seconds: float) -> float:
         if len(hist) < 2:
             return 0.0
         cutoff = time.time() - seconds
         recent = [h for h in hist if h["timestamp"] >= cutoff]
         if len(recent) < 2:
             return 0.0
-        dt = (recent[-1]["timestamp"] - recent[0]["timestamp"]) / 60.0 + 1e-6
+        dt_seconds = recent[-1]["timestamp"] - recent[0]["timestamp"]
+        if dt_seconds < self.min_rise_interval_seconds:
+            return 0.0
+        dt = dt_seconds / 60.0
         dtemp = recent[-1]["avg"] - recent[0]["avg"]
         return dtemp / dt
 
@@ -326,8 +394,192 @@ class TemperatureDetector:
             events.append({"target": "ventilation_system", "event": "emergency_ventilation", "data": {}})
         return events
 
+    def _build_sensor_summary(self, readings: Optional[List[Dict]]) -> Dict[str, Any]:
+        if not readings:
+            return {"count": 0, "max_temp": None, "avg_temp": None, "zones": []}
+
+        temps = [float(r.get("temperature", 0.0)) for r in readings]
+        zone_stats: Dict[str, Dict[str, Any]] = {}
+        for reading in readings:
+            zone_id = reading.get("zone_id") or "unassigned"
+            zone_name = reading.get("zone_name") or zone_id
+            bucket = zone_stats.setdefault(zone_id, {"zone_id": zone_id, "zone_name": zone_name, "temps": []})
+            bucket["temps"].append(float(reading.get("temperature", 0.0)))
+
+        zones = []
+        for bucket in zone_stats.values():
+            zones.append(
+                {
+                    "zone_id": bucket["zone_id"],
+                    "zone_name": bucket["zone_name"],
+                    "count": len(bucket["temps"]),
+                    "max_temp": round(max(bucket["temps"]), 1),
+                    "avg_temp": round(float(np.mean(bucket["temps"])), 1),
+                }
+            )
+
+        return {
+            "count": len(readings),
+            "max_temp": round(max(temps), 1),
+            "avg_temp": round(float(np.mean(temps)), 1),
+            "zones": zones,
+        }
+
+    def _summarize_zones(self, heatmap: np.ndarray) -> List[Dict[str, Any]]:
+        h, w = heatmap.shape[:2]
+        summaries: List[Dict[str, Any]] = []
+        for zone in self.zones:
+            region = zone.get("region", [0.0, 0.0, 1.0, 1.0])
+            if len(region) != 4:
+                continue
+            x1 = min(w - 1, max(0, int(region[0] * w)))
+            y1 = min(h - 1, max(0, int(region[1] * h)))
+            x2 = min(w, max(x1 + 1, int(np.ceil(region[2] * w))))
+            y2 = min(h, max(y1 + 1, int(np.ceil(region[3] * h))))
+            roi = heatmap[y1:y2, x1:x2]
+            if roi.size == 0:
+                continue
+            summaries.append(
+                {
+                    "zone_id": zone.get("zone_id", ""),
+                    "zone_name": zone.get("zone_name", zone.get("zone_id", "")),
+                    "avg_temp": round(float(np.mean(roi)), 1),
+                    "max_temp": round(float(np.max(roi)), 1),
+                }
+            )
+        return summaries
+
+    def train_baseline(self, samples: List[Dict[str, Any]], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        training_samples = [sample for sample in samples if self._is_baseline_sample(sample)]
+        if not training_samples:
+            training_samples = list(samples)
+        if not training_samples:
+            return {}
+
+        summaries = []
+        for sample in training_samples:
+            heatmap = self._get_heatmap(sample.get("thermal_frame"), sample.get("sensor_readings"))
+            summaries.append(
+                {
+                    "avg_temp": float(np.mean(heatmap)),
+                    "max_temp": float(np.max(heatmap)),
+                    "zones": self._summarize_zones(heatmap),
+                }
+            )
+
+        if not summaries:
+            return {}
+
+        zone_names: Dict[str, str] = {}
+        zone_samples: Dict[str, Dict[str, List[float]]] = {}
+        for summary in summaries:
+            for zone in summary["zones"]:
+                zone_names[zone["zone_id"]] = zone["zone_name"]
+                stats = zone_samples.setdefault(zone["zone_id"], {"avg": [], "max": []})
+                stats["avg"].append(zone["avg_temp"])
+                stats["max"].append(zone["max_temp"])
+
+        profile = {
+            "profile_name": (config or {}).get("profile_name", "temperature_baseline"),
+            "trained_at": datetime.now().isoformat(),
+            "sample_count": len(summaries),
+            "overall": {
+                "avg_mean": round(float(np.mean([s["avg_temp"] for s in summaries])), 2),
+                "avg_std": round(max(float(np.std([s["avg_temp"] for s in summaries])), 0.5), 2),
+                "max_mean": round(float(np.mean([s["max_temp"] for s in summaries])), 2),
+                "max_std": round(max(float(np.std([s["max_temp"] for s in summaries])), 0.5), 2),
+            },
+            "zones": {
+                zone_id: {
+                    "zone_name": zone_names.get(zone_id, zone_id),
+                    "avg_mean": round(float(np.mean(values["avg"])), 2),
+                    "avg_std": round(max(float(np.std(values["avg"])), 0.5), 2),
+                    "max_mean": round(float(np.mean(values["max"])), 2),
+                    "max_std": round(max(float(np.std(values["max"])), 0.5), 2),
+                }
+                for zone_id, values in zone_samples.items()
+            },
+        }
+        self._trained_profile = profile
+        return profile
+
+    @staticmethod
+    def _is_baseline_sample(sample: Dict[str, Any]) -> bool:
+        labels = sample.get("labels") or {}
+        if isinstance(labels, dict):
+            status = str(labels.get("status", labels.get("mode", "normal"))).lower()
+            return status in {"normal", "baseline", "healthy"}
+        if isinstance(labels, str):
+            return labels.lower() in {"normal", "baseline", "healthy"}
+        return True
+
+    def _evaluate_ai_insight(
+        self,
+        heatmap: np.ndarray,
+        trend: TempTrend,
+        max_temp: float,
+        avg_temp: float,
+        zone_summary: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        if not self._trained_profile:
+            predicted_status = self._predict_temp_status(trend.predicted_30min)
+            return {
+                "enabled": False,
+                "profile_name": None,
+                "sample_count": 0,
+                "overall_anomaly_score": 0.0,
+                "triggered": predicted_status in {"warning", "alarm", "critical"},
+                "predicted_status": predicted_status,
+                "predicted_30min": trend.predicted_30min,
+                "reason": "training_profile_unavailable",
+                "zone_deviations": [],
+            }
+
+        profile = self._trained_profile
+        overall = profile.get("overall", {})
+        avg_score = abs(avg_temp - overall.get("avg_mean", avg_temp)) / max(overall.get("avg_std", 1.0), 0.5)
+        max_score = abs(max_temp - overall.get("max_mean", max_temp)) / max(overall.get("max_std", 1.0), 0.5)
+
+        zone_deviations = []
+        for zone in zone_summary:
+            baseline = profile.get("zones", {}).get(zone["zone_id"])
+            if not baseline:
+                continue
+            score = abs(zone["max_temp"] - baseline.get("max_mean", zone["max_temp"])) / max(baseline.get("max_std", 1.0), 0.5)
+            if score >= 2.0:
+                zone_deviations.append(
+                    {
+                        "zone_id": zone["zone_id"],
+                        "zone_name": zone["zone_name"],
+                        "current_max": zone["max_temp"],
+                        "baseline_max": baseline.get("max_mean"),
+                        "anomaly_score": round(float(score), 2),
+                    }
+                )
+
+        predicted_status = self._predict_temp_status(trend.predicted_30min)
+        overall_anomaly_score = round(float(max(avg_score, max_score, max([z["anomaly_score"] for z in zone_deviations], default=0.0))), 2)
+        triggered = overall_anomaly_score >= 2.5 or predicted_status in {"warning", "alarm", "critical"}
+
+        return {
+            "enabled": True,
+            "profile_name": profile.get("profile_name"),
+            "sample_count": profile.get("sample_count", 0),
+            "overall_anomaly_score": overall_anomaly_score,
+            "triggered": triggered,
+            "predicted_status": predicted_status,
+            "predicted_30min": trend.predicted_30min,
+            "reason": "trained_baseline_comparison",
+            "zone_deviations": zone_deviations[:3],
+        }
+
+    def _predict_temp_status(self, predicted_temp: Optional[float]) -> str:
+        if predicted_temp is None:
+            return "normal"
+        return self._temp_severity(float(predicted_temp))
+
     def reset(self):
-        self._history.clear()
+        self._histories.clear()
 
     @property
     def is_initialized(self) -> bool:
@@ -335,4 +587,9 @@ class TemperatureDetector:
 
     @property
     def stats(self) -> Dict:
-        return {"inference_count": self._inference_count, "history_points": len(self._history)}
+        return {
+            "inference_count": self._inference_count,
+            "history_points": sum(len(history) for history in self._histories.values()),
+            "history_sources": len(self._histories),
+            "training_enabled": bool(self._trained_profile),
+        }

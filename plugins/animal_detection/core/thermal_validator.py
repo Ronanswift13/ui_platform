@@ -15,10 +15,8 @@
 
 from __future__ import annotations
 import logging
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-import cv2
 import numpy as np
 
 from .event_schema import AnimalDetectionResult, BoundingBox

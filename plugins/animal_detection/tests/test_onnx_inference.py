@@ -19,9 +19,6 @@ ONNX 推理引擎测试套件
 import json
 import os
 import sys
-import tempfile
-import time
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest

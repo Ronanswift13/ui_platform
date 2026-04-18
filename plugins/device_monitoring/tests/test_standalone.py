@@ -9,6 +9,7 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 import numpy as np
+from fastapi.testclient import TestClient
 
 
 class TestDeviceMonitoringStandalone(unittest.TestCase):
@@ -45,6 +46,23 @@ class TestDeviceMonitoringStandalone(unittest.TestCase):
             plugin_static_dir=Path(__file__).parent.parent / "standalone" / "static",
         )
         self.assertIsNotNone(runner)
+
+    def test_standalone_smoke_route_accepts_simulated_sample(self):
+        """Standalone smoke route should submit a simulated sample."""
+        from darkbreaker_sdk.standalone import StandalonePluginRunner
+
+        runner = StandalonePluginRunner(
+            self.plugin,
+            plugin_templates_dir=Path(__file__).parent.parent / "standalone" / "templates",
+            plugin_static_dir=Path(__file__).parent.parent / "standalone" / "static",
+        )
+        client = TestClient(runner.app)
+
+        response = client.post("/api/device/smoke", json={"device_id": "edge_smoke"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["metadata"]["modality"], "device")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 {
   "enabled": [
     "acoustic_monitoring",
+    "action_event_monitoring",
     "animal_detection",
     "bird_monitoring",
     "busbar_inspection",

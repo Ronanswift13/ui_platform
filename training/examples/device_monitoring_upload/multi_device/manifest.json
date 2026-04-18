@@ -1,0 +1,50 @@
+{
+  "name": "device_monitoring_multi_device_batch",
+  "plugin_id": "device_monitoring",
+  "task_type": "multivariate_sensor_anomaly",
+  "version": "1.0.0",
+  "format": "csv_series",
+  "input_modality": "multivariate_timeseries",
+  "num_samples": 1024,
+  "sequence_length": 96,
+  "timestamp_field": "timestamp",
+  "entity_id_field": "device_id",
+  "sensor_columns": [
+    "cpu_temp",
+    "cpu_usage",
+    "memory_usage",
+    "disk_usage",
+    "network_quality",
+    "uptime_hours",
+    "error_count",
+    "last_heartbeat_delta_sec"
+  ],
+  "temporal_schema": {
+    "schema_version": "1.0.0",
+    "timestamp_field": "timestamp",
+    "entity_id_field": "device_id",
+    "sources": [
+      {
+        "name": "batch_series",
+        "kind": "timeseries",
+        "path": "timeseries",
+        "format": "csv",
+        "sensor_columns": [
+          "cpu_temp",
+          "cpu_usage",
+          "memory_usage",
+          "disk_usage",
+          "network_quality",
+          "uptime_hours",
+          "error_count",
+          "last_heartbeat_delta_sec"
+        ]
+      }
+    ]
+  },
+  "target_schema": {
+    "outputs": [
+      {"name": "anomaly_score", "type": "anomaly_score", "range": "[0,1]"}
+    ]
+  }
+}

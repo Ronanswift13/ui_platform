@@ -1,0 +1,468 @@
+{
+  "updated_at": "2026-04-15T14:08:05.136618",
+  "batches": [
+    {
+      "batch_id": "upload_batch_20260415_140801_b1fd85b1",
+      "dataset_name": "standalone_busbar_e2e_1776233281",
+      "plugin_id": "busbar_inspection",
+      "task_type": "detection",
+      "upload_path": "/Users/ronan/Desktop/DarkBreaker/training/datasets/incoming/upload_batch_20260415_140801_b1fd85b1",
+      "unpack_path": "/Users/ronan/Desktop/DarkBreaker/training/datasets/staging/upload_batch_20260415_140801_b1fd85b1/payload/standalone_busbar_e2e",
+      "status": "ready_for_training",
+      "progress": 100.0,
+      "validation_report": {
+        "valid": true,
+        "summary": "校验结果: ✅ 通过\n  统计: {\"plugin_id\": \"busbar_inspection\", \"task_type\": \"detection\", \"declared_images\": 12, \"declared_samples\": 0, \"actual_samples\": 12, \"actual_labels\": 12, \"classes\": [\"insulator_crack\", \"insulator_dirty\", \"fitting_loose\", \"fitting_rust\", \"wire_damage\", \"foreign_object\", \"bird\", \"bird_nest\"]}\n\n上传校验结果: ✅ 通过\n  错误: 0  警告: 12\n\n  [✓] manifest / manifest.json 存在与合法性\n      统计: {'plugin_id': 'busbar_inspection', 'task_type': 'detection', 'classes': ['insulator_crack', 'insulator_dirty', 'fitting_loose', 'fitting_rust', 'wire_damage', 'foreign_object', 'bird', 'bird_nest'], 'num_images': 12}\n  [✓] 文件完整性 / 图像/标签配对与目录结构\n      统计: {'actual_images': 12, 'actual_labels': 12}\n  [✓] 标签合法性 / 标签格式校验 (抽样)\n      统计: {'sampled': 12}\n  [✓] 类别映射 / manifest.classes vs 实际标签 class_id\n      统计: {'seen_class_ids': [0], 'declared_classes': 8}\n  [✓] 重复检测 / 重复样本检测\n      统计: {'total_images': 12, 'duplicate_name_count': 0, 'suspect_size_dup_groups': 0}\n  [✓] 图像质量 / 模糊/坏图/尺寸异常检测 (抽样)\n      ⚠ 疑似模糊 (Laplacian=12.3): e2e_006.jpg\n      ⚠ 疑似模糊 (Laplacian=10.0): e2e_009.jpg\n      ⚠ 疑似模糊 (Laplacian=7.4): e2e_011.jpg\n      统计: {'sampled': 12, 'corrupt': 0, 'blurry': 12, 'tiny': 0}\n  [✓] 数据划分 / train/val/test 划分校验\n      统计: {'mode': 'auto_split', 'split_config': {'train': 0.8, 'val': 0.15, 'test': 0.05}, 'total_images': 12}",
+        "manifest": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {
+            "plugin_id": "busbar_inspection",
+            "task_type": "detection",
+            "declared_images": 12,
+            "declared_samples": 0,
+            "actual_samples": 12,
+            "actual_labels": 12,
+            "classes": [
+              "insulator_crack",
+              "insulator_dirty",
+              "fitting_loose",
+              "fitting_rust",
+              "wire_damage",
+              "foreign_object",
+              "bird",
+              "bird_nest"
+            ]
+          },
+          "summary": "校验结果: ✅ 通过\n  统计: {\"plugin_id\": \"busbar_inspection\", \"task_type\": \"detection\", \"declared_images\": 12, \"declared_samples\": 0, \"actual_samples\": 12, \"actual_labels\": 12, \"classes\": [\"insulator_crack\", \"insulator_dirty\", \"fitting_loose\", \"fitting_rust\", \"wire_damage\", \"foreign_object\", \"bird\", \"bird_nest\"]}",
+          "dataset_manifest": {
+            "name": "standalone_busbar_e2e_1776233281",
+            "plugin_id": "busbar_inspection",
+            "task_type": "detection",
+            "version": "v1.0.0",
+            "num_images": 12,
+            "num_labels": 12,
+            "num_samples": 0,
+            "classes": [
+              "insulator_crack",
+              "insulator_dirty",
+              "fitting_loose",
+              "fitting_rust",
+              "wire_damage",
+              "foreign_object",
+              "bird",
+              "bird_nest"
+            ],
+            "class_aliases": {},
+            "split": {
+              "train": 0.8,
+              "val": 0.15,
+              "test": 0.05
+            },
+            "pre_split": false,
+            "format": "yolo",
+            "image_format": "jpg",
+            "label_format": "txt",
+            "input_modality": "rgb",
+            "voltage_level": "HV_220kV",
+            "description": "standalone e2e upload smoke test",
+            "author": "codex",
+            "created_at": "",
+            "source": "local_real_images",
+            "license": "",
+            "mask_format": "",
+            "mask_color_map": {},
+            "ignore_index": 255,
+            "charset": "",
+            "max_reading_length": 10,
+            "temperature_unit": "celsius",
+            "thermal_bit_depth": 16,
+            "temperature_range": [],
+            "spectral_bands": null,
+            "wavelength_range": null,
+            "spectral_resolution": null,
+            "sample_rate_hz": null,
+            "window_size": null,
+            "stride": null,
+            "sequence_length": null,
+            "prediction_horizon": null,
+            "timestamp_field": "",
+            "timestamp_unit": "unix_ms",
+            "entity_id_field": "",
+            "sequence_id_field": "",
+            "feature_views": [],
+            "sensor_columns": [],
+            "event_types": [],
+            "temporal_schema": {},
+            "target_schema": {},
+            "supported_modalities": [],
+            "required_modalities": [],
+            "missing_modality_policy": "mask_and_gate",
+            "fusion_strategy": "hybrid",
+            "alignment_tolerance_ms": 5000,
+            "multimodal_schema": {},
+            "diagnosis_target_schema": {},
+            "diagnostic_rule_pack": {}
+          }
+        },
+        "labels": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {
+            "标签格式校验 (抽样)": {
+              "sampled": 12
+            },
+            "manifest.classes vs 实际标签 class_id": {
+              "seen_class_ids": [
+                0
+              ],
+              "declared_classes": 8
+            }
+          },
+          "checks": [
+            {
+              "category": "标签合法性",
+              "check_name": "标签格式校验 (抽样)",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "sampled": 12
+              }
+            },
+            {
+              "category": "类别映射",
+              "check_name": "manifest.classes vs 实际标签 class_id",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "seen_class_ids": [
+                  0
+                ],
+                "declared_classes": 8
+              }
+            }
+          ]
+        },
+        "files": {
+          "total_files": 25,
+          "total_size_bytes": 10607458,
+          "images": 12,
+          "videos": 0,
+          "audio": 0,
+          "labels": 12,
+          "manifests": 1,
+          "archives": 0,
+          "other": 0,
+          "by_extension": {
+            ".jpg": 12,
+            ".json": 1,
+            ".txt": 12
+          }
+        },
+        "checks": {
+          "valid": true,
+          "total_errors": 0,
+          "total_warnings": 12,
+          "checks": [
+            {
+              "category": "manifest",
+              "check_name": "manifest.json 存在与合法性",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "plugin_id": "busbar_inspection",
+                "task_type": "detection",
+                "classes": [
+                  "insulator_crack",
+                  "insulator_dirty",
+                  "fitting_loose",
+                  "fitting_rust",
+                  "wire_damage",
+                  "foreign_object",
+                  "bird",
+                  "bird_nest"
+                ],
+                "num_images": 12
+              }
+            },
+            {
+              "category": "文件完整性",
+              "check_name": "图像/标签配对与目录结构",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "actual_images": 12,
+                "actual_labels": 12
+              }
+            },
+            {
+              "category": "标签合法性",
+              "check_name": "标签格式校验 (抽样)",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "sampled": 12
+              }
+            },
+            {
+              "category": "类别映射",
+              "check_name": "manifest.classes vs 实际标签 class_id",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "seen_class_ids": [
+                  0
+                ],
+                "declared_classes": 8
+              }
+            },
+            {
+              "category": "重复检测",
+              "check_name": "重复样本检测",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "total_images": 12,
+                "duplicate_name_count": 0,
+                "suspect_size_dup_groups": 0
+              }
+            },
+            {
+              "category": "图像质量",
+              "check_name": "模糊/坏图/尺寸异常检测 (抽样)",
+              "passed": true,
+              "errors": [],
+              "warnings": [
+                "疑似模糊 (Laplacian=12.3): e2e_006.jpg",
+                "疑似模糊 (Laplacian=10.0): e2e_009.jpg",
+                "疑似模糊 (Laplacian=7.4): e2e_011.jpg",
+                "疑似模糊 (Laplacian=15.6): e2e_012.jpg",
+                "疑似模糊 (Laplacian=11.7): e2e_007.jpg",
+                "疑似模糊 (Laplacian=19.2): e2e_003.jpg",
+                "疑似模糊 (Laplacian=49.1): e2e_004.jpg",
+                "疑似模糊 (Laplacian=19.2): e2e_002.jpg",
+                "疑似模糊 (Laplacian=4.8): e2e_010.jpg",
+                "疑似模糊 (Laplacian=64.0): e2e_001.jpg",
+                "疑似模糊 (Laplacian=58.5): e2e_008.jpg",
+                "疑似模糊 (Laplacian=19.1): e2e_005.jpg"
+              ],
+              "stats": {
+                "sampled": 12,
+                "corrupt": 0,
+                "blurry": 12,
+                "tiny": 0
+              }
+            },
+            {
+              "category": "数据划分",
+              "check_name": "train/val/test 划分校验",
+              "passed": true,
+              "errors": [],
+              "warnings": [],
+              "stats": {
+                "mode": "auto_split",
+                "split_config": {
+                  "train": 0.8,
+                  "val": 0.15,
+                  "test": 0.05
+                },
+                "total_images": 12
+              }
+            }
+          ]
+        },
+        "standardization": {
+          "mode": "visual_v1",
+          "split_counts": {
+            "train": 9,
+            "val": 2,
+            "test": 1
+          },
+          "split_label_counts": {
+            "train": 9,
+            "val": 2,
+            "test": 1
+          },
+          "copied_images": 12,
+          "copied_labels": 12,
+          "standardized_path": "/Users/ronan/Desktop/DarkBreaker/training/datasets/standardized/upload_batch_20260415_140801_b1fd85b1",
+          "compat_data_yaml": "/Users/ronan/Desktop/DarkBreaker/training/data/processed/HV_220kV/busbar/data.yaml",
+          "supported_for_training": true
+        }
+      },
+      "created_at": "2026-04-15T14:08:01.650942",
+      "updated_at": "2026-04-15T14:08:05.136615",
+      "voltage_level": "HV_220kV",
+      "legacy_plugin": "busbar",
+      "archive_name": "standalone_busbar_e2e.zip",
+      "source_type": "archive",
+      "standardized_path": "/Users/ronan/Desktop/DarkBreaker/training/datasets/standardized/upload_batch_20260415_140801_b1fd85b1",
+      "compat_data_yaml": "/Users/ronan/Desktop/DarkBreaker/training/data/processed/HV_220kV/busbar/data.yaml",
+      "message": "标准化完成，可直接用于训练",
+      "deleted": false,
+      "deleted_at": ""
+    },
+    {
+      "batch_id": "upload_20260415_093812_598cb780",
+      "dataset_name": "upload_20260415_093812_598cb780",
+      "plugin_id": "busbar_inspection",
+      "task_type": "detection",
+      "upload_path": "/Users/ronan/Desktop/DarkBreaker/training/data/raw/HV_220kV/upload_20260415_093812_598cb780",
+      "unpack_path": "/Users/ronan/Desktop/DarkBreaker/training/data/raw/HV_220kV/upload_20260415_093812_598cb780",
+      "status": "completed",
+      "progress": 100.0,
+      "validation_report": {
+        "valid": true,
+        "summary": "处理完成: train=11, val=3, test=2",
+        "manifest": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {},
+          "summary": "legacy upload record",
+          "dataset_manifest": {}
+        },
+        "labels": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {},
+          "checks": []
+        },
+        "files": {
+          "total_files": 16,
+          "total_size_bytes": 14009972,
+          "images": 16,
+          "videos": 0,
+          "audio": 0,
+          "labels": 0,
+          "archives": 0,
+          "other": 0,
+          "by_extension": {}
+        }
+      },
+      "created_at": "2026-04-15T09:38:12.733163",
+      "updated_at": "2026-04-15T09:38:12.733163",
+      "voltage_level": "HV_220kV",
+      "legacy_plugin": "busbar",
+      "archive_name": "",
+      "source_type": "archive",
+      "standardized_path": "",
+      "compat_data_yaml": "",
+      "message": "处理完成: train=11, val=3, test=2",
+      "deleted": false,
+      "deleted_at": ""
+    },
+    {
+      "batch_id": "upload_20260216_104528_7c96ac61",
+      "dataset_name": "upload_20260216_104528_7c96ac61",
+      "plugin_id": "transformer_inspection",
+      "task_type": "detection",
+      "upload_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/data/raw/HV_220kV/upload_20260216_104528_7c96ac61",
+      "unpack_path": "/Users/ronan/Desktop/破夜绘明激光监测平台/training/data/raw/HV_220kV/upload_20260216_104528_7c96ac61",
+      "status": "completed",
+      "progress": 100.0,
+      "validation_report": {
+        "valid": true,
+        "summary": "处理完成: train=593, val=170, test=85",
+        "manifest": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {},
+          "summary": "legacy upload record",
+          "dataset_manifest": {}
+        },
+        "labels": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {},
+          "checks": []
+        },
+        "files": {
+          "total_files": 2,
+          "total_size_bytes": 818088536,
+          "images": 0,
+          "videos": 0,
+          "audio": 0,
+          "labels": 0,
+          "archives": 0,
+          "other": 0,
+          "by_extension": {}
+        }
+      },
+      "created_at": "2026-02-16T10:45:29.260248",
+      "updated_at": "2026-02-16T10:45:29.260248",
+      "voltage_level": "HV_220kV",
+      "legacy_plugin": "transformer",
+      "archive_name": "",
+      "source_type": "archive",
+      "standardized_path": "",
+      "compat_data_yaml": "",
+      "message": "处理完成: train=593, val=170, test=85",
+      "deleted": false,
+      "deleted_at": ""
+    },
+    {
+      "batch_id": "upload_20260204_140522_68729d4e",
+      "dataset_name": "path",
+      "plugin_id": "transformer_inspection",
+      "task_type": "detection",
+      "upload_path": "/test/path",
+      "unpack_path": "/test/path",
+      "status": "completed",
+      "progress": 100.0,
+      "validation_report": {
+        "valid": true,
+        "summary": "legacy upload record",
+        "manifest": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {},
+          "summary": "legacy upload record",
+          "dataset_manifest": {}
+        },
+        "labels": {
+          "valid": true,
+          "errors": [],
+          "warnings": [],
+          "stats": {},
+          "checks": []
+        },
+        "files": {
+          "total_files": 10,
+          "total_size_bytes": 1024000,
+          "images": 0,
+          "videos": 0,
+          "audio": 0,
+          "labels": 0,
+          "archives": 0,
+          "other": 0,
+          "by_extension": {}
+        }
+      },
+      "created_at": "2026-02-04T14:05:22.792339",
+      "updated_at": "2026-02-04T14:05:22.792339",
+      "voltage_level": "HV_220kV",
+      "legacy_plugin": "transformer",
+      "archive_name": "",
+      "source_type": "archive",
+      "standardized_path": "",
+      "compat_data_yaml": "",
+      "message": "",
+      "deleted": false,
+      "deleted_at": ""
+    }
+  ]
+}

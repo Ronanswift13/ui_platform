@@ -1,25 +1,27 @@
 """
-表计无建模增强读数插件 - 完整实现
+表计读数插件 - V3.1
 输变电激光星芒破夜绘明监测平台 (E组)
 
 功能范围:
 - 任意角度读数: 关键点检测+透视矫正
 - 自动量程识别: 刻度检测
-- 失败兜底: 重试+历史参考+人工复核标记
+- 失败兜底: 重试+人工复核标记
 
-性能指标:
-- 置信度阈值: 0.6
-- 最大旋转角度: 45°
-- 重试次数: 3
-- 人工复核阈值: 0.5
+V3.1更新:
+- 严格按算法合约输出 metadata
+- MeterType 枚举传递 (不再传字符串)
+- 统一 reading_status 三态
 """
 
 from __future__ import annotations
+import importlib
+import importlib.util
 from pathlib import Path
 from typing import Any, Optional
 from datetime import datetime
-import importlib.util
+import logging
 import sys
+import time
 import numpy as np
 
 from darkbreaker_sdk.interfaces import (
@@ -28,28 +30,49 @@ from darkbreaker_sdk.interfaces import (
 from darkbreaker_sdk.schemas import (
     Alarm, AlarmLevel, AlarmRule, RecognitionResult, ROI, BoundingBox,
 )
+from platform_core.visual_output_protocol import build_visual_meta
+
+logger = logging.getLogger(__name__)
 
 
-def _load_detector_class():
-    # 优先加载增强版检测器
+def _load_detector_module():
     detector_path = Path(__file__).parent / "detector_enhanced.py"
+    module_name = "plugins.meter_reading.detector_enhanced"
     if not detector_path.exists():
         detector_path = Path(__file__).parent / "detector.py"
+        module_name = "plugins.meter_reading.detector"
 
-    spec = importlib.util.spec_from_file_location("meter_detector", detector_path)
+    try:
+        return importlib.import_module(module_name)
+    except ImportError:
+        pass
+
+    spec = importlib.util.spec_from_file_location(module_name, detector_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"无法加载检测器模块: {detector_path}")
     module = importlib.util.module_from_spec(spec)
-    sys.modules["meter_detector"] = module
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
+    sys.modules.setdefault(detector_path.stem, module)
+    return module
 
-    # 优先返回增强版检测器类
+def _load_detector_class():
+    module = _load_detector_module()
     if hasattr(module, 'MeterReadingDetectorEnhanced'):
         return module.MeterReadingDetectorEnhanced
     return module.MeterReadingDetector
 
 
 _MeterReadingDetector = None
+_MeterReadingDetectorModule = None
+
+
+def get_detector_module():
+    global _MeterReadingDetectorModule
+    if _MeterReadingDetectorModule is None:
+        _MeterReadingDetectorModule = _load_detector_module()
+    return _MeterReadingDetectorModule
+
 
 def get_detector_class():
     global _MeterReadingDetector
@@ -58,9 +81,18 @@ def get_detector_class():
     return _MeterReadingDetector
 
 
+def _get_meter_type_enum(type_str: str):
+    """将字符串转换为 MeterType 枚举"""
+    MeterType = get_detector_module().MeterType
+    try:
+        return MeterType(type_str)
+    except ValueError:
+        return MeterType.PRESSURE_GAUGE
+
+
 class MeterReadingPlugin(BasePlugin):
     """
-    表计读数插件
+    表计读数插件 V3.1
 
     实现任意角度读数、自动量程识别和失败兜底
     """
@@ -77,18 +109,18 @@ class MeterReadingPlugin(BasePlugin):
         instance.init(config)
         return instance
 
-    # 表计类型名称映射
     METER_NAMES = {
         "pressure_gauge": "压强表",
         "temperature_gauge": "温度表",
         "oil_level_gauge": "油位表",
         "sf6_density_gauge": "SF6密度表",
         "digital_display": "数字显示屏",
-        "LED_indicator": "LED指示灯",
+        "led_indicator": "LED指示灯",
         "ammeter": "电流表",
         "voltmeter": "电压表",
+        "seven_segment": "七段码显示",
     }
-    
+
     def __init__(self, manifest: PluginManifest, plugin_dir: Path):
         super().__init__(manifest, plugin_dir)
         self._detector = None
@@ -97,36 +129,38 @@ class MeterReadingPlugin(BasePlugin):
         self._inference_count = 0
         self._success_count = 0
         self._manual_review_count = 0
-        
+        self._config = {}
+
         self.confidence_threshold = 0.6
         self.retry_count = 3
-    
+
     def init(self, config: dict[str, Any]) -> bool:
         """初始化插件"""
         try:
             self._config = config
-            
+
             inference_config = config.get("inference", {})
             self.confidence_threshold = inference_config.get("confidence_threshold", 0.6)
-            
+
             fallback_config = config.get("fallback", {})
             self.retry_count = fallback_config.get("retry_count", 3)
-            
+
             MeterReadingDetector = get_detector_class()
             self._detector = MeterReadingDetector(config)
-            
+            self._detector.initialize()
+
             self.status = PluginStatus.READY
             self._initialized = True
-            
-            print(f"[{self.id}] 插件初始化成功")
+
+            logger.info("[%s] 插件初始化成功", self.id)
             return True
-            
+
         except Exception as e:
             self.status = PluginStatus.ERROR
             self._last_error = str(e)
-            print(f"[{self.id}] 初始化失败: {e}")
+            logger.warning("[%s] 初始化失败: %s", self.id, e)
             return False
-    
+
     def infer(
         self,
         frame: np.ndarray,
@@ -136,46 +170,74 @@ class MeterReadingPlugin(BasePlugin):
         """执行推理"""
         if not self._initialized or self._detector is None:
             return []
-        
+
         self.status = PluginStatus.RUNNING
         self._last_inference_time = datetime.now()
         self._inference_count += 1
-        
+
         results: list[RecognitionResult] = []
-        
+
         for roi in rois:
             try:
                 roi_image = self._extract_roi(frame, roi.bbox)
                 if roi_image is None or roi_image.size == 0:
                     continue
-                
-                meter_type = self._get_meter_type(roi)
+
+                meter_type_str = self._get_meter_type(roi)
+                meter_type_enum = _get_meter_type_enum(meter_type_str)
                 roi_id = f"{context.device_id}_{roi.id}"
-                
-                # 读取表计(带重试)
-                reading = None
-                for attempt in range(self.retry_count):
-                    reading = self._detector.read_meter(roi_image, meter_type, roi_id)
-                    if reading.value is not None and reading.confidence >= self.confidence_threshold:
-                        break
-                
-                if reading is None:
-                    continue
-                
-                # 统计
-                if reading.value is not None:
+
+                reading = self._detector.read_meter(
+                    roi_image, meter_type_enum, None, roi_id,
+                )
+
+                if reading.status.value == "success" and reading.value is not None:
                     self._success_count += 1
                 if reading.need_manual_review:
                     self._manual_review_count += 1
-                
-                # 构建标签
+
                 if reading.value is not None:
-                    label = f"{meter_type}_reading"
+                    label = f"{meter_type_str}_reading"
                     value = reading.value
                 else:
-                    label = f"{meter_type}_failed"
+                    label = f"{meter_type_str}_failed"
                     value = None
-                
+
+                reading_meta = dict(reading.metadata) if reading.metadata else {}
+                reading_meta["unit"] = reading.unit
+                reading_meta["meter_type"] = reading.meter_type.value
+                reading_meta["reading_status"] = reading.status.value
+                reading_meta["need_manual_review"] = reading.need_manual_review
+                if "review_status" not in reading_meta:
+                    reading_meta["review_status"] = (
+                        "clear" if reading.status.value == "success"
+                        else "manual_review_required"
+                        if reading.status.value == "need_manual_review"
+                        else "failed"
+                    )
+                if "failure_reason" not in reading_meta:
+                    reading_meta["failure_reason"] = reading.failure_reason or ""
+                if "pipeline_stage" not in reading_meta:
+                    reading_meta["pipeline_stage"] = "unknown"
+                if "timestamp_ms" not in reading_meta:
+                    reading_meta["timestamp_ms"] = int(time.time() * 1000)
+
+                metadata = build_visual_meta(
+                    plugin_name="meter_reading",
+                    task_type="ocr",
+                    modality="meter",
+                    runtime_mode="traditional_fallback",
+                    algorithm_stage="baseline",
+                    quality_gate_status="pass",
+                    review_required=reading.need_manual_review,
+                    reason_codes=(
+                        [reading.failure_reason]
+                        if reading.failure_reason else []
+                    ),
+                    evidence_hint="visual_frame",
+                    extra=reading_meta,
+                )
+
                 result = RecognitionResult(
                     task_id=context.task_id,
                     site_id=context.site_id,
@@ -188,24 +250,19 @@ class MeterReadingPlugin(BasePlugin):
                     confidence=reading.confidence,
                     model_version=self.version,
                     code_version=self.code_hash,
-                    metadata={
-                        "unit": reading.unit,
-                        "meter_type": reading.meter_type.value,
-                        "need_manual_review": reading.need_manual_review,
-                        "keypoints": reading.keypoints,
-                    },
+                    metadata=metadata,
                 )
                 results.append(result)
-                
+
             except Exception as e:
-                print(f"[{self.id}] 处理ROI {roi.id} 时出错: {e}")
+                logger.warning("[%s] 处理ROI %s 时出错: %s", self.id, roi.id, e)
                 continue
-        
+
         self.status = PluginStatus.READY
-        print(f"[{self.id}] 读数完成，共 {len(results)} 个结果")
-        
+        logger.info("[%s] 读数完成, 共 %d 个结果", self.id, len(results))
+
         return results
-    
+
     def postprocess(
         self,
         results: list[RecognitionResult],
@@ -213,11 +270,10 @@ class MeterReadingPlugin(BasePlugin):
     ) -> list[Alarm]:
         """后处理和告警生成"""
         alarms: list[Alarm] = []
-        
+
         for result in results:
             metadata = result.metadata or {}
-            
-            # 读数失败告警
+
             if "_failed" in result.label:
                 alarm = Alarm(
                     task_id=result.task_id,
@@ -230,8 +286,7 @@ class MeterReadingPlugin(BasePlugin):
                     component_id=result.component_id,
                 )
                 alarms.append(alarm)
-            
-            # 需要人工复核告警
+
             elif metadata.get("need_manual_review", False):
                 meter_name = self._get_meter_name(result.label)
                 alarm = Alarm(
@@ -239,14 +294,13 @@ class MeterReadingPlugin(BasePlugin):
                     result_id=None,
                     level=AlarmLevel.INFO,
                     title="表计读数需人工复核",
-                    message=f"{meter_name} 读数 {result.value} {metadata.get('unit', '')}，置信度较低，请人工确认",
+                    message=f"{meter_name} 读数 {result.value} {metadata.get('unit', '')}, 置信度较低, 请人工确认",
                     site_id=result.site_id,
                     device_id=result.device_id,
                     component_id=result.component_id,
                 )
                 alarms.append(alarm)
-            
-            # 读数超限告警(根据规则)
+
             for rule in rules:
                 if self._check_rule(result, rule):
                     alarm = Alarm(
@@ -260,9 +314,9 @@ class MeterReadingPlugin(BasePlugin):
                         component_id=result.component_id,
                     )
                     alarms.append(alarm)
-        
+
         return alarms
-    
+
     def healthcheck(self) -> HealthStatus:
         """健康检查"""
         if not self._initialized:
@@ -351,9 +405,89 @@ class MeterReadingPlugin(BasePlugin):
             ]
         }
 
-    
+    # ==================== Standalone Routes ====================
+
+    def get_standalone_routes(self) -> list[dict]:
+        """返回独立运行模式的自定义 API 路由"""
+        from fastapi import Body
+
+        if not hasattr(self, '_simulator'):
+            from plugins.meter_reading.standalone.meter_simulator import MeterSimulator
+            from plugins.meter_reading.standalone.video_stream import VideoStreamService
+            scenarios_dir = self.plugin_dir / "configs" / "scenarios"
+            self._simulator = MeterSimulator(scenarios_dir)
+            self._stream_service = VideoStreamService(
+                simulator=self._simulator,
+                detector=self._detector,
+            )
+
+        simulator = self._simulator
+        stream_svc = self._stream_service
+
+        async def simulator_scenarios():
+            return {
+                "scenarios": simulator.list_scenarios(),
+                "active": simulator.get_active_scenario_id(),
+            }
+
+        async def simulator_load(payload: dict = Body(...)):
+            scenario_id = payload.get("scenario")
+            if not scenario_id:
+                return {"error": "missing scenario id"}
+            ok = simulator.load_scenario(scenario_id)
+            if not ok:
+                return {"error": f"scenario '{scenario_id}' not found"}
+            state = simulator.get_state()
+            return {"status": "loaded", **state}
+
+        async def simulator_status():
+            return simulator.get_state()
+
+        async def stream_start(payload: dict = Body(...)):
+            source = payload.get("source", "simulated")
+            return stream_svc.start(source)
+
+        async def stream_stop():
+            return stream_svc.stop()
+
+        async def stream_mjpeg():
+            from starlette.responses import StreamingResponse
+            return StreamingResponse(
+                stream_svc.generate_mjpeg(),
+                media_type="multipart/x-mixed-replace; boundary=frame",
+            )
+
+        async def stream_stats():
+            return stream_svc.get_stats()
+
+        async def stream_snapshot():
+            from starlette.responses import Response
+            jpeg = stream_svc.get_snapshot_jpeg()
+            if jpeg is None:
+                return {"error": "no frame available"}
+            return Response(content=jpeg, media_type="image/jpeg")
+
+        async def stream_readings(limit: int = 20):
+            return stream_svc.get_recent_readings(limit)
+
+        async def events(limit: int = 50):
+            return stream_svc.get_events(limit)
+
+        return [
+            {"path": "/api/meter-reading/simulator/scenarios", "endpoint": simulator_scenarios, "methods": ["GET"], "summary": "List simulation scenarios"},
+            {"path": "/api/meter-reading/simulator/load", "endpoint": simulator_load, "methods": ["POST"], "summary": "Load simulation scenario"},
+            {"path": "/api/meter-reading/simulator/status", "endpoint": simulator_status, "methods": ["GET"], "summary": "Get simulator status"},
+            {"path": "/api/meter-reading/stream/start", "endpoint": stream_start, "methods": ["POST"], "summary": "Start video stream"},
+            {"path": "/api/meter-reading/stream/stop", "endpoint": stream_stop, "methods": ["POST"], "summary": "Stop video stream"},
+            {"path": "/api/meter-reading/stream", "endpoint": stream_mjpeg, "methods": ["GET"], "summary": "MJPEG video stream"},
+            {"path": "/api/meter-reading/stream/stats", "endpoint": stream_stats, "methods": ["GET"], "summary": "Stream statistics"},
+            {"path": "/api/meter-reading/snapshot", "endpoint": stream_snapshot, "methods": ["GET"], "summary": "Single frame snapshot"},
+            {"path": "/api/meter-reading/stream/readings", "endpoint": stream_readings, "methods": ["GET"], "summary": "Recent reading results"},
+            {"path": "/api/meter-reading/events", "endpoint": events, "methods": ["GET"], "summary": "Event log"},
+        ]
+
     # ==================== 辅助方法 ====================
-    
+
     def _extract_roi(self, frame: np.ndarray, bbox: BoundingBox) -> Optional[np.ndarray]:
         """从帧中提取ROI区域"""
         h, w = frame.shape[:2]
@@ -363,33 +497,32 @@ class MeterReadingPlugin(BasePlugin):
         if x2 <= x1 or y2 <= y1:
             return None
         return frame[y1:y2, x1:x2].copy()
-    
+
     def _get_meter_type(self, roi: ROI) -> str:
-        """获取表计类型"""
+        """获取表计类型字符串"""
         roi_type = getattr(roi, 'roi_type', None)
         if roi_type is not None:
             return roi_type.value if hasattr(roi_type, 'value') else str(roi_type)
-        
+
         name = getattr(roi, 'name', '').lower()
         for mtype in self.METER_NAMES.keys():
             if mtype in name:
                 return mtype
-        
-        return "pressure_gauge"  # 默认
-    
+
+        return "pressure_gauge"
+
     def _get_meter_name(self, label: str) -> str:
         """获取表计中文名称"""
         for key, name in self.METER_NAMES.items():
             if key in label:
                 return name
         return "表计"
-    
+
     def _check_rule(self, result: RecognitionResult, rule: AlarmRule) -> bool:
         """检查告警规则"""
         if result.value is None:
             return False
-        
-        # 简化的规则检查
+
         min_value = getattr(rule, "min_value", None)
         if min_value is not None and result.value < min_value:
             return True

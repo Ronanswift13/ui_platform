@@ -1,0 +1,17 @@
+# Runtime artifacts
+data/results.db
+*.pyc
+__pycache__/
+.pytest_cache/
+htmlcov/
+*.egg-info/
+logs/
+
+# Model files (tracked separately)
+models/*.onnx
+models/*.pt
+models/*.pth
+
+# IDE
+.vscode/
+.idea/

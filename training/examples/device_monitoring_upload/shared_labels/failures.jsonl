@@ -1,0 +1,2 @@
+{"device_id":"edge_01","failure_time":"2026-04-03T12:00:00Z","failure_type":"edge_compute_overheat","severity":"critical"}
+{"device_id":"lidar_01","failure_time":"2026-04-05T09:00:00Z","failure_type":"lidar_link_down","severity":"alarm"}

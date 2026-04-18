@@ -19,6 +19,39 @@
         "evacuation_guidance",
         "drill_simulation"
     ],
+    "verified_capabilities": [],
+    "experimental_capabilities": [
+        "fire_detection",
+        "smoke_detection",
+        "drill_simulation"
+    ],
+    "blocked_capabilities": [
+        "thermal_anomaly_detection",
+        "multi_sensor_fusion",
+        "active_suppression_control",
+        "evacuation_guidance",
+        "real_dl_onnx_inference"
+    ],
+    "required_fixtures": [
+        "fire_visible_sample.jpg",
+        "smoke_visible_sample.jpg",
+        "thermal_hotspot_sample.jpg",
+        "fire_smoke_yolov8n.onnx"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": false,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "仅 test_standalone.py (1 test) 可通过",
+        "无 fixtures，无 regression",
+        "ONNX 模型不存在，detector 回退到模拟模式",
+        "multi_sensor_fusion 代码存在但无传感器硬件集成测试",
+        "active_suppression_control 依赖喷淋/断电硬件接口",
+        "evacuation_guidance 代码路径存在但无验证",
+        "7 个声称能力中仅 3 个有代码实现，4 个完全 blocked"
+    ],
 
     "device_types": [
         "visible_camera",

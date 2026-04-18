@@ -7,6 +7,7 @@ UI 服务器
 
 from __future__ import annotations
 import sys
+import importlib
 from pathlib import Path
 
 # 添加项目根目录到路径 (必须在其他导入之前)
@@ -16,7 +17,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 # 高级插件集成 (在路径设置之后导入)
 try:
@@ -31,50 +32,137 @@ TEMPLATES_DIR = PROJECT_ROOT / "ui" / "templates"
 STATIC_DIR = PROJECT_ROOT / "ui" / "static"
 
 
-# 模块配置
+# 模块配置 — 完整 16 插件注册表 (V4.0 统一)
 MODULES = {
+    # ========== 室外监测插件 (10) ==========
     "transformer": {
         "name": "主变自主巡视",
         "icon": "box",
         "description": "主变压器本体及附属设施的外观缺陷识别、状态识别和热成像分析",
         "plugin_id": "transformer_inspection",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=transformer_inspection",
     },
     "switch": {
         "name": "开关间隔巡视",
         "icon": "toggle-on",
         "description": "断路器、隔离开关、接地开关的分合位状态识别和逻辑校验",
         "plugin_id": "switch_inspection",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=switch_inspection",
     },
     "busbar": {
         "name": "母线自主巡视",
         "icon": "diagram-3",
         "description": "绝缘子串、金具、导线连接点的远距小目标检测",
         "plugin_id": "busbar_inspection",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=busbar_inspection",
     },
     "capacitor": {
         "name": "电容器巡视",
         "icon": "battery-charging",
         "description": "电容器组的结构完整性检测和区域入侵检测",
         "plugin_id": "capacitor_inspection",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=capacitor_inspection",
+    },
+    "bird": {
+        "name": "鸟类监控",
+        "icon": "feather",
+        "description": "室外输电线路鸟类识别、风险评估和驱离告警",
+        "plugin_id": "bird_monitoring",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=bird_monitoring",
+    },
+    "acoustic": {
+        "name": "声学监测",
+        "icon": "soundwave",
+        "description": "变电站设备局部放电声学监测与异常识别",
+        "plugin_id": "acoustic_monitoring",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=acoustic_monitoring",
+    },
+    "gas": {
+        "name": "气体检测",
+        "icon": "cloud-haze2",
+        "description": "SF6等绝缘气体泄漏检测与浓度监测",
+        "plugin_id": "gas_detection",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=gas_detection",
+    },
+    "hyperspectral": {
+        "name": "高光谱检测",
+        "icon": "rainbow",
+        "description": "基于高光谱成像的设备表面缺陷检测",
+        "plugin_id": "hyperspectral_detection",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=hyperspectral_detection",
+    },
+    "slam": {
+        "name": "SLAM建图",
+        "icon": "map",
+        "description": "基于激光雷达的变电站三维环境建图与导航",
+        "plugin_id": "slam_mapping",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=slam_mapping",
+    },
+    "fusion": {
+        "name": "多模态融合",
+        "icon": "diagram-3-fill",
+        "description": "多传感器数据融合检测与综合分析",
+        "plugin_id": "multimodal_fusion",
+        "category": "outdoor",
+        "route": "/outdoor?plugin=multimodal_fusion",
+    },
+    # ========== 室内监测插件 (6) ==========
+    "indoor_fence": {
+        "name": "室内电子围栏",
+        "icon": "shield-shaded",
+        "description": "基于激光雷达的电子围栏、多人监测、黄线越界检测和授权校验",
+        "plugin_id": "indoor_fence",
+        "category": "indoor",
+        "route": "/indoor?plugin=indoor_fence",
+    },
+    "animal": {
+        "name": "动物入侵检测",
+        "icon": "bug",
+        "description": "室内变电站小动物入侵检测与告警",
+        "plugin_id": "animal_detection",
+        "category": "indoor",
+        "route": "/indoor?plugin=animal_detection",
+    },
+    "temperature": {
+        "name": "温度监测",
+        "icon": "thermometer-sun",
+        "description": "室内设备温度实时监测与超温告警",
+        "plugin_id": "temperature_monitoring",
+        "category": "indoor",
+        "route": "/indoor?plugin=temperature_monitoring",
+    },
+    "device": {
+        "name": "设备监测",
+        "icon": "hdd-rack",
+        "description": "室内配电设备运行状态监测与异常诊断",
+        "plugin_id": "device_monitoring",
+        "category": "indoor",
+        "route": "/indoor?plugin=device_monitoring",
+    },
+    "fire": {
+        "name": "消防监测",
+        "icon": "fire",
+        "description": "室内消防设施状态监测与火灾预警",
+        "plugin_id": "fire_detection",
+        "category": "indoor",
+        "route": "/indoor?plugin=fire_detection",
     },
     "meter": {
         "name": "表计读数",
         "icon": "speedometer2",
         "description": "站内全类型模拟表计和数字表计的任意角度读数识别",
         "plugin_id": "meter_reading",
-    },
-    # ========== 新增模块 ==========
-    "bird": {
-        "name": "鸟类监控",
-        "icon": "feather",
-        "description": "室外输电线路鸟类识别、风险评估和驱离告警",
-        "plugin_id": "bird_monitoring",
-    },
-    "indoor_fence": {
-        "name": "室内电子围栏",
-        "icon": "shield-shaded",
-        "description": "基于激光雷达的电子围栏、多人监测、黄线越界检测和授权校验",
-        "plugin_id": "indoor_fence",
+        "category": "indoor",
+        "route": "/indoor?plugin=meter_reading",
     },
 }
 
@@ -117,6 +205,14 @@ def create_app() -> FastAPI:
             print("✓ 训练API路由已集成 (旧版)")
         except Exception as e2:
             print(f"✗ 训练API导入完全失败: {e2}")
+
+    # ============== 集成动作事件监测API ==============
+    try:
+        from apps.action_event_api import router as action_event_router
+        app.include_router(action_event_router)
+        print("✓ 动作事件监测API已集成")
+    except Exception as e:
+        print(f"✗ 动作事件监测API导入失败: {e}")
 
     # ============== 集成室内监测中心API (V3.5 -> V2.0升级) ==============
     try:
@@ -169,15 +265,33 @@ def create_app() -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
-        """首页"""
+        """首页 - 重定向到主控驾驶舱"""
         return templates.TemplateResponse(
-            "index.html",
+            "pages/cockpit.html",
             {
                 "request": request,
-                "active_tab": "home",
-                "version": "1.0.0",
+                "active_tab": "cockpit",
+                "version": "4.0.0",
             },
         )
+
+    @app.get("/cockpit", response_class=HTMLResponse)
+    async def cockpit_page(request: Request):
+        """主控驾驶舱页面"""
+        return templates.TemplateResponse(
+            "pages/cockpit.html",
+            {
+                "request": request,
+                "active_tab": "cockpit",
+                "version": "4.0.0",
+            },
+        )
+
+    # ============== 旧版路由 301 重定向 (V4.0 统一入口治理) ==============
+    @app.get("/home")
+    async def home_redirect():
+        """旧版首页 → 301 重定向到主控驾驶舱"""
+        return RedirectResponse(url="/cockpit", status_code=301)
 
     @app.get("/module/{module_id}", response_class=HTMLResponse)
     async def module_page(request: Request, module_id: str):
@@ -276,17 +390,10 @@ def create_app() -> FastAPI:
         )
 
     # ============== 监测中心Dashboard页面 ==============
-    @app.get("/dashboard", response_class=HTMLResponse)
-    async def dashboard_page(request: Request):
-        """监测中心Dashboard页面"""
-        return templates.TemplateResponse(
-            "pages/dashboard.html",
-            {
-                "request": request,
-                "active_tab": "dashboard",
-                "version": "3.0.0",
-            },
-        )
+    @app.get("/dashboard")
+    async def dashboard_redirect():
+        """旧版 Dashboard → 301 重定向到主控驾驶舱"""
+        return RedirectResponse(url="/cockpit", status_code=301)
 
     # ============== 室外监测中心 (V4.0升级) ==============
     @app.get("/outdoor", response_class=HTMLResponse)
@@ -327,18 +434,23 @@ def create_app() -> FastAPI:
             },
         )
 
-    # ============== 统一仪表盘页面 (V3.0新增) ==============
-    @app.get("/unified-dashboard", response_class=HTMLResponse)
-    async def unified_dashboard_page(request: Request):
-        """统一监控仪表盘页面"""
+    # ============== 动作时间线页面 (二次设备动作监测) ==============
+    @app.get("/action-timeline", response_class=HTMLResponse)
+    async def action_timeline_page(request: Request):
+        """动作时间线与关联分析页面"""
         return templates.TemplateResponse(
-            "pages/unified_dashboard.html",
+            "pages/action_timeline.html",
             {
                 "request": request,
-                "active_tab": "unified_dashboard",
-                "version": "3.0.0",
+                "active_tab": "action_timeline",
+                "version": "1.0.0",
             },
         )
+
+    @app.get("/unified-dashboard")
+    async def unified_dashboard_redirect():
+        """旧版统一仪表盘 → 301 重定向到主控驾驶舱"""
+        return RedirectResponse(url="/cockpit", status_code=301)
 
     # ============== 中期迭代功能页面 (V3.0新增) ==============
 
@@ -415,6 +527,65 @@ def create_app() -> FastAPI:
                 "version": "3.0.0",
             },
         )
+
+    # ============== 驾驶舱聚合接口 (V4.0 新增) ==============
+    @app.get("/api/cockpit/overview")
+    async def cockpit_overview():
+        """驾驶舱概览 — 一次返回首屏所需全部数据"""
+        plugins_data = []
+        try:
+            from platform_core.plugin_manager.installer import PluginInstaller
+            _inst = PluginInstaller(plugins_dir=PROJECT_ROOT / "plugins")
+            plugins_data = [p.to_dict() for p in _inst.list_available()]
+        except Exception:
+            # 降级：基于 MODULES 注册表生成基础数据
+            for mod_key, mod in MODULES.items():
+                plugins_data.append({
+                    "id": mod["plugin_id"],
+                    "name": mod["name"],
+                    "category": mod.get("category", "outdoor"),
+                    "enabled": True,
+                    "status": "ready",
+                    "version": "4.0.0",
+                    "health": 85,
+                    "alarms": 0,
+                    "detections": 0,
+                    "route": mod.get("route", ""),
+                })
+
+        # 聚合统计
+        total_alarms = sum(p.get("alarms", 0) for p in plugins_data)
+        total_detections = sum(p.get("detections", 0) for p in plugins_data)
+        online_count = sum(
+            1 for p in plugins_data
+            if p.get("enabled") and p.get("status") == "ready"
+        )
+
+        return {
+            "plugins": plugins_data,
+            "stats": {
+                "total_plugins": len(plugins_data),
+                "plugins_online": online_count,
+                "total_alarms": total_alarms,
+                "total_detections": total_detections,
+            },
+            "alarms": [],  # 后续可接入告警存储
+        }
+
+    # ============== 插件注册表接口 (V4.0 新增) ==============
+    @app.get("/api/plugins/registry")
+    async def plugin_registry():
+        """返回全部插件的元数据注册表，前端统一数据源"""
+        registry = []
+        for mod_key, mod in MODULES.items():
+            registry.append({
+                "id": mod["plugin_id"],
+                "name": mod["name"],
+                "icon": mod["icon"],
+                "category": mod.get("category", "outdoor"),
+                "route": mod.get("route", ""),
+            })
+        return registry
 
     # ============== 插件管理器 (Plugin Manager) ==============
     try:

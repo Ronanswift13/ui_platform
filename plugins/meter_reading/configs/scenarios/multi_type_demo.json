@@ -1,0 +1,58 @@
+{
+    "scenario_id": "multi_type_demo",
+    "name": "多类型综合演示",
+    "description": "展示全部表计类型: 2个模拟表 + 1个数字表 + 2个LED指示灯",
+    "step_interval_ms": 500,
+    "total_steps": 300,
+    "meters": [
+        {
+            "id": "pressure_1",
+            "type": "analog",
+            "label": "压强表",
+            "unit": "MPa",
+            "range_min": 0.0,
+            "range_max": 1.6,
+            "initial_value": 0.8,
+            "pattern": "sine",
+            "speed": 0.6
+        },
+        {
+            "id": "oil_level_2",
+            "type": "analog",
+            "label": "油位表",
+            "unit": "%",
+            "range_min": 0,
+            "range_max": 100,
+            "initial_value": 65,
+            "pattern": "ramp",
+            "speed": 0.3
+        },
+        {
+            "id": "digital_3",
+            "type": "digital",
+            "label": "电压表",
+            "unit": "kV",
+            "range_min": 0,
+            "range_max": 35,
+            "initial_value": 10.5,
+            "pattern": "sine",
+            "speed": 0.8
+        },
+        {
+            "id": "led_run",
+            "type": "led",
+            "label": "运行灯",
+            "led_color": "green",
+            "cycle": ["green"],
+            "speed": 1.0
+        },
+        {
+            "id": "led_alarm",
+            "type": "led",
+            "label": "告警灯",
+            "led_color": "off",
+            "cycle": ["off", "off", "off", "red"],
+            "speed": 0.5
+        }
+    ]
+}

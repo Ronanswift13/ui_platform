@@ -1,0 +1,35 @@
+[run]
+source = .
+omit =
+    # 入口脚本 (不可单元测试)
+    run_standalone.py
+    standalone/app.py
+    __main__.py
+    # 演示文件
+    demo.py
+    demo/*
+    # 遗留模块 (已被新模块替代)
+    detector.py
+    core/tracker_v3.py
+    core/enhanced_tracking.py
+    core/fusion/legacy_fusion.py
+    # 插件注册/入口文件 (需要完整 SDK 环境)
+    plugins.py
+    plugin.py
+    # API 集成层 (需要完整 web 环境)
+    api_integration.py
+    # 测试文件本身
+    tests/*
+    # 工具脚本
+    scripts/*
+    # 缓存
+    __pycache__/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__
+    raise NotImplementedError
+    pass
+    \.\.\.

@@ -1,0 +1,51 @@
+# ============================================================
+# 热成像分析插件配置
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
+
+# 模型配置
+model:
+  path: "models/thermal_anomaly.onnx"
+  device: "cpu"
+  status: "placeholder"
+
+# 运行时配置
+runtime:
+  mode: "rule_based"
+  fallback_enabled: true
+
+# 温度阈值
+thresholds:
+  temp_warning: 60.0
+  temp_serious: 80.0
+  temp_critical: 100.0
+  gradient_threshold: 15.0
+
+# 质量门控
+quality:
+  min_resolution: [64, 64]
+  valid_temp_range: [-20.0, 200.0]
+  noise_threshold: 5.0
+
+# 趋势分析
+trend:
+  history_length: 100
+  trend_window: 10
+  trend_threshold: 5.0
+
+# 标签映射
+labels:
+  - normal
+  - hotspot
+  - gradient_anomaly
+  - trend_anomaly
+  - overheating
+
+# 升级占位
+upgrade_placeholders:
+  model_registry_id: null
+  model_asset_status: "not_available"
+  calibration_required: true
+  dataset_requirements: "thermal_labeled_10k"
+  annotation_status: "not_started"

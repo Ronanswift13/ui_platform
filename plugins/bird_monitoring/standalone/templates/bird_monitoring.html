@@ -1,7 +1,7 @@
 {% extends "base_standalone.html" %}
 
-{% block title %}Bird Monitoring - DarkBreaker{% endblock %}
-{% block navbar_title %}Bird Monitoring Dashboard{% endblock %}
+{% block title %}鸟类监控 - DarkBreaker{% endblock %}
+{% block navbar_title %}鸟类监控仪表板{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -13,83 +13,319 @@
         margin-bottom: 1rem;
     }
     .panel-title {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         text-transform: uppercase;
         color: var(--text-secondary);
         margin-bottom: 0.75rem;
         letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
     }
     .metric-value {
-        font-size: 1.8rem;
+        font-size: 1.75rem;
         font-weight: 700;
         line-height: 1.2;
     }
     .metric-label {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         color: var(--text-secondary);
     }
-    .status-normal { color: var(--success); }
-    .status-warning { color: var(--warning); }
-    .status-alarm, .status-critical { color: var(--danger); }
-    .event-list {
-        max-height: 280px;
-        overflow-y: auto;
+
+    .mode-switch {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
     }
-    .event-item {
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--border-color);
+    .mode-btn {
+        flex: 1;
+        padding: 0.55rem;
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
         font-size: 0.85rem;
     }
-    .event-item:last-child { border-bottom: none; }
+    .mode-btn.active {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(59, 130, 246, 0.10);
+    }
+
+    .runtime-badge {
+        display: inline-block;
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+    .runtime-badge.simulation { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .runtime-badge.standalone_simulation { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .runtime-badge.real_dl { background: rgba(34,197,94,0.18); color: #22c55e; }
+    .runtime-badge.traditional_fallback { background: rgba(59,130,246,0.18); color: #3b82f6; }
+
+    .viewport {
+        position: relative;
+        width: 100%;
+        background: #0a0b0d;
+        border-radius: 6px;
+        min-height: 320px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .viewport img { width: 100%; display: block; }
+    .viewport .placeholder {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        text-align: center;
+        padding: 2rem 1rem;
+    }
+    .sim-watermark {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 0.7rem;
+        background: rgba(245,158,11,0.85);
+        color: #1a1a1a;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 3px;
+    }
+
+    .scenario-card {
+        padding: 0.55rem 0.6rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        margin-bottom: 0.45rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: border-color 0.15s, background-color 0.15s;
+    }
+    .scenario-card:hover { border-color: var(--accent); }
+    .scenario-card.active {
+        border-color: var(--accent);
+        background: rgba(59,130,246,0.1);
+    }
+    .scenario-card .name { font-weight: 600; }
+    .scenario-card .desc {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+    .scenario-card .expected {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #f59e0b;
+        margin-top: 4px;
+    }
+
+    .result-list, .alarm-list {
+        max-height: 320px;
+        overflow-y: auto;
+    }
+    .result-item, .alarm-item {
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.8rem;
+    }
+    .result-item:last-child, .alarm-item:last-child { border-bottom: none; }
+    .result-label {
+        font-weight: 700;
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+    }
+    .label-no_bird { background: rgba(34,197,94,0.18); color: #22c55e; }
+    .label-bird_safe { background: rgba(34,197,94,0.18); color: #22c55e; }
+    .label-bird_warning { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .label-bird_danger { background: rgba(239,68,68,0.20); color: #ef4444; }
+    .label-bird_critical { background: rgba(220,38,38,0.30); color: #ef4444; }
+    .label-review_required { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .label-unknown_bird { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .label-quality_failed { background: rgba(139,92,246,0.18); color: #8b5cf6; }
+    .label-error { background: rgba(239,68,68,0.20); color: #ef4444; }
+
+    .alarm-item.level-WARNING { border-left: 3px solid #f59e0b; }
+    .alarm-item.level-ERROR { border-left: 3px solid #ef4444; }
+    .alarm-item.level-CRITICAL { border-left: 3px solid #dc2626; }
+    .alarm-item.level-INFO { border-left: 3px solid #3b82f6; }
+
+    .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.2rem 0.75rem;
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        margin-top: 0.4rem;
+    }
+
+    .quality-bar {
+        height: 6px;
+        background: #1f2937;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 4px;
+    }
+    .quality-bar > div {
+        height: 100%;
+        background: #22c55e;
+        transition: width 0.3s;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row g-3 p-3">
+
+    <!-- ============ 顶部指标 ============ -->
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Detection Status</div>
-            <div class="metric-value status-normal" id="detection-status">Ready</div>
-            <div class="metric-label">Bird monitoring active</div>
+            <div class="panel-title"><i class="bi bi-cpu"></i> Runtime Mode</div>
+            <div><span id="runtime-mode-badge" class="runtime-badge simulation">simulation</span></div>
+            <div class="metric-label mt-1" id="runtime-mode-detail">检测器模式</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Active Tracks</div>
-            <div class="metric-value" id="active-tracks">0</div>
-            <div class="metric-label">Tracked birds</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Bird Database</div>
-            <div class="metric-value" id="db-size">0</div>
-            <div class="metric-label">Known species</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Inference Count</div>
+            <div class="panel-title"><i class="bi bi-binoculars"></i> Inference Count</div>
             <div class="metric-value" id="inference-count">0</div>
-            <div class="metric-label">Total processed</div>
+            <div class="metric-label">来自 plugin.healthcheck</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title"><i class="bi bi-database"></i> Bird DB</div>
+            <div class="metric-value" id="db-size">0</div>
+            <div class="metric-label">已加载物种</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title"><i class="bi bi-activity"></i> Active Tracks</div>
+            <div class="metric-value" id="active-tracks">0</div>
+            <div class="metric-label">当前跟踪</div>
         </div>
     </div>
 
-    <div class="col-md-6">
+    <!-- ============ 模式切换 ============ -->
+    <div class="col-12">
+        <div class="mode-switch">
+            <button class="mode-btn active" id="btn-mode-sim" onclick="switchMode('sim')">
+                <i class="bi bi-play-circle"></i> 仿真演示 (standalone_simulation)
+            </button>
+            <button class="mode-btn" id="btn-mode-live" onclick="switchMode('live')">
+                <i class="bi bi-camera-video"></i> 真实上传检测 (/api/detect)
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ 左侧: 视窗 ============ -->
+    <div class="col-md-8">
+        <div class="panel" id="panel-sim">
+            <div class="panel-title">
+                <i class="bi bi-display"></i> 仿真视窗
+                <span class="ms-auto runtime-badge standalone_simulation">standalone_simulation</span>
+            </div>
+            <div class="viewport" id="sim-viewport">
+                <div class="placeholder" id="sim-placeholder">
+                    选择右侧场景，点击「执行单步」生成仿真帧。<br>
+                    <span style="color:#f59e0b">提示：仿真帧不代表真实检测结果。</span>
+                </div>
+                <img id="sim-frame" alt="" style="display:none;">
+                <span class="sim-watermark" id="sim-watermark" style="display:none;">SIMULATION</span>
+            </div>
+            <div class="d-flex gap-2 mt-2">
+                <button class="btn btn-sm btn-outline-primary" id="btn-step" onclick="simStep()">
+                    <i class="bi bi-skip-forward"></i> 执行单步
+                </button>
+                <button class="btn btn-sm btn-outline-success" id="btn-auto" onclick="toggleAuto()">
+                    <i class="bi bi-play"></i> 自动运行
+                </button>
+                <span class="ms-auto text-secondary small" id="sim-meta">未选择场景</span>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-live" style="display:none;">
+            <div class="panel-title">
+                <i class="bi bi-camera-video"></i> 真实检测上传
+                <span class="ms-auto runtime-badge" id="live-runtime-badge">--</span>
+            </div>
+            <div class="viewport">
+                <div class="placeholder" id="live-placeholder">
+                    上传图像调用 /api/detect。<br>
+                    当前 detector 无 ONNX 模型，预期返回 <code>no_bird</code> 或 <code>quality_failed</code>。
+                </div>
+                <img id="live-image" alt="" style="display:none;">
+            </div>
+            <div class="d-flex gap-2 mt-2 align-items-center">
+                <input type="file" id="live-upload" accept="image/*" class="form-control form-control-sm" style="max-width:340px;">
+                <button class="btn btn-sm btn-primary" id="btn-detect" onclick="runRealDetection()">
+                    <i class="bi bi-search"></i> 执行检测
+                </button>
+                <span class="text-secondary small ms-auto" id="live-status">等待上传…</span>
+            </div>
+        </div>
+
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-binoculars me-1"></i>Bird Detections</div>
-            <div class="event-list" id="detection-events">
-                <div class="event-item text-secondary">No detections yet</div>
+            <div class="panel-title"><i class="bi bi-bell"></i> 告警信息</div>
+            <div class="alarm-list" id="alarm-list">
+                <div class="text-secondary small p-2">暂无告警</div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-6">
+    <!-- ============ 右侧: 场景 + 结果 + 质量 ============ -->
+    <div class="col-md-4">
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-exclamation-triangle-fill me-1"></i>Risk Alerts</div>
-            <div class="event-list" id="risk-alerts">
-                <div class="event-item text-secondary">No alerts</div>
+            <div class="panel-title"><i class="bi bi-collection"></i> 仿真场景</div>
+            <div id="scenario-list">
+                <div class="text-secondary small p-2">加载场景…</div>
             </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-list-check"></i> 检测结果</div>
+            <div class="result-list" id="result-list">
+                <div class="text-secondary small p-2">等待检测…</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-image"></i> 输入质量（三态门）</div>
+            <div id="quality-panel">
+                <div class="d-flex justify-content-between small">
+                    <span>状态</span>
+                    <span id="q-status" class="badge bg-secondary">--</span>
+                </div>
+                <div class="d-flex justify-content-between small mt-2">
+                    <span>清晰度</span><span id="q-clarity">--</span>
+                </div>
+                <div class="quality-bar"><div id="q-clarity-bar" style="width:0%"></div></div>
+                <div class="d-flex justify-content-between small mt-2">
+                    <span>亮度</span><span id="q-brightness">--</span>
+                </div>
+                <div class="quality-bar"><div id="q-brightness-bar" style="width:0%; background:#3b82f6;"></div></div>
+                <div class="small mt-2 text-secondary" id="q-issues">暂无质量问题</div>
+                <div class="small mt-1" id="q-soft-note" style="color:#f59e0b; display:none;"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-download"></i> 训练占位导出</div>
+            <div class="small text-secondary mb-2">
+                将最近一次真实检测的 <code>training_placeholders</code> 导出为 JSON，
+                便于人工标注或离线归档。仅在真实 <code>/api/detect</code> 结果存在时可用。
+            </div>
+            <button class="btn btn-sm btn-outline-light" onclick="downloadTrainingPlaceholders()">
+                <i class="bi bi-filetype-json"></i> 下载 placeholders.json
+            </button>
+            <div class="small text-secondary mt-2" id="placeholder-status">尚无可下载数据</div>
         </div>
     </div>
 </div>
@@ -97,17 +333,341 @@
 
 {% block extra_scripts %}
 <script>
-    function updateDashboard(data) {
+(function() {
+    'use strict';
+
+    let currentMode = 'sim';
+    let currentScenario = null;
+    let autoTimer = null;
+
+    function api(path, opts) {
+        opts = opts || {};
+        return fetch(path, opts).then(r => r.json()).catch(e => {
+            console.error('API failed', path, e);
+            return null;
+        });
+    }
+
+    function setRuntimeBadge(el, mode) {
+        if (!el) return;
+        el.className = 'runtime-badge ' + (mode || 'simulation');
+        el.textContent = mode || 'unknown';
+    }
+
+    /* ─── 顶部 status & runtime_mode ─────────────────── */
+    async function loadStatus() {
+        const data = await api('/api/status');
         if (!data) return;
-        if (data.active_tracks !== undefined) {
-            document.getElementById('active-tracks').textContent = data.active_tracks;
+        const details = (data.health && data.health.details) || {};
+        const runtimeMode = details.runtime_mode || 'unknown';
+        setRuntimeBadge(document.getElementById('runtime-mode-badge'), runtimeMode);
+        setRuntimeBadge(document.getElementById('live-runtime-badge'), runtimeMode);
+        document.getElementById('runtime-mode-detail').textContent =
+            details.real_model_loaded ? '真实模型已加载' :
+            (details.simulation_enabled ? 'simulation 空检测' : 'unknown');
+        document.getElementById('inference-count').textContent = details.inference_count || 0;
+        document.getElementById('db-size').textContent = details.bird_database_size || 0;
+        document.getElementById('active-tracks').textContent = details.active_tracks || 0;
+    }
+
+    /* ─── 场景列表 ───────────────────────────────────── */
+    async function loadScenarios() {
+        const data = await api('/api/simulator/scenarios');
+        const list = document.getElementById('scenario-list');
+        if (!data || !data.scenarios) {
+            list.innerHTML = '<div class="text-danger small p-2">仿真场景接口不可用</div>';
+            return;
         }
-        if (data.bird_database_size !== undefined) {
-            document.getElementById('db-size').textContent = data.bird_database_size;
+        list.innerHTML = '';
+        data.scenarios.forEach(sc => {
+            const card = document.createElement('div');
+            card.className = 'scenario-card';
+            card.dataset.id = sc.scenario_id;
+            card.innerHTML = `
+                <div class="name">${sc.name}</div>
+                <div class="desc">${sc.description}</div>
+                <div class="expected">预期 label: ${sc.expected_label} · ${sc.alarm_level}</div>
+            `;
+            card.addEventListener('click', () => selectScenario(sc.scenario_id, card));
+            list.appendChild(card);
+        });
+    }
+
+    async function selectScenario(scenarioId, cardEl) {
+        document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('active'));
+        if (cardEl) cardEl.classList.add('active');
+        currentScenario = scenarioId;
+        const data = await api('/api/simulator/load?scenario_id=' + encodeURIComponent(scenarioId), {
+            method: 'POST',
+        });
+        if (!data || data.error) {
+            document.getElementById('sim-meta').textContent = '场景加载失败';
+            return;
         }
-        if (data.inference_count !== undefined) {
-            document.getElementById('inference-count').textContent = data.inference_count;
+        document.getElementById('sim-meta').textContent =
+            '当前: ' + data.scenario.name + ' (' + data.scenario.expected_label + ')';
+        // 加载场景后立即步进一帧
+        simStep();
+    }
+
+    /* ─── 单步执行 ───────────────────────────────────── */
+    async function simStep() {
+        if (!currentScenario) {
+            document.getElementById('sim-meta').textContent = '请先选择场景';
+            return;
+        }
+        const payload = await api('/api/simulator/step', { method: 'POST' });
+        if (!payload) return;
+        renderSimResult(payload);
+        // 拉取仿真帧 (随时间戳避免缓存)
+        const img = document.getElementById('sim-frame');
+        const placeholder = document.getElementById('sim-placeholder');
+        const watermark = document.getElementById('sim-watermark');
+        img.onload = () => {
+            placeholder.style.display = 'none';
+            img.style.display = 'block';
+            watermark.style.display = 'inline-block';
+        };
+        img.onerror = () => {
+            placeholder.textContent = '仿真帧渲染失败 (cv2 可能未安装)';
+        };
+        img.src = '/api/simulator/frame?ts=' + Date.now();
+    }
+
+    function toggleAuto() {
+        const btn = document.getElementById('btn-auto');
+        if (autoTimer) {
+            clearInterval(autoTimer);
+            autoTimer = null;
+            btn.innerHTML = '<i class="bi bi-play"></i> 自动运行';
+            return;
+        }
+        autoTimer = setInterval(simStep, 2500);
+        btn.innerHTML = '<i class="bi bi-pause"></i> 暂停';
+        simStep();
+    }
+
+    /* ─── 渲染仿真结果 ───────────────────────────────── */
+    function renderSimResult(payload) {
+        renderResults(payload.detections || [], payload.runtime_mode);
+        renderAlarms(payload.alarms || []);
+        renderQuality(payload.quality || {});
+        document.getElementById('sim-meta').textContent =
+            (payload.scenario_name || '') + ' · 帧 #' + payload.frame_id +
+            ' · ' + (payload.processing_time_ms || 0).toFixed(1) + 'ms';
+    }
+
+    /* ─── 真实检测上传 ───────────────────────────────── */
+    async function runRealDetection() {
+        const fileInput = document.getElementById('live-upload');
+        if (!fileInput.files || !fileInput.files[0]) {
+            document.getElementById('live-status').textContent = '请先选择图像';
+            return;
+        }
+        const file = fileInput.files[0];
+        const fd = new FormData();
+        fd.append('file', file);
+        document.getElementById('live-status').textContent = '检测中…';
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.getElementById('live-image');
+            img.src = e.target.result;
+            img.style.display = 'block';
+            document.getElementById('live-placeholder').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+
+        const resp = await fetch('/api/detect', { method: 'POST', body: fd });
+        const data = await resp.json().catch(() => null);
+        if (!data) {
+            document.getElementById('live-status').textContent = '检测失败';
+            return;
+        }
+        // 真实检测的 runtime_mode 从结果 metadata 取
+        const results = data.results || [];
+        let mode = 'unknown';
+        if (results.length && results[0].metadata && results[0].metadata.runtime_mode) {
+            mode = results[0].metadata.runtime_mode;
+        }
+        setRuntimeBadge(document.getElementById('live-runtime-badge'), mode);
+        renderResults(results, mode);
+        renderAlarms(
+            (data.alarms || []).map(a => ({
+                level: (a.level || 'INFO').toUpperCase(),
+                title: a.title || a.message || a.alarm_type || 'alarm',
+                message: a.message || '',
+                runtime_mode: mode,
+            }))
+        );
+        // 提取首条结果的 quality 信息（含三态 status 与 soft_issues）
+        if (results.length && results[0].metadata) {
+            const q = results[0].metadata.input_quality || {};
+            renderQuality({
+                status: q.status,
+                clarity_score: q.clarity_score,
+                brightness_score: q.brightness_score,
+                issues: q.issues || [],
+                soft_issues: q.soft_issues || [],
+                is_valid: q.is_valid !== false,
+            });
+        }
+        // 缓存训练占位以供离线下载
+        setLastTrainingPlaceholders(results);
+        document.getElementById('live-status').textContent =
+            '完成 · 用时 ' + (data.inference_time_ms || 0).toFixed(1) + 'ms · runtime_mode=' + mode;
+    }
+
+    /* ─── 通用渲染 ───────────────────────────────────── */
+    function renderResults(detections, runtimeMode) {
+        const list = document.getElementById('result-list');
+        if (!detections.length) {
+            list.innerHTML = '<div class="text-secondary small p-2">无检测结果</div>';
+            return;
+        }
+        list.innerHTML = '';
+        detections.forEach(det => {
+            const item = document.createElement('div');
+            item.className = 'result-item';
+            const meta = det.metadata || {};
+            const label = det.label || det.pred_label || 'unknown';
+            const bbox = det.bbox || {};
+            const bboxStr = (bbox.x !== undefined)
+                ? `[x=${(+bbox.x).toFixed(2)}, y=${(+bbox.y).toFixed(2)}, w=${(+bbox.width).toFixed(2)}, h=${(+bbox.height).toFixed(2)}]`
+                : '--';
+            item.innerHTML = `
+                <div>
+                    <span class="result-label label-${label}">${label}</span>
+                    <span class="ms-2 small text-secondary">conf=${(+(det.confidence || 0)).toFixed(2)}</span>
+                    <span class="ms-2 runtime-badge ${meta.runtime_mode || runtimeMode || ''}">${meta.runtime_mode || runtimeMode || 'unknown'}</span>
+                </div>
+                <div class="meta-grid">
+                    <div>species: ${meta.species_name || meta.species_id || '--'}</div>
+                    <div>risk: ${meta.risk_level || '--'}</div>
+                    <div>distance: ${meta.distance_m !== undefined ? (+meta.distance_m).toFixed(1) + ' m' : '--'}</div>
+                    <div>review: ${meta.review_required ? '是' : '否'}</div>
+                    <div>bbox: ${bboxStr}</div>
+                    <div>train_placeholder: ${meta.training_placeholders ? meta.training_placeholders.suggested_label_for_dataset || '✓' : '--'}</div>
+                </div>
+                ${meta.review_reason ? `<div class="small mt-1" style="color:#f59e0b;">复核理由: ${meta.review_reason}</div>` : ''}
+                ${meta.suggested_action ? `<div class="small mt-1 text-secondary">建议: ${meta.suggested_action}</div>` : ''}
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function renderAlarms(alarms) {
+        const list = document.getElementById('alarm-list');
+        if (!alarms.length) {
+            list.innerHTML = '<div class="text-secondary small p-2">暂无告警</div>';
+            return;
+        }
+        list.innerHTML = '';
+        alarms.forEach(a => {
+            const lvl = (a.level || 'INFO').toUpperCase();
+            const item = document.createElement('div');
+            item.className = 'alarm-item level-' + lvl;
+            item.innerHTML = `
+                <div><strong>${a.title || lvl}</strong>
+                    <span class="badge bg-secondary ms-1">${lvl}</span>
+                    <span class="ms-2 runtime-badge ${a.runtime_mode || ''}">${a.runtime_mode || ''}</span>
+                </div>
+                <div class="small text-secondary">${a.message || ''}</div>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function renderQuality(quality) {
+        const clarity = +quality.clarity_score || 0;
+        const brightness = +quality.brightness_score || 0;
+        document.getElementById('q-clarity').textContent = clarity.toFixed(2);
+        document.getElementById('q-clarity-bar').style.width = (clarity * 100).toFixed(0) + '%';
+        document.getElementById('q-brightness').textContent = brightness.toFixed(2);
+        document.getElementById('q-brightness-bar').style.width = (brightness * 100).toFixed(0) + '%';
+        const issues = quality.issues || [];
+        document.getElementById('q-issues').textContent =
+            issues.length ? '问题: ' + issues.join('; ') : '暂无质量问题';
+        document.getElementById('q-issues').style.color = issues.length ? '#f59e0b' : '';
+
+        const statusEl = document.getElementById('q-status');
+        const status = quality.status || (quality.is_valid === false ? 'hard_fail' : 'pass');
+        statusEl.textContent = status;
+        statusEl.className = 'badge ' + (
+            status === 'pass' ? 'bg-success' :
+            status === 'soft_fail' ? 'bg-warning text-dark' :
+            status === 'hard_fail' ? 'bg-danger' : 'bg-secondary'
+        );
+
+        const softNote = document.getElementById('q-soft-note');
+        const softIssues = quality.soft_issues || [];
+        if (status === 'soft_fail' && softIssues.length) {
+            softNote.style.display = 'block';
+            softNote.textContent = 'soft_fail: ' + softIssues.join('; ') + ' → 本帧将强制进入 review_required';
+        } else {
+            softNote.style.display = 'none';
+            softNote.textContent = '';
         }
     }
+
+    /* ─── 训练占位下载（真实上传专用） ──────────────── */
+    let lastTrainingPlaceholders = null;
+    function setLastTrainingPlaceholders(results) {
+        lastTrainingPlaceholders = null;
+        const payload = (results || [])
+            .map(r => (r.metadata && r.metadata.training_placeholders) ? {
+                label: r.label,
+                roi_id: r.roi_id,
+                placeholders: r.metadata.training_placeholders,
+                runtime_mode: r.metadata.runtime_mode,
+            } : null)
+            .filter(Boolean);
+        const status = document.getElementById('placeholder-status');
+        if (!payload.length) {
+            status.textContent = '尚无可下载数据';
+            return;
+        }
+        lastTrainingPlaceholders = {
+            plugin_id: 'bird_monitoring',
+            generated_at: new Date().toISOString(),
+            entries: payload,
+        };
+        status.textContent = '已缓存 ' + payload.length + ' 条占位记录，可下载。';
+    }
+    window.downloadTrainingPlaceholders = function() {
+        if (!lastTrainingPlaceholders) {
+            document.getElementById('placeholder-status').textContent = '尚无可下载数据';
+            return;
+        }
+        const blob = new Blob(
+            [JSON.stringify(lastTrainingPlaceholders, null, 2)],
+            { type: 'application/json' }
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'bird_monitoring_training_placeholders.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    /* ─── 模式切换 ───────────────────────────────────── */
+    window.switchMode = function(mode) {
+        currentMode = mode;
+        document.getElementById('btn-mode-sim').classList.toggle('active', mode === 'sim');
+        document.getElementById('btn-mode-live').classList.toggle('active', mode === 'live');
+        document.getElementById('panel-sim').style.display = mode === 'sim' ? '' : 'none';
+        document.getElementById('panel-live').style.display = mode === 'live' ? '' : 'none';
+    };
+    window.simStep = simStep;
+    window.toggleAuto = toggleAuto;
+    window.runRealDetection = runRealDetection;
+
+    /* ─── 启动 ───────────────────────────────────────── */
+    loadStatus();
+    loadScenarios();
+    setInterval(loadStatus, 5000);
+})();
 </script>
 {% endblock %}

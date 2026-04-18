@@ -1,7 +1,7 @@
 # ============================================================
-# 表计无建模增强读数插件配置 (E组)
+# 表计读数插件配置 V3.1 (E组)
 # 输变电激光星芒破夜绘明监测平台
-# 版本: 1.0.0
+# 版本: 3.1.0
 # ============================================================
 
 # 模型配置
@@ -15,7 +15,7 @@ inference:
   nms_threshold: 0.4
   max_detections: 50
 
-# 支持的表计类型
+# 支持的表计类型 (9种)
 meter_types:
   analog:
     - pressure_gauge
@@ -26,8 +26,9 @@ meter_types:
     - voltmeter
   digital:
     - digital_display
-    - LED_indicator
     - seven_segment
+  led:
+    - led_indicator
 
 # 关键点检测配置
 keypoint_detection:
@@ -67,15 +68,18 @@ preprocessing:
   enhance_lighting: true
   anti_glare: true
   contrast_enhancement: 1.2
+  clahe_clip_limit: 2.0
+  clahe_grid_size: 8
 
 # 指针检测算法参数
 pointer_detection:
   hough_threshold: 50
   min_line_length: 30
   max_line_gap: 10
+  center_dist_threshold: 20
   angle_range:
-    min: -150
-    max: 150
+    min: -135
+    max: 135
 
 # 刻度识别配置
 scale_recognition:
@@ -87,10 +91,16 @@ scale_recognition:
 # 数字显示识别配置
 digital_recognition:
   ocr_engine: "easyocr"
-  char_whitelist: "0123456789.-+eE"
+  char_whitelist: "0123456789.-"
   seven_segment:
     enabled: true
     templates_path: "models/seven_segment_templates"
+
+# LED指示灯检测配置
+led_detection:
+  brightness_threshold: 100
+  saturation_min: 50
+  lit_area_min_ratio: 0.1
 
 # ROI类型映射
 roi_types:
@@ -99,7 +109,10 @@ roi_types:
   oil_level_gauge: "油位表"
   sf6_density_gauge: "SF6密度表"
   digital_display: "数字显示屏"
-  LED_indicator: "LED指示灯"
+  led_indicator: "LED指示灯"
+  ammeter: "电流表"
+  voltmeter: "电压表"
+  seven_segment: "七段码显示"
 
 # 告警配置
 alarm:

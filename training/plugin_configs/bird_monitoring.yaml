@@ -1,0 +1,51 @@
+# 鸟类监测 - 训练配置模板
+plugin_id: bird_monitoring
+display_name: 鸟类监测
+
+model:
+  family: yolov8
+  backbone: yolov8n
+  pretrained: yolov8n.pt
+  input_modality: rgb
+  image_size: 640
+
+task:
+  primary: detection
+  secondary: classification
+  label_schema: detection_bbox
+  classes:
+    bird:
+      - bird_perching
+      - bird_flying
+      - bird_nesting
+    risk:
+      - safe
+      - warning
+      - danger
+
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  warmup_epochs: 3
+
+augmentation:
+  mosaic: 1.0
+  mixup: 0.1
+  fliplr: 0.5
+  scale: 0.5
+  # 鸟类多尺度
+  multi_scale: true
+
+evaluation:
+  metrics: [mAP@0.5, recall, precision, risk_accuracy]
+  qualification:
+    mAP@0.5: 0.50
+    recall: 0.70
+
+export:
+  formats: [onnx]
+
+voltage_levels: [EHV_500kV, HV_220kV, HV_110kV]

@@ -1,0 +1,213 @@
+{
+  "id": "action_event_monitoring",
+  "name": "二次设备动作事件监测",
+  "version": "1.0.0",
+  "description": "采集二次设备动作、变位和SOE信号，归一化为标准动作事件并输出规则告警壳",
+  "author": "DarkBreaker Team",
+  "category": "outdoor",
+  "enabled": true,
+  "entrypoint": "plugin.py",
+  "plugin_class": "ActionEventMonitoringPlugin",
+  "config_file": "configs/default.yaml",
+  "standalone": {
+    "enabled": true,
+    "entrypoint": "run_standalone.py",
+    "module": "plugins.action_event_monitoring",
+    "port": 8097,
+    "health_path": "/api/health",
+    "smoke_path": "/api/action-event/smoke"
+  },
+  "capabilities": [
+    "anomaly_detection",
+    "protocol_integration"
+  ],
+  "domain_capabilities": [
+    "sensor_input",
+    "time_series_monitoring",
+    "action_monitoring",
+    "soe_collection",
+    "signal_change_detection",
+    "protocol_subscription",
+    "standard_alarm_output"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "device_id": {
+        "type": "string"
+      },
+      "timestamp": {
+        "oneOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "string",
+            "format": "date-time"
+          }
+        ]
+      },
+      "events": {
+        "type": "array",
+        "description": "统一动作事件输入壳"
+      },
+      "signal_changes": {
+        "type": "array",
+        "description": "统一信号变位输入壳"
+      },
+      "state_change_events": {
+        "type": "array",
+        "description": "状态变位事件输入"
+      },
+      "protocol_ingested_data": {
+        "type": "object",
+        "description": "OPC UA/MQTT/IEC104/IEC61850 等协议采集后的事件数据"
+      },
+      "context": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "device_id"
+    ],
+    "anyOf": [
+      {
+        "required": [
+          "events"
+        ]
+      },
+      {
+        "required": [
+          "signal_changes"
+        ]
+      },
+      {
+        "required": [
+          "state_change_events"
+        ]
+      },
+      {
+        "required": [
+          "protocol_ingested_data"
+        ]
+      }
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean"
+      },
+      "status": {
+        "type": "string"
+      },
+      "label": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "warning",
+          "abnormal",
+          "error"
+        ]
+      },
+      "value": {
+        "type": "object"
+      },
+      "confidence": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "metadata": {
+        "type": "object"
+      },
+      "results": {
+        "type": "array"
+      },
+      "stored_event_ids": {
+        "type": "array"
+      },
+      "analysis_triggered": {
+        "type": "boolean"
+      },
+      "plugin_name": {
+        "type": "string"
+      },
+      "task_type": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "object"
+      },
+      "anomaly_events": {
+        "type": "array"
+      },
+      "abnormal_intervals": {
+        "type": "array"
+      },
+      "severity": {
+        "type": "string"
+      },
+      "reason_codes": {
+        "type": "array"
+      },
+      "recommended_actions": {
+        "type": "array"
+      },
+      "trend_diagnosis": {
+        "type": "object"
+      },
+      "evidence": {
+        "type": "array"
+      },
+      "review_required": {
+        "type": "boolean"
+      },
+      "model_info": {
+        "type": "object"
+      },
+      "placeholders": {
+        "type": "object"
+      },
+      "input_protocol": {
+        "type": "object"
+      }
+    },
+    "required": [
+      "success",
+      "status",
+      "label",
+      "value",
+      "confidence",
+      "metadata",
+      "summary",
+      "anomaly_events",
+      "abnormal_intervals",
+      "trend_diagnosis",
+      "reason_codes",
+      "recommended_actions",
+      "evidence",
+      "model_info",
+      "placeholders"
+    ]
+  },
+  "config_schema": {
+    "type": "object",
+    "required": [
+      "sampling",
+      "window",
+      "thresholds",
+      "runtime",
+      "model",
+      "alarm_rules",
+      "upgrade_placeholders"
+    ]
+  },
+  "dependencies": [
+    "platform_core.action_event_schema",
+    "platform_core.action_event_store",
+    "platform_core.device_correlation"
+  ],
+  "runtime_requirements": "requirements.txt"
+}

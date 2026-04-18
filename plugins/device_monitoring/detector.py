@@ -90,11 +90,13 @@ class DeviceHealthCalculator:
         # CPU使用率
         cpu_usage = metrics.get("cpu_usage", 30)
         w = self.weights.get("cpu_usage", 0.15)
-        if cpu_usage > 90:
+        cpu_usage_alarm = self.thresholds.get("cpu_usage_alarm_percent", self.thresholds.get("cpu_usage_alarm", 90))
+        cpu_usage_warning = self.thresholds.get("cpu_usage_warning_percent", self.thresholds.get("cpu_usage_warning", 70))
+        if cpu_usage > cpu_usage_alarm:
             score -= w * 100
             issues.append(f"CPU使用率过高: {cpu_usage}%")
             recs.append("检查是否有异常进程，考虑升级硬件")
-        elif cpu_usage > 70:
+        elif cpu_usage > cpu_usage_warning:
             score -= w * 40
             issues.append(f"CPU使用率偏高: {cpu_usage}%")
 
@@ -290,8 +292,8 @@ class DeviceMonitorDetector:
                         "trend_slope": round(slope, 4),
                         "current_health": round(current, 1),
                     }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("设备故障预测降级: %s", exc)
 
         return None
 

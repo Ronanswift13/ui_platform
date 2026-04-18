@@ -61,16 +61,8 @@ if str(plugins_parent) not in sys.path:
 
 
 def main():
-    from darkbreaker_sdk.standalone import StandalonePluginRunner
-    from plugins.busbar_inspection.plugin import Plugin
-
-    plugin = Plugin.create_standalone()
-    runner = StandalonePluginRunner(
-        plugin,
-        plugin_templates_dir=PLUGIN_DIR / "standalone" / "templates",
-        plugin_static_dir=PLUGIN_DIR / "standalone" / "static",
-    )
-    runner.run(host="0.0.0.0", port=8089)
+    from plugins.busbar_inspection.standalone.app import main as standalone_main
+    standalone_main()
 
 
 if __name__ == "__main__":

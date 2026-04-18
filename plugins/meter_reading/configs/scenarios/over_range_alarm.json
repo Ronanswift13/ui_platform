@@ -1,0 +1,50 @@
+{
+    "scenario_id": "over_range_alarm",
+    "name": "超限告警",
+    "description": "模拟表计读数逐渐漂移至量程极限, 触发告警",
+    "step_interval_ms": 400,
+    "total_steps": 300,
+    "meters": [
+        {
+            "id": "pressure_A",
+            "type": "analog",
+            "label": "压强表 A",
+            "unit": "MPa",
+            "range_min": 0.0,
+            "range_max": 1.6,
+            "initial_value": 0.5,
+            "pattern": "drift",
+            "speed": 1.2
+        },
+        {
+            "id": "sf6_B",
+            "type": "analog",
+            "label": "SF6密度表 B",
+            "unit": "MPa",
+            "range_min": 0.0,
+            "range_max": 0.8,
+            "initial_value": 0.3,
+            "pattern": "drift",
+            "speed": 0.8
+        },
+        {
+            "id": "digital_C",
+            "type": "digital",
+            "label": "电流表 C",
+            "unit": "A",
+            "range_min": 0,
+            "range_max": 100,
+            "initial_value": 30,
+            "pattern": "drift",
+            "speed": 1.5
+        },
+        {
+            "id": "led_D",
+            "type": "led",
+            "label": "告警灯 D",
+            "led_color": "green",
+            "cycle": ["green", "green", "yellow", "red", "red"],
+            "speed": 1.0
+        }
+    ]
+}

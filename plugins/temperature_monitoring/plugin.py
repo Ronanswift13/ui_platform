@@ -15,6 +15,7 @@ from darkbreaker_sdk.interfaces import HealthStatus
 from darkbreaker_sdk.schemas import (
     Alarm, AlarmLevel, RecognitionResult, BoundingBox,
 )
+from platform_core.visual_output_protocol import build_visual_meta
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class TemperatureMonitoringPlugin:
         self._detector = None
         self._is_initialized = False
         self._training_buffer: List[Dict] = []
+        self._trained_profile: Dict[str, Any] = {}
 
     @classmethod
     def create_standalone(cls, config=None):
@@ -74,6 +76,8 @@ class TemperatureMonitoringPlugin:
             from .detector import TemperatureDetector
             self._detector = TemperatureDetector(self.config)
             self._detector.initialize()
+            if self._trained_profile:
+                self._detector._trained_profile = self._trained_profile.copy()
             self._is_initialized = True
             self._status = PluginStatus.READY
             logger.info(f"[{self.PLUGIN_NAME}] 初始化成功")
@@ -99,7 +103,11 @@ class TemperatureMonitoringPlugin:
             return self._err("插件未初始化")
         try:
             self._status = PluginStatus.RUNNING
-            r = self._detector.detect(thermal_frame, sensor_readings)
+            source_key = (
+                (context or {}).get("source_key")
+                or ("thermal_frame" if thermal_frame is not None else ("sensor_readings" if sensor_readings else "simulation"))
+            )
+            r = self._detector.detect(thermal_frame, sensor_readings, source_key=source_key)
             output = {
                 "plugin_id": self.id, "plugin_version": self.version, "code_hash": self.code_hash,
                 "task_id": (context or {}).get("task_id", ""),
@@ -131,6 +139,16 @@ class TemperatureMonitoringPlugin:
             roi_id="", bbox=BoundingBox(x=h["center"][0], y=h["center"][1], width=0.05, height=0.05),
             label=f"hotspot_{h['severity']}", confidence=min(1.0, h["temperature"]/100),
             model_version=self.version, code_version=self.code_hash,
+            metadata=build_visual_meta(
+                plugin_name="temperature_monitoring",
+                task_type="thermal_analysis",
+                modality="thermal",
+                runtime_mode="traditional_fallback",
+                algorithm_stage="baseline",
+                quality_gate_status="pass",
+                evidence_hint="thermal_heatmap",
+                extra={"temperature": h["temperature"], "severity": h["severity"]},
+            ),
         ) for h in r.get("hotspots", [])]
 
     def postprocess(self, results, rules):
@@ -145,11 +163,41 @@ class TemperatureMonitoringPlugin:
                             details=self._detector.stats if self._detector else {})
 
     def upload_training_data(self, data, labels) -> Dict:
-        self._training_buffer.append({"timestamp": datetime.now().isoformat(), "labels": labels})
-        return {"success": True, "total": len(self._training_buffer)}
+        sensor_readings = (data or {}).get("sensor_readings")
+        thermal_frame = (data or {}).get("thermal_frame")
+        if thermal_frame is not None:
+            thermal_frame = np.asarray(thermal_frame, dtype=np.float32)
+
+        if thermal_frame is None and not sensor_readings:
+            return {"success": False, "message": "训练样本缺少 thermal_frame 或 sensor_readings", "total": len(self._training_buffer)}
+
+        sample = {
+            "timestamp": datetime.now().isoformat(),
+            "labels": labels or {},
+            "sensor_readings": sensor_readings,
+            "thermal_frame": thermal_frame,
+        }
+        self._training_buffer.append(sample)
+        accepted_mode = "thermal_frame" if thermal_frame is not None else "sensor_readings"
+        return {"success": True, "total": len(self._training_buffer), "accepted_mode": accepted_mode}
 
     def start_training(self, config) -> Dict:
-        return {"success": True, "message": "温度预测模型训练已提交", "samples": len(self._training_buffer)}
+        if not self._detector:
+            return {"success": False, "message": "插件未初始化", "samples": 0}
+        if not self._training_buffer:
+            return {"success": False, "message": "暂无训练样本", "samples": 0}
+
+        profile = self._detector.train_baseline(self._training_buffer, config or {})
+        if not profile:
+            return {"success": False, "message": "训练失败，无法生成温度基线", "samples": len(self._training_buffer)}
+
+        self._trained_profile = profile
+        return {
+            "success": True,
+            "message": "温度基线训练完成，可用于异常评分与预测辅助",
+            "samples": profile.get("sample_count", len(self._training_buffer)),
+            "profile": profile,
+        }
 
     @property
     def plugin_info(self) -> Dict:
@@ -171,6 +219,12 @@ class TemperatureMonitoringPlugin:
             ],
         }
 
+    def get_standalone_routes(self) -> List[Dict[str, Any]]:
+        """Provide standalone-only simulation routes for the dashboard."""
+        from .standalone.simulator import build_standalone_routes
+
+        return build_standalone_routes(self)
+
     def _gen_alarms(self, result) -> List[Dict]:
         alarms = []
         if result.status in ("alarm", "critical"):
@@ -184,11 +238,20 @@ class TemperatureMonitoringPlugin:
                                "title": f"{h.zone_name or '区域'}高温告警",
                                "message": f"热点温度{h.temperature}°C",
                                "zone_id": h.zone_id, "timestamp": datetime.now().isoformat()})
+        ai_insight = result.metadata.get("ai_insight", {})
+        if ai_insight.get("enabled") and ai_insight.get("triggered"):
+            alarms.append({
+                "type": "ai_temperature_anomaly",
+                "level": ai_insight.get("predicted_status", "warning"),
+                "title": "训练基线检测到温度异常趋势",
+                "message": f"异常分数{ai_insight.get('overall_anomaly_score', 0)}，30分钟预测状态{ai_insight.get('predicted_status', 'normal')}",
+                "timestamp": datetime.now().isoformat(),
+            })
         return alarms
 
     def _err(self, msg):
         return {"plugin_id": self.id, "plugin_version": self.version, "timestamp": datetime.now().isoformat(),
-                "success": False, "status": "error", "heatmap": [], "hotspots": [], "alarms": [], "error_message": msg}
+                "success": False, "status": "error", "heatmap": [], "hotspots": [], "alarms": [], "error_message": msg, "metadata": {}}
 
     def _load_default_config(self):
         try:

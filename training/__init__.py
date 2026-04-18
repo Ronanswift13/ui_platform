@@ -13,42 +13,59 @@ Multi-Voltage Level Substation Equipment Training System
 - 中压 (MV): 35kV, 66kV
 - 低压 (LV): 10kV, 6kV, 380V
 
-支持的插件:
+支持的插件 (v1 - 站内设备):
 - transformer: 主变压器巡检
 - switch: 开关间隔检测
 - busbar: 母线巡检
 - capacitor: 电容器巡检
 - meter: 表计读数
 
+支持的视觉插件 (v2 - 统一训练库):
+- busbar_inspection: 母线巡检 (detection)
+- capacitor_inspection: 电容器巡检 (detection + classification)
+- switch_inspection: 开关间隔检测 (detection + classification)
+- transformer_inspection: 主变压器巡检 (detection + classification)
+- animal_detection: 动物入侵检测 (detection + classification + thermal)
+- bird_monitoring: 鸟类监测 (detection + classification)
+- fire_detection: 火灾检测 (detection + classification + thermal)
+- meter_reading: 表计读数识别 (ocr + detection)
+- temperature_monitoring: 温度监测 (thermal_anomaly + classification)
+- thermal: 热像分析 (thermal_anomaly) [占位]
+- hyperspectral_detection: 高光谱检测 (hyperspectral_classification + anomaly)
+
 目录结构:
     training/
     ├── __init__.py                # 本文件
-    ├── train_main.py              # 主训练脚本
+    ├── train_main.py              # 主训练脚本 (v1)
+    ├── training_api.py            # 训练 API (v1)
+    ├── training_api_v2.py         # 统一训练 API (v2)
+    │
+    │ ── v2 统一训练库 ──
+    ├── registry/                  # 插件训练映射注册表
+    │   └── plugin_training_mapping.json
+    ├── schemas/                   # Schema 定义与校验
+    │   ├── dataset_manifest.py    # 数据集 manifest 结构
+    │   ├── label_schemas.py       # 按 task_type 的标签格式
+    │   └── training_config_schema.py
+    ├── pipelines/                 # 五阶段训练流水线
+    │   ├── ingestion/             # 数据摄入 + manifest 校验
+    │   ├── preprocessing/         # 按 task_type 预处理
+    │   ├── training/              # 按 task_type 训练
+    │   ├── evaluation/            # 统一评估
+    │   └── export/                # ONNX / TensorRT 导出
+    ├── plugin_configs/            # 11 个视觉插件训练模板
+    ├── datasets/visual_defect/    # 统一数据集存储
+    │
+    │ ── v1 兼容层 ──
     ├── train_mac.sh               # Mac训练脚本
     ├── prepare_training_data.py   # 数据准备脚本
     ├── evaluate_training.py       # 训练评估脚本
     ├── data_augmentation.py       # 数据增强模块
     ├── model_integration.py       # 模型集成模块
-    ├── quick_setup.py             # 快速设置脚本
-    ├── setup_all_data.py          # 数据设置脚本
     ├── configs/                   # 训练配置
-    │   ├── training_config.yaml   # 训练参数配置
-    │   └── datasets_download.yaml # 数据集下载配置
-    ├── checkpoints/               # 模型检查点
-    │   ├── transformer/           # A组 - 主变巡视
-    │   ├── switch/                # B组 - 开关间隔
-    │   ├── busbar/                # C组 - 母线巡视
-    │   ├── capacitor/             # D组 - 电容器
-    │   └── meter/                 # E组 - 表计读数
-    ├── exports/                   # ONNX导出
-    ├── logs/                      # 训练日志
-    ├── data/                      # 训练数据
-    │   ├── raw/                   # 原始数据
-    │   ├── processed/             # 处理后数据
-    │   ├── placeholder/           # 占位符数据
-    │   ├── augmented/             # 增强数据
-    │   ├── loaders/               # 数据加载器
-    │   └── voltage_loaders.py     # 电压等级数据加载器
+    ├── checkpoints/               # 模型检查点 (按 plugin_id + task_type)
+    ├── exports/                   # ONNX导出 (按 plugin_id + task_type)
+    ├── data/                      # 训练数据 (v1 格式)
     └── results/                   # 训练结果
 
 使用方法:
@@ -326,6 +343,50 @@ except ImportError:
     LV10kVLoader = None
 
 # =============================================================================
+# v2 统一训练库导入
+# =============================================================================
+try:
+    from .registry import (
+        get_registry,
+        get_plugin_config,
+        resolve_alias,
+        list_visual_plugins,
+        get_task_type_info,
+    )
+except ImportError:
+    get_registry = None
+    get_plugin_config = None
+    resolve_alias = None
+    list_visual_plugins = None
+    get_task_type_info = None
+
+try:
+    from .schemas import (
+        DatasetManifest,
+        validate_manifest,
+        get_schema_for_task_type,
+        TrainingConfigSchema,
+        validate_training_config,
+    )
+except ImportError:
+    DatasetManifest = None
+    validate_manifest = None
+    get_schema_for_task_type = None
+    TrainingConfigSchema = None
+    validate_training_config = None
+
+try:
+    from .pipelines.ingestion import ManifestValidator, DataRouter
+except ImportError:
+    ManifestValidator = None
+    DataRouter = None
+
+try:
+    from .pipelines.export import ModelExporter
+except ImportError:
+    ModelExporter = None
+
+# =============================================================================
 # 导出
 # =============================================================================
 __all__ = [
@@ -390,5 +451,21 @@ __all__ = [
     "HV220kVLoader",
     "HV110kVLoader",
     "MV35kVLoader",
-    "LV10kVLoader"
+    "LV10kVLoader",
+    # v2 注册表
+    "get_registry",
+    "get_plugin_config",
+    "resolve_alias",
+    "list_visual_plugins",
+    "get_task_type_info",
+    # v2 Schema
+    "DatasetManifest",
+    "validate_manifest",
+    "get_schema_for_task_type",
+    "TrainingConfigSchema",
+    "validate_training_config",
+    # v2 流水线
+    "ManifestValidator",
+    "DataRouter",
+    "ModelExporter",
 ]

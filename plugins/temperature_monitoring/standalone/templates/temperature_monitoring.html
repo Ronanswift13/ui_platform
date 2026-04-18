@@ -1,105 +1,427 @@
 {% extends "base_standalone.html" %}
 
 {% block title %}Temperature Monitoring - DarkBreaker{% endblock %}
-{% block navbar_title %}Temperature Monitoring Dashboard{% endblock %}
+{% block navbar_title %}温度监测独立仿真看板{% endblock %}
 
 {% block extra_head %}
 <style>
-    .panel {
-        background-color: var(--panel-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
+    :root {
+        --panel-elevated: rgba(15, 23, 42, 0.78);
+        --panel-soft: rgba(30, 41, 59, 0.78);
+        --hero-warm: rgba(249, 115, 22, 0.14);
+        --hero-cool: rgba(14, 165, 233, 0.18);
+        --trace: rgba(148, 163, 184, 0.28);
+        --zone-a: #38bdf8;
+        --zone-b: #fb7185;
     }
-    .panel-title {
-        font-size: 0.85rem;
+    .tm-shell {
+        position: relative;
+        padding: 1.25rem;
+        background:
+            radial-gradient(circle at top right, rgba(249, 115, 22, 0.16), transparent 28%),
+            radial-gradient(circle at left center, rgba(14, 165, 233, 0.12), transparent 24%),
+            linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.98));
+        min-height: calc(100vh - 84px);
+    }
+    .tm-panel {
+        background: linear-gradient(180deg, var(--panel-elevated), var(--panel-soft));
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 18px;
+        box-shadow: 0 18px 40px rgba(2, 6, 23, 0.28);
+        backdrop-filter: blur(10px);
+    }
+    .tm-hero {
+        padding: 1.4rem 1.5rem;
+        background:
+            linear-gradient(120deg, var(--hero-warm), transparent 48%),
+            linear-gradient(300deg, var(--hero-cool), transparent 52%);
+    }
+    .tm-eyebrow {
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
         color: var(--text-secondary);
-        margin-bottom: 0.75rem;
-        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
     }
-    .metric-value {
+    .tm-hero h2 {
         font-size: 1.8rem;
-        font-weight: 700;
-        line-height: 1.2;
+        margin: 0 0 0.45rem;
     }
-    .metric-label {
-        font-size: 0.75rem;
+    .tm-hero p {
+        color: var(--text-secondary);
+        max-width: 52rem;
+        margin: 0;
+    }
+    .tm-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 1rem;
+    }
+    .tm-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.42);
+        color: var(--text-primary);
+        font-size: 0.82rem;
+    }
+    .tm-chip strong {
+        color: var(--text-secondary);
+        font-weight: 600;
+    }
+    .tm-panel-title {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+        margin-bottom: 0.9rem;
+    }
+    .tm-control-grid {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr auto auto;
+        gap: 0.75rem;
+        align-items: end;
+    }
+    .tm-control-grid .form-label {
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+    }
+    .tm-control-grid .form-select {
+        background: rgba(15, 23, 42, 0.7);
+        border-color: rgba(148, 163, 184, 0.18);
+        color: var(--text-primary);
+    }
+    .tm-btn {
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 12px;
+        padding: 0.72rem 1rem;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        background: rgba(15, 23, 42, 0.74);
+    }
+    .tm-btn-primary {
+        background: linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(239, 68, 68, 0.84));
+        border-color: rgba(251, 146, 60, 0.35);
+    }
+    .tm-status-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 7rem;
+        padding: 0.42rem 0.9rem;
+        border-radius: 999px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.76rem;
+    }
+    .status-normal {
+        color: #4ade80;
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.28);
+    }
+    .status-warning {
+        color: #fbbf24;
+        background: rgba(245, 158, 11, 0.14);
+        border: 1px solid rgba(245, 158, 11, 0.28);
+    }
+    .status-alarm,
+    .status-critical {
+        color: #fda4af;
+        background: rgba(239, 68, 68, 0.16);
+        border: 1px solid rgba(239, 68, 68, 0.32);
+    }
+    .tm-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.8rem;
+    }
+    .tm-metric {
+        padding: 0.9rem 1rem;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.52);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .tm-metric-label {
+        font-size: 0.74rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.4rem;
+    }
+    .tm-metric-value {
+        font-size: 1.65rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .tm-metric-note {
+        margin-top: 0.35rem;
+        font-size: 0.76rem;
         color: var(--text-secondary);
     }
-    .status-normal { color: var(--success); }
-    .status-warning { color: var(--warning); }
-    .status-alarm { color: var(--danger); }
-    .event-list {
-        max-height: 280px;
-        overflow-y: auto;
+    .tm-canvas {
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        background:
+            linear-gradient(180deg, rgba(15, 23, 42, 0.62), rgba(2, 6, 23, 0.86)),
+            repeating-linear-gradient(90deg, transparent, transparent 48px, rgba(148, 163, 184, 0.04) 48px, rgba(148, 163, 184, 0.04) 49px);
     }
-    .event-item {
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--border-color);
-        font-size: 0.85rem;
+    .tm-legend {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.6rem;
+        margin-top: 0.9rem;
     }
-    .event-item:last-child { border-bottom: none; }
+    .tm-zone {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.65rem 0.8rem;
+        background: rgba(15, 23, 42, 0.48);
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        font-size: 0.8rem;
+    }
+    .tm-zone-swatch {
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 999px;
+        flex: 0 0 auto;
+    }
+    .tm-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+    .tm-list-item {
+        padding: 0.75rem 0.85rem;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.48);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .tm-list-item strong {
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+    .tm-list-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.9rem;
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+    }
+    .tm-equipment-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+    }
+    .tm-equipment {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 0.8rem;
+        align-items: center;
+        padding: 0.8rem 0.9rem;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .tm-equipment-index {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(56, 189, 248, 0.16);
+        color: #bae6fd;
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
+    .tm-equipment small,
+    .tm-help,
+    .tm-empty {
+        color: var(--text-secondary);
+    }
+    .tm-temp {
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+    .tm-sensor-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 0.55rem;
+    }
+    .tm-sensor-table td {
+        padding: 0.7rem 0.8rem;
+        background: rgba(15, 23, 42, 0.48);
+        border-top: 1px solid rgba(148, 163, 184, 0.12);
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        font-size: 0.82rem;
+    }
+    .tm-sensor-table td:first-child {
+        border-left: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 12px 0 0 12px;
+    }
+    .tm-sensor-table td:last-child {
+        border-right: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 0 12px 12px 0;
+        text-align: right;
+        font-weight: 700;
+    }
+    @media (max-width: 1200px) {
+        .tm-control-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row g-3 p-3">
-    <!-- Top Metrics -->
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Max Temperature</div>
-            <div class="metric-value" id="max-temp">-- C</div>
-            <div class="metric-label">Current maximum</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Avg Temperature</div>
-            <div class="metric-value" id="avg-temp">-- C</div>
-            <div class="metric-label">Current average</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Rise Rate</div>
-            <div class="metric-value" id="rise-rate">-- C/min</div>
-            <div class="metric-label">Temperature trend</div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Hotspots</div>
-            <div class="metric-value" id="hotspot-count">0</div>
-            <div class="metric-label">Active hotspots</div>
-        </div>
-    </div>
-
-    <!-- Heatmap -->
-    <div class="col-md-8">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-thermometer-half me-1"></i>Thermal Heatmap</div>
-            <canvas id="heatmapCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
-        </div>
-    </div>
-
-    <!-- Hotspot List -->
-    <div class="col-md-4">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-geo-alt me-1"></i>Hotspot Details</div>
-            <div class="event-list" id="hotspot-list">
-                <div class="event-item text-secondary">No hotspots detected</div>
+<div class="tm-shell">
+    <div class="tm-panel tm-hero mb-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-xl-7">
+                <div class="tm-eyebrow">Substation Thermal Sandbox</div>
+                <h2 id="scene-name">站内热场仿真准备中</h2>
+                <p id="scene-description">独立看板将使用与本插件输入契约一致的热成像帧或传感器阵列读数驱动演示，不直接依赖 detector 的无输入回退逻辑。</p>
+                <div class="tm-chip-row">
+                    <div class="tm-chip"><strong>仿真模式</strong><span id="simulation-input-mode">--</span></div>
+                    <div class="tm-chip"><strong>预期状态</strong><span id="expected-status">--</span></div>
+                    <div class="tm-chip"><strong>场景节奏</strong><span id="cycle-hint">--</span></div>
+                    <div class="tm-chip"><strong>推演步数</strong><span id="simulation-tick">0</span></div>
+                </div>
+            </div>
+            <div class="col-xl-5">
+                <div class="tm-control-grid">
+                    <div>
+                        <label class="form-label" for="simulation-scenario">仿真场景</label>
+                        <select id="simulation-scenario" class="form-select"></select>
+                    </div>
+                    <button id="btn-load-scenario" class="tm-btn tm-btn-primary" type="button">
+                        <i class="bi bi-diagram-3 me-1"></i>切换场景
+                    </button>
+                    <button id="btn-step-once" class="tm-btn" type="button">
+                        <i class="bi bi-fast-forward me-1"></i>单步推演
+                    </button>
+                    <button id="btn-toggle-autoplay" class="tm-btn" type="button">
+                        <i class="bi bi-pause-circle me-1"></i>暂停自动
+                    </button>
+                </div>
+                <div class="tm-help mt-3" id="scene-guidance">正在加载站内工况说明…</div>
             </div>
         </div>
     </div>
 
-    <!-- Alarms -->
-    <div class="col-md-12">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Temperature Alarms</div>
-            <div class="event-list" id="alarm-list">
-                <div class="event-item text-secondary">No alarms</div>
+    <div class="row g-3">
+        <div class="col-xxl-8">
+            <div class="tm-panel p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="tm-panel-title mb-0">热场总览与区域叠加</div>
+                    <div id="status-pill" class="tm-status-pill status-normal">NORMAL</div>
+                </div>
+                <canvas id="heatmapCanvas" class="tm-canvas" width="960" height="600"></canvas>
+                <div id="zone-legend" class="tm-legend"></div>
+            </div>
+            <div class="tm-panel p-3">
+                <div class="tm-panel-title">最近 12 次推演趋势</div>
+                <canvas id="trendCanvas" class="tm-canvas" width="960" height="220"></canvas>
+            </div>
+        </div>
+
+        <div class="col-xxl-4">
+            <div class="tm-panel p-3 mb-3">
+                <div class="tm-panel-title">当前指标</div>
+                <div class="tm-metric-grid">
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">最高温度</div>
+                        <div class="tm-metric-value" id="max-temp">--</div>
+                        <div class="tm-metric-note">最高热点或区域峰值</div>
+                    </div>
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">平均温度</div>
+                        <div class="tm-metric-value" id="avg-temp">--</div>
+                        <div class="tm-metric-note">站内热场均值</div>
+                    </div>
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">温升速率</div>
+                        <div class="tm-metric-value" id="rise-rate">--</div>
+                        <div class="tm-metric-note">趋势判断核心值</div>
+                    </div>
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">活跃热点</div>
+                        <div class="tm-metric-value" id="hotspot-count">0</div>
+                        <div class="tm-metric-note">z-score 识别结果</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tm-panel p-3 mb-3">
+                <div class="tm-panel-title">数据链路与训练状态</div>
+                <div class="tm-metric-grid">
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">当前输入源</div>
+                        <div class="tm-metric-value" id="live-input-mode">--</div>
+                        <div class="tm-metric-note">仿真与真实检测独立统计</div>
+                    </div>
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">测点数量</div>
+                        <div class="tm-metric-value" id="live-sensor-count">0</div>
+                        <div class="tm-metric-note">当前有效温度传感器</div>
+                    </div>
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">训练基线</div>
+                        <div class="tm-metric-value" id="training-status">未启用</div>
+                        <div class="tm-metric-note">后续异常评分与预测辅助</div>
+                    </div>
+                    <div class="tm-metric">
+                        <div class="tm-metric-label">AI 异常分数</div>
+                        <div class="tm-metric-value" id="ai-score">0.00</div>
+                        <div class="tm-metric-note" id="ai-prediction-note">等待训练样本</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tm-panel p-3 mb-3">
+                <div class="tm-panel-title">站内工况</div>
+                <div class="tm-chip-row mb-3">
+                    <div class="tm-chip"><strong>环境温度</strong><span id="ambient-temp">--</span></div>
+                    <div class="tm-chip"><strong>负荷率</strong><span id="load-pct">--</span></div>
+                </div>
+                <div id="equipment-grid" class="tm-equipment-grid">
+                    <div class="tm-empty">尚未加载设备工况。</div>
+                </div>
+            </div>
+
+            <div class="tm-panel p-3">
+                <div class="tm-panel-title">关键测点</div>
+                <table class="tm-sensor-table">
+                    <tbody id="sensor-list">
+                        <tr><td class="tm-empty" colspan="3">正在等待测点数据…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-xl-6">
+            <div class="tm-panel p-3">
+                <div class="tm-panel-title">热点详情</div>
+                <div id="hotspot-list" class="tm-list">
+                    <div class="tm-list-item tm-empty">暂无热点数据。</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="tm-panel p-3">
+                <div class="tm-panel-title">告警与联动</div>
+                <div id="alarm-list" class="tm-list">
+                    <div class="tm-list-item tm-empty">当前场景暂无告警。</div>
+                </div>
             </div>
         </div>
     </div>
@@ -108,13 +430,477 @@
 
 {% block extra_scripts %}
 <script>
-    function updateDashboard(data) {
-        if (!data || !data.success) return;
-        document.getElementById('max-temp').textContent = (data.max_temp || 0).toFixed(1) + ' C';
-        document.getElementById('avg-temp').textContent = (data.avg_temp || 0).toFixed(1) + ' C';
-        const trend = data.trend || {};
-        document.getElementById('rise-rate').textContent = (trend.rise_rate || 0).toFixed(2) + ' C/min';
-        document.getElementById('hotspot-count').textContent = (data.hotspots || []).length;
+    const simState = {
+        timer: null,
+        autoplay: true,
+        currentScenarioId: null,
+        history: [],
+        zones: [],
+    };
+
+    const zoneColors = ['var(--zone-a)', 'var(--zone-b)', '#f59e0b', '#34d399'];
+
+    async function apiJson(url, options = {}) {
+        const response = await fetch(url, {
+            headers: { 'Content-Type': 'application/json' },
+            ...options,
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
     }
+
+    function statusClass(status) {
+        return `status-${(status || 'normal').toLowerCase()}`;
+    }
+
+    function formatTemp(value) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) {
+            return '--';
+        }
+        return `${Number(value).toFixed(1)} C`;
+    }
+
+    function formatRate(value) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) {
+            return '--';
+        }
+        return `${Number(value).toFixed(2)} C/min`;
+    }
+
+    function tempToColor(value, min, max) {
+        const span = Math.max(max - min, 1);
+        const ratio = Math.min(1, Math.max(0, (value - min) / span));
+        const hue = (1 - ratio) * 210;
+        const sat = 88;
+        const light = 34 + ratio * 26;
+        return `hsl(${hue}, ${sat}%, ${light}%)`;
+    }
+
+    function updateStatusPill(status) {
+        const pill = document.getElementById('status-pill');
+        pill.className = `tm-status-pill ${statusClass(status)}`;
+        pill.textContent = (status || 'normal').toUpperCase();
+    }
+
+    function renderZoneLegend(zones) {
+        const container = document.getElementById('zone-legend');
+        if (!zones || zones.length === 0) {
+            container.innerHTML = '<div class="tm-zone tm-empty">当前未配置区域定义。</div>';
+            return;
+        }
+        container.innerHTML = zones.map((zone, index) => `
+            <div class="tm-zone">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="tm-zone-swatch" style="background:${zoneColors[index % zoneColors.length]};"></span>
+                    <span>${zone.zone_name || zone.zone_id}</span>
+                </div>
+                <span class="tm-help">${zone.zone_id}</span>
+            </div>
+        `).join('');
+    }
+
+    function drawHeatmap(heatmap, zones, hotspots) {
+        const canvas = document.getElementById('heatmapCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!heatmap || !heatmap.length || !heatmap[0].length) {
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+            ctx.font = '20px sans-serif';
+            ctx.fillText('尚未获得热场数据', 32, 48);
+            return;
+        }
+
+        const rows = heatmap.length;
+        const cols = heatmap[0].length;
+        const cellW = canvas.width / cols;
+        const cellH = canvas.height / rows;
+        let min = Infinity;
+        let max = -Infinity;
+
+        for (const row of heatmap) {
+            for (const value of row) {
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+            }
+        }
+
+        for (let y = 0; y < rows; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+                ctx.fillStyle = tempToColor(heatmap[y][x], min, max);
+                ctx.fillRect(x * cellW, y * cellH, cellW + 1, cellH + 1);
+            }
+        }
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= cols; x += 8) {
+            ctx.beginPath();
+            ctx.moveTo(x * cellW, 0);
+            ctx.lineTo(x * cellW, canvas.height);
+            ctx.stroke();
+        }
+
+        (zones || []).forEach((zone, index) => {
+            const region = zone.region || [];
+            if (region.length !== 4) {
+                return;
+            }
+            const color = zoneColors[index % zoneColors.length];
+            const x = region[0] * canvas.width;
+            const y = region[1] * canvas.height;
+            const width = (region[2] - region[0]) * canvas.width;
+            const height = (region[3] - region[1]) * canvas.height;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 6]);
+            ctx.strokeRect(x, y, width, height);
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.72)';
+            ctx.fillRect(x + 10, y + 10, Math.max(100, zone.zone_name.length * 18), 28);
+            ctx.fillStyle = color;
+            ctx.font = '600 14px sans-serif';
+            ctx.fillText(zone.zone_name || zone.zone_id, x + 18, y + 29);
+        });
+
+        (hotspots || []).forEach((hotspot, index) => {
+            const x = hotspot.center[0] * canvas.width;
+            const y = hotspot.center[1] * canvas.height;
+            const severity = hotspot.severity || 'normal';
+            const color = severity === 'critical' ? '#fb7185' :
+                severity === 'alarm' ? '#f97316' :
+                severity === 'warning' ? '#fbbf24' : '#4ade80';
+
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.arc(x, y, 9 + index, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.82)';
+            ctx.fillRect(x + 12, y - 12, 110, 24);
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = '600 13px sans-serif';
+            ctx.fillText(`${hotspot.temperature.toFixed(1)} C`, x + 18, y + 5);
+        });
+
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.64)';
+        ctx.fillRect(12, canvas.height - 42, 176, 28);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '600 13px sans-serif';
+        ctx.fillText(`热场范围 ${min.toFixed(1)} C - ${max.toFixed(1)} C`, 20, canvas.height - 23);
+    }
+
+    function drawTrend() {
+        const canvas = document.getElementById('trendCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (simState.history.length < 2) {
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+            ctx.font = '18px sans-serif';
+            ctx.fillText('执行至少两次推演后显示温度轨迹', 26, 42);
+            return;
+        }
+
+        const padding = { top: 24, right: 24, bottom: 28, left: 36 };
+        const values = simState.history.map(item => item.maxTemp);
+        const min = Math.min(...values) - 2;
+        const max = Math.max(...values) + 2;
+        const width = canvas.width - padding.left - padding.right;
+        const height = canvas.height - padding.top - padding.bottom;
+
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i += 1) {
+            const y = padding.top + (height / 3) * i;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(canvas.width - padding.right, y);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        values.forEach((value, index) => {
+            const x = padding.left + (width / (values.length - 1)) * index;
+            const y = padding.top + height - ((value - min) / Math.max(max - min, 1)) * height;
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        values.forEach((value, index) => {
+            const x = padding.left + (width / (values.length - 1)) * index;
+            const y = padding.top + height - ((value - min) / Math.max(max - min, 1)) * height;
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath();
+            ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '12px sans-serif';
+            ctx.fillText(`${Math.round(value)}C`, x - 14, y - 10);
+        });
+    }
+
+    function renderEquipment(items) {
+        const container = document.getElementById('equipment-grid');
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div class="tm-empty">当前场景没有设备工况。</div>';
+            return;
+        }
+
+        container.innerHTML = items.map((item, index) => `
+            <div class="tm-equipment">
+                <div class="tm-equipment-index">${index + 1}</div>
+                <div>
+                    <strong>${item.label}</strong>
+                    <small>${item.zone_name} · ${item.role}</small>
+                </div>
+                <div class="text-end">
+                    <div class="tm-temp">${item.temperature.toFixed(1)} C</div>
+                    <span class="tm-status-pill ${statusClass(item.status)}">${item.status.toUpperCase()}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderSensors(items) {
+        const body = document.getElementById('sensor-list');
+        if (!items || items.length === 0) {
+            body.innerHTML = '<tr><td class="tm-empty" colspan="3">暂无测点快照。</td></tr>';
+            return;
+        }
+
+        body.innerHTML = items.map(item => `
+            <tr>
+                <td>${item.label}</td>
+                <td class="tm-help">${item.zone_name}</td>
+                <td>${item.temperature.toFixed(1)} C</td>
+            </tr>
+        `).join('');
+    }
+
+    function renderHotspots(hotspots) {
+        const container = document.getElementById('hotspot-list');
+        if (!hotspots || hotspots.length === 0) {
+            container.innerHTML = '<div class="tm-list-item tm-empty">当前场景未检测到异常热点。</div>';
+            return;
+        }
+
+        container.innerHTML = hotspots.map(hotspot => `
+            <div class="tm-list-item">
+                <strong>${hotspot.zone_name || '未归属区域'} · ${hotspot.temperature.toFixed(1)} C</strong>
+                <div class="tm-list-meta">
+                    <span>状态 ${hotspot.severity}</span>
+                    <span>中心 (${hotspot.center[0].toFixed(2)}, ${hotspot.center[1].toFixed(2)})</span>
+                    <span>面积比 ${hotspot.area_ratio.toFixed(3)}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderAlarms(alarms, linkageEvents) {
+        const container = document.getElementById('alarm-list');
+        const items = [];
+
+        (alarms || []).forEach(alarm => {
+            items.push(`
+                <div class="tm-list-item">
+                    <strong>${alarm.title}</strong>
+                    <div class="tm-list-meta">
+                        <span>级别 ${alarm.level || alarm.type}</span>
+                        <span>${alarm.message}</span>
+                    </div>
+                </div>
+            `);
+        });
+
+        (linkageEvents || []).forEach(event => {
+            items.push(`
+                <div class="tm-list-item">
+                    <strong>联动事件 · ${event.target}</strong>
+                    <div class="tm-list-meta">
+                        <span>事件 ${event.event}</span>
+                        <span>${JSON.stringify(event.data || {})}</span>
+                    </div>
+                </div>
+            `);
+        });
+
+        if (items.length === 0) {
+            container.innerHTML = '<div class="tm-list-item tm-empty">当前场景暂无告警与联动。</div>';
+            return;
+        }
+
+        container.innerHTML = items.join('');
+    }
+
+    function updateSceneHeader(simulation, scene) {
+        document.getElementById('scene-name').textContent = simulation.scenario_name || '温度监测仿真';
+        document.getElementById('scene-description').textContent = scene.description || '正在等待场景描述。';
+        document.getElementById('scene-guidance').textContent = scene.guidance || '当前场景未提供额外提示。';
+        document.getElementById('simulation-input-mode').textContent = simulation.input_mode || '--';
+        document.getElementById('expected-status').textContent = simulation.expected_status || '--';
+        document.getElementById('cycle-hint').textContent = simulation.cycle_hint || '--';
+        document.getElementById('simulation-tick').textContent = String(simulation.tick || 0);
+        document.getElementById('ambient-temp').textContent = formatTemp(scene.ambient_temp);
+        document.getElementById('load-pct').textContent = scene.load_pct !== undefined ? `${scene.load_pct}%` : '--';
+    }
+
+    function updateMetrics(data) {
+        document.getElementById('max-temp').textContent = formatTemp(data.max_temp);
+        document.getElementById('avg-temp').textContent = formatTemp(data.avg_temp);
+        document.getElementById('rise-rate').textContent = formatRate((data.trend || {}).rise_rate);
+        document.getElementById('hotspot-count').textContent = String((data.hotspots || []).length);
+        updateStatusPill(data.status || 'normal');
+    }
+
+    function updateOperationalData(data) {
+        const metadata = data.metadata || {};
+        const sensorSummary = metadata.sensor_summary || {};
+        const aiInsight = metadata.ai_insight || {};
+
+        document.getElementById('live-input-mode').textContent = metadata.input_mode || '--';
+        document.getElementById('live-sensor-count').textContent = String(sensorSummary.count || 0);
+        document.getElementById('training-status').textContent = metadata.training_enabled ? '已启用' : '未启用';
+        document.getElementById('ai-score').textContent = Number(aiInsight.overall_anomaly_score || 0).toFixed(2);
+        document.getElementById('ai-prediction-note').textContent = metadata.training_enabled
+            ? `30分钟预测 ${aiInsight.predicted_status || 'normal'}`
+            : '等待训练样本';
+    }
+
+    function updateHistory(data) {
+        simState.history.push({
+            tick: (data.simulation || {}).tick || simState.history.length + 1,
+            maxTemp: Number(data.max_temp || 0),
+        });
+        simState.history = simState.history.slice(-12);
+        drawTrend();
+    }
+
+    function updateDashboard(data) {
+        if (!data || !data.success) {
+            return;
+        }
+
+        const simulation = data.simulation || {};
+        const scene = data.substation_scene || {};
+        const zones = scene.zones || simState.zones || [];
+
+        updateSceneHeader(simulation, scene);
+        updateMetrics(data);
+        updateOperationalData(data);
+        renderZoneLegend(zones);
+        renderEquipment(scene.equipment_states || []);
+        renderSensors(data.sensor_snapshot || []);
+        renderHotspots(data.hotspots || []);
+        renderAlarms(data.alarms || [], data.linkage_events || []);
+        drawHeatmap(data.heatmap || [], zones, data.hotspots || []);
+        updateHistory(data);
+    }
+
+    function populateScenarioSelect(scenarios, currentScenarioId) {
+        const select = document.getElementById('simulation-scenario');
+        select.innerHTML = (scenarios || []).map(item => `
+            <option value="${item.scenario_id}">
+                ${item.name} · ${item.input_mode} · 目标 ${item.expected_status}
+            </option>
+        `).join('');
+        if (currentScenarioId) {
+            select.value = currentScenarioId;
+            simState.currentScenarioId = currentScenarioId;
+        }
+    }
+
+    async function loadScenarioOptions() {
+        const payload = await apiJson('/api/simulation/scenarios');
+        populateScenarioSelect(payload.scenarios, payload.current_scenario_id);
+    }
+
+    async function loadScenario(scenarioId) {
+        const selected = scenarioId || document.getElementById('simulation-scenario').value;
+        const payload = await apiJson(`/api/simulation/load?scenario_id=${encodeURIComponent(selected)}`, {
+            method: 'POST',
+            body: '{}',
+        });
+        simState.currentScenarioId = payload.scenario.scenario_id;
+        simState.history = [];
+        await stepSimulation();
+    }
+
+    async function stepSimulation() {
+        const payload = await apiJson('/api/simulation/step', {
+            method: 'POST',
+            body: '{}',
+        });
+        updateDashboard(payload);
+    }
+
+    async function loadBootstrap() {
+        const payload = await apiJson('/api/simulation/bootstrap');
+        simState.zones = payload.zones || [];
+        populateScenarioSelect(payload.scenarios, payload.current_scenario_id);
+        updateDashboard(payload.initial_data || {});
+    }
+
+    function restartTimer() {
+        if (simState.timer) {
+            clearInterval(simState.timer);
+            simState.timer = null;
+        }
+        if (simState.autoplay) {
+            simState.timer = setInterval(() => {
+                stepSimulation().catch(console.error);
+            }, 2200);
+        }
+        const button = document.getElementById('btn-toggle-autoplay');
+        button.innerHTML = simState.autoplay
+            ? '<i class="bi bi-pause-circle me-1"></i>暂停自动'
+            : '<i class="bi bi-play-circle me-1"></i>恢复自动';
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        document.getElementById('btn-load-scenario').addEventListener('click', function() {
+            loadScenario().catch(console.error);
+        });
+
+        document.getElementById('btn-step-once').addEventListener('click', function() {
+            stepSimulation().catch(console.error);
+        });
+
+        document.getElementById('btn-toggle-autoplay').addEventListener('click', function() {
+            simState.autoplay = !simState.autoplay;
+            restartTimer();
+        });
+
+        try {
+            await loadBootstrap();
+            restartTimer();
+        } catch (error) {
+            console.error(error);
+            try {
+                const state = await apiJson('/api/simulation/state');
+                simState.zones = state.zones || [];
+                await loadScenarioOptions();
+                if (state.scenario && state.scenario.scenario_id) {
+                    document.getElementById('simulation-scenario').value = state.scenario.scenario_id;
+                }
+                await stepSimulation();
+                restartTimer();
+            } catch (fallbackError) {
+                console.error(fallbackError);
+                document.getElementById('scene-description').textContent = `独立仿真初始化失败: ${fallbackError.message}`;
+            }
+        }
+    });
 </script>
 {% endblock %}

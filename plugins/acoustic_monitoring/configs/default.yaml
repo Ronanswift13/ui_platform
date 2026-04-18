@@ -5,6 +5,15 @@
 sample_rate: 16000          # 采样率 (Hz)
 audio_duration: 2.0         # 音频采集时长 (秒)
 
+sampling:
+  sampling_rate: 16000
+  sample_interval_seconds: 0.5
+  source_mode: simulated_or_microphone
+
+window:
+  size: 2.0
+  unit: seconds
+
 # 梅尔频谱参数
 n_mels: 128
 n_fft: 2048
@@ -18,6 +27,25 @@ ultrasonic_freq_max: 100000
 # 告警参数
 alarm_accumulation_count: 3
 
+thresholds:
+  anomaly_score: 0.5
+  partial_discharge_score: 0.6
+  mechanical_fault_score: 0.6
+
+runtime:
+  mode: standalone
+  require_hardware: false
+  rule_confidence: 1.0
+
+model:
+  status: placeholder
+  anomaly_detection_enabled: true
+  trend_prediction_enabled: false
+
+alarm_rules:
+  min_status: warning
+  accumulation_count: 3
+
 # === 检测参数 ===
 detection_params:
   anomaly_threshold: 0.5
@@ -29,6 +57,9 @@ detection_params:
     high_freq_energy_ratio: 0.4   # 高频能量占比阈值
     impulse_density: 0.1          # 脉冲密度阈值
     impulse_multiplier: 4.0       # 脉冲判定倍数
+    bandpass_low: 30000           # PD 带通滤波下截止 (Hz)
+    bandpass_high: 100000         # PD 带通滤波上截止 (Hz)
+    envelope_kurtosis_gate: 5.0   # 包络峰度门限
 
   # 电晕放电 (Corona) 检测
   corona_discharge:
@@ -44,6 +75,8 @@ detection_params:
     freq_max: 200.0               # 搜索频率上限 (Hz)
     kurtosis_scaling: 4.0         # 峰度评分缩放
     periodicity_threshold: 0.3    # 周期性阈值
+    bandpass_low: 1000.0          # Hilbert 包络带通下限 (Hz)
+    bandpass_high: 5000.0         # Hilbert 包络带通上限 (Hz)
 
   # 变压器嗡鸣 (Transformer) 检测
   transformer_hum:
@@ -57,3 +90,17 @@ detection_params:
     energy_cv_threshold: 0.5      # 能量变异系数阈值
     cf_weight: 0.7                # 峰值因子权重
     energy_weight: 0.3            # 能量变异权重
+
+# === 训练数据导出 ===
+export_training_features: false    # 是否在检测结果中导出训练特征
+
+upgrade_placeholders:
+  prediction_model: audio trend prediction hook
+  anomaly_detection_model: acoustic anomaly model hook
+  protocol_adapter: microphone/ultrasonic adapter hook
+  online_learning: online acoustic baseline hook
+  model_features_placeholder: []
+  sequence_embedding_placeholder: null
+  temporal_pattern_placeholder: null
+  anomaly_score_trace_placeholder: []
+  root_cause_feature_placeholder: null

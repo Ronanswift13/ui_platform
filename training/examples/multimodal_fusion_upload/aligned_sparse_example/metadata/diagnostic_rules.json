@@ -1,0 +1,17 @@
+[
+  {
+    "name": "变压器综合过热诊断",
+    "conditions": ["visual:overheating", "gas:dga_fault"],
+    "priority": "critical"
+  },
+  {
+    "name": "绝缘劣化诊断",
+    "conditions": ["acoustic:partial_discharge", "hyperspectral:insulation_aging"],
+    "priority": "alarm"
+  },
+  {
+    "name": "接触电阻升高",
+    "conditions": ["acoustic:poor_contact", "visual:overheating"],
+    "priority": "warning"
+  }
+]

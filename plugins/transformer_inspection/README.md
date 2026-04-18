@@ -1,228 +1,61 @@
-# 主变自主巡视插件 (A组)
+# transformer_inspection
 
-## 功能概述
+`transformer_inspection` 是一个面向主变巡视场景的 enhanced-detector 插件。当前主链路是 `plugin.py -> detector_enhanced.py`，负责外观缺陷识别、呼吸器硅胶状态识别、油位计读数和可选热像阈值告警；`defect_detector.py` 与 `thermal_analyzer.py` 仍是旁路模块，没有接入 `Plugin.infer()` 主链路。
 
-主变压器本体及附属设施（套管、散热器、油位计、呼吸器、端子箱等）的智能巡视检测。
+## Verified Entry Points
 
-### 核心功能
+- `python3 demo/run_demo.py`
+- `python3 -m pytest tests -q`
+- `./scripts/run_targeted_tests.sh <module>`
+- `./scripts/run_regression_tests.sh`
+- `./scripts/run_quality_gate.sh`
 
-1. **外观缺陷识别**
-   - ✅ 破损检测 (基于边缘检测)
-   - ✅ 锈蚀识别 (基于颜色检测) 
-   - ✅ 渗漏油检测 (基于深色区域检测)
-   - ✅ 异物悬挂识别 (基于轮廓检测)
+## Runtime Contract
 
-2. **状态识别**
-   - ✅ 呼吸器硅胶变色识别 (基于颜色分析)
-   - ✅ 阀门开闭状态识别 (基于轮廓方向)
+- `Plugin.create_standalone()` 从 `manifest.json` 和 `configs/default.yaml` 启动插件。
+- `infer(frame, rois, context)` 接受 BGR `numpy.ndarray`、ROI 列表和 `PluginContext`。
+- 为了 demo 和 smoke test，`context=None` 会自动填一个 standalone 上下文；平台运行时仍应传入真实 `PluginContext`。
+- 当前 ROI 语义主要依赖 `roi.name` / `roi.id` / `roi.metadata`：
+  - 包含 `breather` / `silica` 的 ROI 走 `recognize_silica_gel()`
+  - 包含 `oil_level` / `meter` / `gauge` 的 ROI 走 `detect_oil_level()`
+  - 其他 ROI 默认只走 `detect_defects()`
+- 热成像路径只在 `thermal.enabled=true` 且 `context.metadata["thermal_frame"]` 提供热像时生效。
 
-3. **热成像集成** (可选)
-   - ✅ 红外图像温度提取 (温度阈值与热点区域分析)
+## Output and Degradation
 
-## 快速开始
+- 缺陷结果由 detector 的 `Detection` dataclass 适配成 `RecognitionResult`。
+- 硅胶状态只输出：
+  - `silica_gel_normal`
+  - `silica_gel_abnormal`
+  - `silica_gel_unknown`
+- 油位计结果输出 `oil_level_reading`，`value` 为 `level_ratio`，状态字符串放在 metadata。
+- 当前阀门状态标签仍保留在历史配置里，但没有接入运行时主链路，不应写成已验证能力。
+- 若可选深度模型不可用，detector 回退到 OpenCV/颜色规则链路。
 
-### 安装依赖
+## Dependencies and Configuration
 
-```bash
-pip install numpy opencv-python
-```
+- 基础依赖：`numpy`、`opencv-python`、`pyyaml`、`darkbreaker-sdk`
+- 可选依赖：
+  - `ai_models.deep_learning.yolov8_vit`
+  - `ai_models.deep_learning.segformer`
+  - `ai_models.deep_learning.gabor_texture`
+  - 外部 `model_registry`
+- 当前 detector 与 plugin 都读取 `configs/default.yaml` 的 `inference.*` 阈值。
 
-### 基本使用
+## HF Governance Assets
 
-```python
-from transformer_inspection import TransformerInspectionPlugin
+- `.agent_skills/00~08`
+- `.claude/commands/implement.md`
+- `.claude/commands/repair.md`
+- `.claude/commands/audit.md`
+- `scripts/run_targeted_tests.sh`
+- `scripts/run_regression_tests.sh`
+- `scripts/run_quality_gate.sh`
+- `scripts/collect_root_cause.sh`
 
-# 创建插件实例
-plugin = TransformerInspectionPlugin(manifest, plugin_dir)
+## Current Limits
 
-# 初始化
-config = {
-    "inference": {
-        "confidence_threshold": 0.5
-    },
-    "recognition": {
-        "defect_types": ["damage", "rust", "oil_leak", "foreign_object"],
-        "state_types": ["silica_gel_normal", "valve_open"]
-    }
-}
-plugin.init(config)
-
-# 执行推理
-results = plugin.infer(frame, rois, context)
-
-# 后处理
-alarms = plugin.postprocess(results, rules)
-```
-
-## ROI类型说明
-
-| ROI类型 | 说明 | 检测目标 |
-|---------|------|----------|
-| bushing | 套管 | 破损、污损、渗漏油 |
-| radiator | 散热器 | 渗漏油、锈蚀 |
-| oil_level | 油位计 | 刻度读数、破损 |
-| breather | 呼吸器 | 硅胶颜色变化 |
-| terminal_box | 端子箱 | 外观异常、破损 |
-
-## 输出格式
-
-### 识别结果
-
-```json
-{
-    "task_id": "xxx",
-    "roi_id": "xxx",
-    "bbox": {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4},
-    "label": "oil_leak",
-    "confidence": 0.85,
-    "model_version": "1.0.0",
-    "code_version": "abc123"
-}
-```
-
-### 告警输出
-
-```json
-{
-    "level": "error",
-    "title": "检测到渗漏油",
-    "message": "在 radiator_01 区域检测到渗漏油，置信度: 0.85"
-}
-```
-
-## 检测算法说明
-
-### 1. 油漏检测
-
-- **方法**: 基于深色区域检测
-- **原理**: 油漏通常表现为深色的斑点或痕迹
-- **步骤**:
-  1. 灰度化
-  2. 阈值化（检测深色区域）
-  3. 形态学去噪
-  4. 轮廓提取
-  5. 面积过滤
-
-### 2. 锈蚀检测
-
-- **方法**: 基于HSV颜色空间检测
-- **原理**: 铁锈呈现橙红色
-- **步骤**:
-  1. BGR转HSV
-  2. 定义铁锈颜色范围
-  3. 颜色掩码
-  4. 轮廓提取
-  5. 面积过滤
-
-### 3. 破损检测
-
-- **方法**: 基于边缘密度分析
-- **原理**: 破损区域边缘密集
-- **步骤**:
-  1. Canny边缘检测
-  2. 计算边缘密度
-  3. 密度阈值判断
-  4. 边缘区域定位
-
-### 4. 异物检测
-
-- **方法**: 基于轮廓形状分析
-- **原理**: 异物通常为不规则小物体
-- **步骤**:
-  1. 边缘检测
-  2. 轮廓提取
-  3. 圆形度计算
-  4. 面积和形状过滤
-
-### 5. 硅胶变色检测
-
-- **方法**: 基于颜色比例分析
-- **原理**: 正常硅胶为蓝色，变色后为粉红色
-- **步骤**:
-  1. BGR转HSV
-  2. 蓝色/粉红色掩码
-  3. 计算颜色占比
-  4. 占比阈值判断
-
-### 6. 阀门状态检测
-
-- **方法**: 基于霍夫直线检测
-- **原理**: 阀门开闭对应不同角度
-- **步骤**:
-  1. 边缘检测
-  2. 霍夫直线检测
-  3. 角度计算
-  4. 状态判断
-
-### 7. 热成像温度提取
-
-- **方法**: 灰度映射温度 + 热点阈值分析
-- **原理**: 将红外图像灰度映射为温度区间，提取最高/平均/最低温度并定位热点区域
-- **步骤**:
-  1. 灰度化
-  2. 温度区间映射
-  3. 热点阈值分割
-  4. 最大热点区域定位
-
-## 配置参数
-
-### 推理配置
-
-```yaml
-inference:
-  confidence_threshold: 0.5  # 置信度阈值
-  nms_threshold: 0.4        # NMS阈值
-  max_detections: 100       # 最大检测数量
-```
-
-### 识别类型
-
-```yaml
-recognition:
-  defect_types:
-    - damage          # 破损
-    - rust            # 锈蚀
-    - oil_leak        # 渗漏油
-    - foreign_object  # 异物
-  state_types:
-    - silica_gel_normal    # 硅胶正常
-    - silica_gel_abnormal  # 硅胶变色
-    - valve_open           # 阀门开启
-    - valve_closed         # 阀门关闭
-
-### 热成像配置
-
-```yaml
-thermal:
-  enabled: false
-  temperature_threshold: 80.0  # 摄氏度
-  min_temp: 20.0
-  max_temp: 120.0
-```
-```
-
-## 性能指标
-
-- **单帧处理时间**: < 500ms (CPU)
-- **置信度范围**: 0.4 - 0.95
-- **适用光照**: 室外自然光/阴天/多云
-- **分辨率**: 支持 1920x1080 及以上
-
-## 局限性
-
-1. **光照依赖**: 强逆光或极暗环境下性能下降
-2. **遮挡处理**: 严重遮挡可能导致漏检
-3. **模型依赖**: 当前使用OpenCV规则检测，深度学习模型可提升性能
-4. **热成像**: 建议使用独立热成像摄像头以保证温度精度
-
-## 未来改进
-
-- [ ] 集成深度学习模型（YOLO/Faster R-CNN）
-- [ ] 添加时序分析（多帧融合）
-- [ ] 支持夜间模式检测
-- [ ] 添加3D点云分析
-- [ ] 优化温度标定与辐射校准
-
-## 技术支持
-
-如有问题，请联系A组团队或提交Issue。
+- 还没有真实图像回放集；`run_regression_tests.sh` 目前是“全量 pytest + demo smoke + 可选静态扫描”。
+- `scripts/benchmark.py` 是手动性能检查入口，不在默认 HF 门禁里。
+- `defect_detector.py`、`thermal_analyzer.py` 不是当前主链路事实源。
+- 阀门状态识别还停留在历史口径，当前不要把它作为已验证能力引用。

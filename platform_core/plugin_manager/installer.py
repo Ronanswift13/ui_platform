@@ -55,6 +55,7 @@ PLUGIN_CATEGORIES = {
     # Monitoring plugins (shared indoor/outdoor)
     "acoustic_monitoring": "monitoring",
     "gas_detection": "monitoring",
+    "action_event_monitoring": "monitoring",
     "hyperspectral_detection": "monitoring",
     "multimodal_fusion": "monitoring",
 }
@@ -75,6 +76,7 @@ PLUGIN_PORTS = {
     "bird_monitoring": 8092,
     "acoustic_monitoring": 8093,
     "gas_detection": 8094,
+    "action_event_monitoring": 8097,
     "hyperspectral_detection": 8095,
     "multimodal_fusion": 8096,
 }

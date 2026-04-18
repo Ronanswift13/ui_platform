@@ -11,6 +11,33 @@
         "state_recognition",
         "image_quality"
     ],
+    "verified_capabilities": [
+        "state_recognition"
+    ],
+    "experimental_capabilities": [
+        "image_quality"
+    ],
+    "blocked_capabilities": [
+        "five_prevention_logic_validation"
+    ],
+    "required_fixtures": [
+        "switch_open_sample.jpg",
+        "switch_closed_sample.jpg",
+        "isolator_state_sample.jpg"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "无真实图像回放数据集",
+        "YOLOv8-ViT 模型为可选导入，当前环境不可用",
+        "五防逻辑校验代码存在但未接入主插件链路",
+        "SF6 表计读数默认关闭",
+        "switch_consistency.py 为独立模块，有测试但不自动集成",
+        "image_quality 仅有契约测试，无真实清晰度评价回归"
+    ],
     "device_types": [
         "breaker",
         "isolator",

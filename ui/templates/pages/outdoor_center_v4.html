@@ -448,6 +448,101 @@
     .performance-metrics { display: flex; gap: 1rem; }
     .metric-value { color: var(--accent-primary); font-weight: 600; }
 
+    /* 一致性校核面板 */
+    .consistency-section { margin-bottom: 0.5rem; }
+
+    .consistency-card {
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--panel-border);
+        border-radius: 8px;
+        padding: 0.6rem 0.8rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .consistency-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.4rem;
+    }
+
+    .consistency-device {
+        font-size: 0.8rem;
+        color: #fff;
+        font-weight: 500;
+    }
+
+    .consistency-badge {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    .badge-consistent { background: rgba(16,185,129,0.2); color: var(--accent-success); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-inconsistent { background: rgba(239,68,68,0.2); color: var(--accent-danger); border: 1px solid rgba(239,68,68,0.3); }
+    .badge-insufficient { background: rgba(245,158,11,0.2); color: var(--accent-warning); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-review_required { background: rgba(139,92,246,0.2); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+
+    .consistency-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.72rem;
+        padding: 0.2rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .consistency-row:last-child { border-bottom: none; }
+    .consistency-label { color: #888; }
+    .consistency-val { color: #ccc; }
+    .consistency-val.state-open { color: var(--accent-success); }
+    .consistency-val.state-closed { color: var(--accent-danger); }
+    .consistency-val.state-unknown { color: #888; }
+
+    .conflict-item {
+        font-size: 0.7rem;
+        color: var(--accent-warning);
+        padding: 0.2rem 0;
+        padding-left: 0.5rem;
+        border-left: 2px solid var(--accent-warning);
+        margin: 0.2rem 0;
+    }
+
+    .conflict-item.error { color: var(--accent-danger); border-left-color: var(--accent-danger); }
+
+    .action-event-summary {
+        font-size: 0.7rem;
+        color: #aaa;
+        background: rgba(0,212,255,0.05);
+        border-radius: 4px;
+        padding: 0.3rem 0.5rem;
+        margin-top: 0.3rem;
+    }
+
+    .btn-review-entry {
+        width: 100%;
+        margin-top: 0.3rem;
+        padding: 0.3rem;
+        font-size: 0.72rem;
+        border-radius: 4px;
+        background: rgba(139,92,246,0.15);
+        border: 1px solid rgba(139,92,246,0.3);
+        color: #a78bfa;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-review-entry:hover { background: rgba(139,92,246,0.25); }
+
+    .boundary-note {
+        font-size: 0.65rem;
+        color: #666;
+        font-style: italic;
+        padding: 0.3rem 0;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        margin-top: 0.3rem;
+    }
+
     /* 响应式 */
     @media (max-width: 1200px) {
         .outdoor-container { grid-template-columns: 200px 1fr 280px; }
@@ -663,6 +758,21 @@
                     <div class="text-muted text-center" style="padding:1rem;font-size:0.75rem">
                         暂无告警
                     </div>
+                </div>
+            </div>
+
+            <!-- 一致性校核(开关模块专用) -->
+            <div class="control-section consistency-section" id="consistency-section" style="display:none">
+                <div class="control-section-title">
+                    <i class="bi bi-shield-check"></i> 一致性校核
+                </div>
+                <div id="consistency-list">
+                    <div class="text-muted text-center" style="padding:1rem;font-size:0.75rem">
+                        加载中...
+                    </div>
+                </div>
+                <div class="boundary-note" id="consistency-boundary">
+                    本结论仅用于远程巡视辅助与一致性校核，不得直接生成远方控制命令
                 </div>
             </div>
 

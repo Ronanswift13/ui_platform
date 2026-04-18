@@ -33,7 +33,7 @@ risk_assessment:
   # 相间距参考值(米)
   default_phase_spacing_m: 3.0
 
-# 驱鸟设备配置
+# 驱离建议配置（不控制硬件；device_* 字段为 legacy 占位，当前生产链忽略）
 deterrent:
   enabled: false
   acoustic_enabled: true
@@ -89,6 +89,19 @@ alerting:
     popup_enabled: true
     sms_enabled: false
     email_enabled: false
+
+# 输入质量评估（三态: pass / soft_fail / hard_fail）
+# - hard_fail 阈值（min_dimension / clarity_threshold）触发 → quality_failed，阻断推理
+# - soft_fail 阈值（soft_*）触发 → 继续推理但强制 review_required
+quality:
+  min_dimension: 64
+  clarity_threshold: 50.0
+  review_confidence_threshold: 0.5
+  species_confidence_threshold: 0.6
+  # soft_fail thresholds（0~1 归一化分数）
+  soft_overall_threshold: 0.6
+  soft_clarity_threshold: 0.5
+  soft_brightness_threshold: 0.5
 
 # 日志配置
 logging:

@@ -11,8 +11,6 @@
 4. 上传数据与训练管道完整集成
 5. YOLO格式数据组织
 
-作者: Claude AI Assistant
-日期: 2026-02-02
 """
 
 import os

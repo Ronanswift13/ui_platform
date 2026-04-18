@@ -23,6 +23,8 @@ from pathlib import Path
 import numpy as np
 
 from darkbreaker_sdk.interfaces import HealthStatus
+from darkbreaker_sdk.schemas import BoundingBox, RecognitionResult
+from platform_core.visual_output_protocol import build_visual_meta
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +287,38 @@ class HyperspectralDetectionPlugin:
     # =========================================================================
     
     def infer(self, frame, rois, context):
-        return []
+        """BasePlugin.infer — 占位实现，返回 placeholder RecognitionResult。"""
+        if frame is None or not self._is_initialized:
+            return []
+
+        task_id = getattr(context, "task_id", "")
+        site_id = getattr(context, "site_id", "")
+        device_id = getattr(context, "device_id", "")
+
+        meta = build_visual_meta(
+            plugin_name="hyperspectral_detection",
+            task_type="spectral_analysis",
+            modality="hyperspectral",
+            runtime_mode="simulation",
+            algorithm_stage="placeholder",
+            model_status="placeholder",
+            quality_gate_status="not_applicable",
+            evidence_hint="spectral_cube",
+        )
+
+        return [RecognitionResult(
+            task_id=task_id,
+            site_id=site_id,
+            device_id=device_id,
+            component_id="",
+            roi_id="",
+            bbox=BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0),
+            label="normal_placeholder",
+            confidence=0.0,
+            model_version=self.PLUGIN_VERSION,
+            code_version=self.code_hash,
+            metadata=meta,
+        )]
 
     def postprocess(self, results, rules):
         return []

@@ -1,0 +1,59 @@
+{
+  "name": "device_monitoring_single_device_cam01",
+  "plugin_id": "device_monitoring",
+  "task_type": "equipment_health_prediction",
+  "version": "1.0.0",
+  "format": "csv_series",
+  "input_modality": "multivariate_timeseries",
+  "num_samples": 336,
+  "sequence_length": 336,
+  "prediction_horizon": 24,
+  "timestamp_field": "timestamp",
+  "entity_id_field": "device_id",
+  "sensor_columns": [
+    "cpu_temp",
+    "cpu_usage",
+    "memory_usage",
+    "disk_usage",
+    "network_quality",
+    "uptime_hours",
+    "error_count",
+    "last_heartbeat_delta_sec"
+  ],
+  "temporal_schema": {
+    "schema_version": "1.0.0",
+    "timestamp_field": "timestamp",
+    "entity_id_field": "device_id",
+    "sources": [
+      {
+        "name": "device_series",
+        "kind": "timeseries",
+        "path": "timeseries",
+        "format": "csv",
+        "sensor_columns": [
+          "cpu_temp",
+          "cpu_usage",
+          "memory_usage",
+          "disk_usage",
+          "network_quality",
+          "uptime_hours",
+          "error_count",
+          "last_heartbeat_delta_sec"
+        ]
+      },
+      {
+        "name": "supervision",
+        "kind": "labels",
+        "path": "labels",
+        "format": "jsonl"
+      }
+    ]
+  },
+  "target_schema": {
+    "outputs": [
+      {"name": "health_index", "type": "regression", "range": "[0,100]"},
+      {"name": "anomaly_score", "type": "anomaly_score", "range": "[0,1]"},
+      {"name": "predicted_failure", "type": "classification", "horizon": "24h"}
+    ]
+  }
+}

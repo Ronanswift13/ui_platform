@@ -1,0 +1,49 @@
+# 气体泄漏检测 - 时序训练配置模板
+plugin_id: gas_detection
+display_name: 气体泄漏检测
+
+model:
+  family: timeseries_transformer
+  backbone: lstm_gas_forecaster
+  input_modality: multivariate_timeseries
+  paradigm: lstm
+
+task:
+  primary: multivariate_sensor_anomaly
+  secondary: equipment_health_prediction
+  label_schema: temporal_annotation
+  sensor_columns: [SF6, H2, CO, C2H2, CH4, C2H4, C2H6, temperature, humidity, pressure]
+
+data_contract:
+  required_dirs: [timeseries]
+  optional_dirs: [labels, metadata]
+  manifest_required_fields: [sequence_length, sensor_columns, temporal_schema]
+
+training:
+  epochs: 100
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  sequence_length: 168
+  prediction_horizon: 24
+  sample_interval_seconds: 3600
+
+evaluation:
+  metrics: [anomaly_auc, health_mae, health_rmse, failure_f1, lead_time_hours]
+  qualification:
+    anomaly_auc: 0.80
+    lead_time_hours: 4
+
+export:
+  formats: [onnx]
+  model_roles:
+    sf6_forecast:
+      task_type: equipment_health_prediction
+      runtime: onnxruntime
+    multi_gas_forecast:
+      task_type: equipment_health_prediction
+      runtime: onnxruntime
+    equipment_health_trend:
+      task_type: multivariate_sensor_anomaly
+      runtime: onnxruntime

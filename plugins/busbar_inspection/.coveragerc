@@ -1,0 +1,22 @@
+[run]
+source = plugins.busbar_inspection
+omit =
+    */tests/*
+    */demo/*
+    */__pycache__/*
+    */plugin_v4_reference.py
+    */config_adapter.py
+    */reason_code_mapper.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+# 第一轮补齐：暂时设置为 30%，待集成新模块后提升到 70%
+fail_under = 30

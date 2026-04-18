@@ -1,0 +1,1159 @@
+{
+  "summary": {
+    "total": 21,
+    "by_level": {
+      "STD": [
+        "root",
+        "ui",
+        "acoustic_monitoring",
+        "action_event_monitoring",
+        "bird_monitoring",
+        "capacitor_inspection",
+        "device_monitoring",
+        "fire_detection",
+        "gas_detection",
+        "hyperspectral_detection",
+        "multimodal_fusion",
+        "slam_mapping",
+        "switch_inspection",
+        "temperature_monitoring",
+        "transformer_inspection"
+      ],
+      "HF": [
+        "animal_detection",
+        "busbar_inspection",
+        "indoor_fence",
+        "meter_reading"
+      ],
+      "L0": [
+        "radar",
+        "thermal"
+      ]
+    },
+    "by_type": {
+      "root": [
+        "root"
+      ],
+      "ui": [
+        "ui"
+      ],
+      "plugin-light-detector": [
+        "acoustic_monitoring",
+        "bird_monitoring",
+        "device_monitoring",
+        "fire_detection",
+        "indoor_fence",
+        "temperature_monitoring"
+      ],
+      "plugin-minimal": [
+        "action_event_monitoring"
+      ],
+      "plugin-service-integration": [
+        "animal_detection",
+        "gas_detection",
+        "hyperspectral_detection",
+        "multimodal_fusion",
+        "slam_mapping"
+      ],
+      "plugin-enhanced-detector": [
+        "busbar_inspection",
+        "capacitor_inspection",
+        "meter_reading",
+        "switch_inspection",
+        "transformer_inspection"
+      ],
+      "placeholder": [
+        "radar",
+        "thermal"
+      ]
+    },
+    "hf_upgrade_candidates": [
+      "capacitor_inspection",
+      "switch_inspection",
+      "transformer_inspection"
+    ],
+    "std_not_ready_for_hf": [
+      "acoustic_monitoring",
+      "action_event_monitoring",
+      "bird_monitoring",
+      "device_monitoring",
+      "fire_detection",
+      "gas_detection",
+      "hyperspectral_detection",
+      "multimodal_fusion",
+      "slam_mapping",
+      "temperature_monitoring"
+    ]
+  },
+  "objects": [
+    {
+      "name": "root",
+      "scope": "root",
+      "object_type": "root",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": false,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "files_missing": [
+        "plugin.py",
+        "detector.py",
+        "detector_enhanced.py",
+        "manifest.json"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "models"
+      ],
+      "dirs_missing": [
+        "standalone"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前规则只针对 plugin 对象评估 HF 快速晋升",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "add/update .claude/commands"
+    },
+    {
+      "name": "ui",
+      "scope": "ui",
+      "object_type": "ui",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [
+        "run_quality_gate.sh",
+        "collect_root_cause.sh"
+      ],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "files_missing": [
+        "plugin.py",
+        "detector.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "README.md"
+      ],
+      "dirs_present": [],
+      "dirs_missing": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前规则只针对 plugin 对象评估 HF 快速晋升",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "align 08_task_routing.md with scripts"
+    },
+    {
+      "name": "acoustic_monitoring",
+      "scope": "plugin",
+      "object_type": "plugin-light-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-light-detector，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "medium",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "action_event_monitoring",
+      "scope": "plugin",
+      "object_type": "plugin-minimal",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [
+        "run_sanity_checks.sh"
+      ],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector.py",
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "configs"
+      ],
+      "dirs_missing": [
+        "tests",
+        "standalone",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-minimal，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "align 08_task_routing.md with scripts"
+    },
+    {
+      "name": "animal_detection",
+      "scope": "plugin",
+      "object_type": "plugin-service-integration",
+      "governance_level": "HF",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh"
+      ],
+      "scripts_missing": [
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "manifest.json",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "files_missing": [
+        "detector.py",
+        "detector_enhanced.py"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "dirs_missing": [],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象已经是 HF，无需作为 STD→HF 候选",
+      "estimated_upgrade_effort": "low",
+      "recommended_next_action": "align 08_task_routing.md with scripts"
+    },
+    {
+      "name": "bird_monitoring",
+      "scope": "plugin",
+      "object_type": "plugin-light-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-light-detector，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "medium",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "busbar_inspection",
+      "scope": "plugin",
+      "object_type": "plugin-enhanced-detector",
+      "governance_level": "HF",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh"
+      ],
+      "scripts_missing": [
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "files_missing": [
+        "detector.py"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "models"
+      ],
+      "dirs_missing": [
+        "standalone"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象已经是 HF，无需作为 STD→HF 候选",
+      "estimated_upgrade_effort": "low",
+      "recommended_next_action": "align 08_task_routing.md with scripts"
+    },
+    {
+      "name": "capacitor_inspection",
+      "scope": "plugin",
+      "object_type": "plugin-enhanced-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector_enhanced.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "dirs_missing": [],
+      "hf_upgrade_candidate": "yes",
+      "hf_upgrade_reason": "STD + plugin-enhanced-detector + has_agent_skills=true + 核心事实源齐备 (plugin.py / detector_enhanced.py / manifest.json / tests / configs)",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "device_monitoring",
+      "scope": "plugin",
+      "object_type": "plugin-light-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-light-detector，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "medium",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "fire_detection",
+      "scope": "plugin",
+      "object_type": "plugin-light-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-light-detector，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "medium",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "gas_detection",
+      "scope": "plugin",
+      "object_type": "plugin-service-integration",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector.py",
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "configs",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-service-integration，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "hyperspectral_detection",
+      "scope": "plugin",
+      "object_type": "plugin-service-integration",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector.py",
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "configs",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-service-integration，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "indoor_fence",
+      "scope": "plugin",
+      "object_type": "plugin-light-detector",
+      "governance_level": "HF",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh"
+      ],
+      "scripts_missing": [
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector.py",
+        "manifest.json",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "files_missing": [
+        "detector_enhanced.py",
+        "README.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象已经是 HF，无需作为 STD→HF 候选",
+      "estimated_upgrade_effort": "low",
+      "recommended_next_action": "align 08_task_routing.md with scripts"
+    },
+    {
+      "name": "meter_reading",
+      "scope": "plugin",
+      "object_type": "plugin-enhanced-detector",
+      "governance_level": "HF",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh"
+      ],
+      "scripts_missing": [
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "files_missing": [
+        "detector.py",
+        "README.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "dirs_missing": [],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象已经是 HF，无需作为 STD→HF 候选",
+      "estimated_upgrade_effort": "low",
+      "recommended_next_action": "align 08_task_routing.md with scripts"
+    },
+    {
+      "name": "multimodal_fusion",
+      "scope": "plugin",
+      "object_type": "plugin-service-integration",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector.py",
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "configs",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-service-integration，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "radar",
+      "scope": "plugin",
+      "object_type": "placeholder",
+      "governance_level": "L0",
+      "has_agent_skills": false,
+      "agent_skills_files": [],
+      "agent_skills_missing": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "has_claude_commands": false,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "README.md"
+      ],
+      "files_missing": [
+        "plugin.py",
+        "detector.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [],
+      "dirs_missing": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前治理等级为 L0，不属于 STD→HF 快速晋升阶段",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "stabilize plugin core facts before promotion"
+    },
+    {
+      "name": "slam_mapping",
+      "scope": "plugin",
+      "object_type": "plugin-service-integration",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector.py",
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "configs",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-service-integration，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "switch_inspection",
+      "scope": "plugin",
+      "object_type": "plugin-enhanced-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "README.md"
+      ],
+      "files_missing": [
+        "detector.py",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "dirs_missing": [],
+      "hf_upgrade_candidate": "yes",
+      "hf_upgrade_reason": "STD + plugin-enhanced-detector + has_agent_skills=true + 核心事实源齐备 (plugin.py / detector_enhanced.py / manifest.json / tests / configs)",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "temperature_monitoring",
+      "scope": "plugin",
+      "object_type": "plugin-light-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector.py",
+        "manifest.json"
+      ],
+      "files_missing": [
+        "detector_enhanced.py",
+        "README.md",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone"
+      ],
+      "dirs_missing": [
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前对象类型为 plugin-light-detector，不适用 enhanced detector 型 HF 快速晋升规则",
+      "estimated_upgrade_effort": "medium",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    },
+    {
+      "name": "thermal",
+      "scope": "plugin",
+      "object_type": "placeholder",
+      "governance_level": "L0",
+      "has_agent_skills": false,
+      "agent_skills_files": [],
+      "agent_skills_missing": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "has_claude_commands": false,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "README.md"
+      ],
+      "files_missing": [
+        "plugin.py",
+        "detector.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [],
+      "dirs_missing": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "hf_upgrade_candidate": "no",
+      "hf_upgrade_reason": "当前治理等级为 L0，不属于 STD→HF 快速晋升阶段",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "stabilize plugin core facts before promotion"
+    },
+    {
+      "name": "transformer_inspection",
+      "scope": "plugin",
+      "object_type": "plugin-enhanced-detector",
+      "governance_level": "STD",
+      "has_agent_skills": true,
+      "agent_skills_files": [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+        "08"
+      ],
+      "agent_skills_missing": [],
+      "has_claude_commands": true,
+      "scripts_present": [],
+      "scripts_missing": [
+        "run_targeted_tests.sh",
+        "run_regression_tests.sh",
+        "run_quality_gate.sh",
+        "collect_root_cause.sh",
+        "run_sanity_checks.sh"
+      ],
+      "files_present": [
+        "plugin.py",
+        "detector_enhanced.py",
+        "manifest.json",
+        "README.md"
+      ],
+      "files_missing": [
+        "detector.py",
+        "PROJECT_CARD.md",
+        "CLAUDE.md"
+      ],
+      "dirs_present": [
+        "tests",
+        "configs",
+        "standalone",
+        "models"
+      ],
+      "dirs_missing": [],
+      "hf_upgrade_candidate": "yes",
+      "hf_upgrade_reason": "STD + plugin-enhanced-detector + has_agent_skills=true + 核心事实源齐备 (plugin.py / detector_enhanced.py / manifest.json / tests / configs)",
+      "estimated_upgrade_effort": "high",
+      "recommended_next_action": "normalize run_quality_gate.sh"
+    }
+  ]
+}

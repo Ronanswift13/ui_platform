@@ -1,0 +1,296 @@
+ D ../../INTEGRATION_SUMMARY.md
+ M ../../apps/data_upload_api.py
+ M ../../apps/outdoor_api.py
+ M ../../apps/ui_server.py
+ M ../../darkbreaker_sdk/standalone/runner.py
+ M ../../darkbreaker_sdk/standalone/static/js/standalone.js
+ M ../../darkbreaker_sdk/standalone/templates/base_standalone.html
+ D ../../defect_verification_report.md
+ D ../../integration_completion_report.md
+ M ../../platform_core/data_import/protocol_adapters.py
+ M ../.enabled_plugins.json
+ M ../acoustic_monitoring/configs/default.yaml
+ M ../acoustic_monitoring/detector.py
+ M ../acoustic_monitoring/plugin.py
+ M ../acoustic_monitoring/standalone/audio_manager.py
+ M ../acoustic_monitoring/standalone/templates/acoustic_monitoring.html
+ M ../animal_detection/.agent_skills/07_learning_log.md
+ D ../animal_detection/.agent_skills/08_runtime_dependency_repair_prompt.md
+ M ../animal_detection/core/detector.py
+ M ../animal_detection/core/deterrent.py
+ M ../animal_detection/core/event_schema.py
+ M ../animal_detection/core/onnx_inference.py
+ M ../animal_detection/core/statistics.py
+ M ../animal_detection/core/thermal_validator.py
+ M ../animal_detection/core/tracker.py
+ M ../animal_detection/tests/conftest.py
+ M ../animal_detection/tests/test_onnx_inference.py
+ M ../animal_detection/tests/test_plugin.py
+ M detector_enhanced.py
+ M plugin.py
+ M run_standalone.py
+ M standalone/__init__.py
+ M standalone/app.py
+ M standalone/templates/busbar_inspection.html
+ M tests/test_standalone.py
+ M ../capacitor_inspection/demo/run_demo.py
+ M ../capacitor_inspection/detector_enhanced.py
+ M ../capacitor_inspection/plugin.py
+ M ../indoor_fence/.agent_skills/07_learning_log.md
+ M ../indoor_fence/adapters/base_adapter.py
+ M ../indoor_fence/adapters/camera_adapter.py
+ M ../indoor_fence/adapters/lidar_adapter.py
+ M ../indoor_fence/configs/default.yaml
+ D ../indoor_fence/core/fusion.py
+ M ../indoor_fence/core/state_machine.py
+ M ../indoor_fence/plugin.py
+ M ../indoor_fence/standalone/__init__.py
+ M ../indoor_fence/standalone/templates/indoor_fence.html
+ M ../meter_reading/configs/default.yaml
+ M ../meter_reading/detector_enhanced.py
+ M ../meter_reading/plugin.py
+ M ../meter_reading/standalone/templates/meter_reading.html
+ M ../slam_mapping/plugin.py
+ M ../slam_mapping/run_standalone.py
+ M ../slam_mapping/standalone/app.py
+ M ../slam_mapping/standalone/templates/slam_mapping.html
+ M ../slam_mapping/tests/test_standalone.py
+ M ../switch_inspection/README.md
+ M ../switch_inspection/detector_enhanced.py
+ M ../switch_inspection/plugin.py
+ M ../switch_inspection/standalone/templates/switch_inspection.html
+ M ../switch_inspection/tests/conftest.py
+ M ../switch_inspection/tests/test_standalone.py
+ M ../temperature_monitoring/configs/default.yaml
+ M ../temperature_monitoring/detector.py
+ M ../temperature_monitoring/plugin.py
+ M ../temperature_monitoring/standalone/templates/temperature_monitoring.html
+ M ../temperature_monitoring/tests/test_standalone.py
+ M ../transformer_inspection/README.md
+ M ../transformer_inspection/demo/run_demo.py
+ M ../transformer_inspection/detector_enhanced.py
+ M ../transformer_inspection/plugin.py
+ M ../transformer_inspection/scripts/benchmark.py
+ M ../transformer_inspection/tests/conftest.py
+ D ../transformer_inspection/tests/test_plugin.py
+ M ../transformer_inspection/tests/test_standalone.py
+ M ../../ui/static/css/main.css
+ M ../../ui/static/js/main.js
+ M ../../ui/static/js/outdoor_center_v4.js
+ M ../../ui/templates/base.html
+ M ../../ui/templates/components/evidence_chain.html
+ M ../../ui/templates/pages/outdoor_center_v4.html
+ D ../../ui_reset.md
+?? ../../.agent_skills/
+?? ../../CLAUDE.md
+?? ../../PROJECT_CARD.md
+?? ../../apps/action_event_api.py
+?? ../../docs/action_event_closure_notes.md
+?? ../../docs/agent_governance_report.json
+?? ../../docs/agent_governance_report.md
+?? ../../docs/hf_promotion_enhanced_detector_checklist.md
+?? ../../platform_core/action_event_schema.py
+?? ../../platform_core/action_event_store.py
+?? ../../platform_core/action_sequence_analyzer.py
+?? ../../platform_core/device_correlation.py
+?? ../../platform_core/root_cause_service.py
+?? ../acoustic_monitoring/.agent_skills/
+?? ../action_event_monitoring/
+?? ../animal_detection/.agent_skills/00_project_context.md
+?? ../animal_detection/.agent_skills/01_architecture_rules.md
+?? ../animal_detection/.agent_skills/02_algorithm_contract.md
+?? ../animal_detection/.agent_skills/03_test_strategy.md
+?? ../animal_detection/.agent_skills/04_quality_audit.md
+?? ../animal_detection/.agent_skills/05_security_boundary.md
+?? ../animal_detection/.agent_skills/06_refactor_policy.md
+?? ../animal_detection/.agent_skills/08_task_routing.md
+?? ../animal_detection/.agent_skills/09_runtime_dependency_repair.md
+?? ../animal_detection/.coveragerc
+?? ../animal_detection/CLAUDE.md
+?? ../animal_detection/PROJECT_CARD.md
+?? ../animal_detection/README.md
+?? ../animal_detection/docs/
+?? ../animal_detection/pytest.ini
+?? ../animal_detection/scripts/collect_root_cause.sh
+?? ../animal_detection/scripts/run_quality_gate.sh
+?? ../animal_detection/scripts/run_regression_tests.sh
+?? ../animal_detection/scripts/run_targeted_tests.sh
+?? ../animal_detection/tests/fixtures/
+?? ../animal_detection/tests/regression/
+?? ../animal_detection/tests/test_confidence_sanitization.py
+?? ../animal_detection/tests/test_detector.py
+?? ../animal_detection/tests/test_event_schema_contract.py
+?? ../animal_detection/tests/test_matrix_template.md
+?? ../bird_monitoring/.agent_skills/
+?? ../bird_monitoring/data/
+?? .agent_skills/
+?? .coveragerc
+?? CLAUDE.md
+?? PROJECT_CARD.md
+?? config_adapter.py
+?? data/
+?? docs/
+?? prompts/
+?? reason_code_mapper.py
+?? scripts/bootstrap_project.sh
+?? scripts/collect_root_cause.sh
+?? scripts/run_quality_gate.sh
+?? scripts/run_regression_tests.sh
+?? scripts/run_targeted_tests.sh
+?? standalone/busbar_simulator.py
+?? tests/fixtures/
+?? tests/regression/
+?? tests/test_confidence_sanitization.py
+?? tests/test_config_contract.py
+?? tests/test_matrix_template.md
+?? tests/test_quality_gate_contract.py
+?? tests/test_reason_code_contract.py
+?? ../capacitor_inspection/.agent_skills/
+?? ../capacitor_inspection/PROJECT_CARD.md
+?? ../capacitor_inspection/README.md
+?? ../capacitor_inspection/data/
+?? ../capacitor_inspection/scripts/
+?? ../capacitor_inspection/tests/
+?? ../device_monitoring/.agent_skills/
+?? ../device_monitoring/data/
+?? ../fire_detection/.agent_skills/
+?? ../gas_detection/.agent_skills/
+?? ../gas_detection/data/
+?? ../hyperspectral_detection/.agent_skills/
+?? ../indoor_fence/.agent_skills/00_project_context.md
+?? ../indoor_fence/.agent_skills/01_architecture_rules.md
+?? ../indoor_fence/.agent_skills/02_algorithm_contract.md
+?? ../indoor_fence/.agent_skills/03_test_strategy.md
+?? ../indoor_fence/.agent_skills/04_quality_audit.md
+?? ../indoor_fence/.agent_skills/05_security_boundary.md
+?? ../indoor_fence/.agent_skills/06_refactor_policy.md
+?? ../indoor_fence/.agent_skills/08_task_routing.md
+?? ../indoor_fence/.coveragerc
+?? ../indoor_fence/AATF_REUSABLE_TEMPLATE.md
+?? ../indoor_fence/CLAUDE.md
+?? ../indoor_fence/PROJECT_CARD.md
+?? ../indoor_fence/adapters/imu_adapter.py
+?? ../indoor_fence/adapters/simulator.py
+?? ../indoor_fence/adapters/uwb_adapter.py
+?? ../indoor_fence/configs/scenarios/
+?? ../indoor_fence/core/fusion/
+?? ../indoor_fence/core/rules/
+?? ../indoor_fence/core/tracking/
+?? ../indoor_fence/data/
+?? ../indoor_fence/detection/
+?? ../indoor_fence/docs/
+?? ../indoor_fence/indoor_card.md
+?? ../indoor_fence/prompts/
+?? ../indoor_fence/protocols.py
+?? ../indoor_fence/scripts/collect_root_cause.sh
+?? ../indoor_fence/scripts/run_quality_gate.sh
+?? ../indoor_fence/scripts/run_regression_tests.sh
+?? ../indoor_fence/scripts/run_targeted_tests.sh
+?? ../indoor_fence/standalone/data_recorder.py
+?? ../indoor_fence/standalone/data_replayer.py
+?? ../indoor_fence/standalone/realtime_pipeline.py
+?? ../indoor_fence/standalone/simulation_renderer.py
+?? ../indoor_fence/standalone/simulator_routes.py
+?? ../indoor_fence/standalone/training_pipeline.py
+?? ../indoor_fence/standalone/training_routes.py
+?? ../indoor_fence/standalone/video_stream.py
+?? ../indoor_fence/tests/test_adapters_base.py
+?? ../indoor_fence/tests/test_adaptive.py
+?? ../indoor_fence/tests/test_api_routes.py
+?? ../indoor_fence/tests/test_auto_fence.py
+?? ../indoor_fence/tests/test_behavior.py
+?? ../indoor_fence/tests/test_camera_adapter.py
+?? ../indoor_fence/tests/test_data_recorder.py
+?? ../indoor_fence/tests/test_data_replayer.py
+?? ../indoor_fence/tests/test_detection.py
+?? ../indoor_fence/tests/test_ekf.py
+?? ../indoor_fence/tests/test_fusion_v3.py
+?? ../indoor_fence/tests/test_imu_adapter.py
+?? ../indoor_fence/tests/test_integration.py
+?? ../indoor_fence/tests/test_lidar_adapter.py
+?? ../indoor_fence/tests/test_matrix_template.md
+?? ../indoor_fence/tests/test_model_manager.py
+?? ../indoor_fence/tests/test_nlos_weights.py
+?? ../indoor_fence/tests/test_pose.py
+?? ../indoor_fence/tests/test_protocols.py
+?? ../indoor_fence/tests/test_realtime_tracking.py
+?? ../indoor_fence/tests/test_rules.py
+?? ../indoor_fence/tests/test_simulation_renderer.py
+?? ../indoor_fence/tests/test_simulator.py
+?? ../indoor_fence/tests/test_simulator_integration.py
+?? ../indoor_fence/tests/test_state_machine_v3.py
+?? ../indoor_fence/tests/test_tracker_v3_new.py
+?? ../indoor_fence/tests/test_training.py
+?? ../indoor_fence/tests/test_uwb_adapter.py
+?? ../indoor_fence/tests/test_video_stream.py
+?? ../meter_reading/.agent_skills/
+?? ../meter_reading/.coveragerc
+?? ../meter_reading/AATF_REUSABLE_TEMPLATE.md
+?? ../meter_reading/CLAUDE.md
+?? ../meter_reading/PROJECT_CARD.md
+?? ../meter_reading/configs/scenarios/
+?? ../meter_reading/data/
+?? ../meter_reading/docs/
+?? ../meter_reading/prompts/
+?? ../meter_reading/scripts/
+?? ../meter_reading/standalone/meter_simulator.py
+?? ../meter_reading/standalone/video_stream.py
+?? ../meter_reading/tests/
+?? ../multimodal_fusion/.agent_skills/
+?? ../radar/README.md
+?? ../slam_mapping/.agent_skills/
+?? ../slam_mapping/data/
+?? ../slam_mapping/standalone/simulator.py
+?? ../switch_inspection/.agent_skills/
+?? ../switch_inspection/PROJECT_CARD.md
+?? ../switch_inspection/data/
+?? ../switch_inspection/scripts/collect_root_cause.sh
+?? ../switch_inspection/scripts/run_quality_gate.sh
+?? ../switch_inspection/scripts/run_regression_tests.sh
+?? ../switch_inspection/scripts/run_targeted_tests.sh
+?? ../switch_inspection/switch_consistency.py
+?? ../switch_inspection/tests/test_config_contract.py
+?? ../switch_inspection/tests/test_detector_contract.py
+?? ../switch_inspection/tests/test_fallback_chain.py
+?? ../switch_inspection/tests/test_plugin_contract.py
+?? ../switch_inspection/tests/test_plugin_postprocess.py
+?? ../switch_inspection/tests/test_quality_gate_contract.py
+?? ../switch_inspection/tests/test_reason_code_contract.py
+?? ../switch_inspection/tests/test_switch_consistency.py
+?? ../temperature_monitoring/.agent_skills/
+?? ../temperature_monitoring/data/
+?? ../temperature_monitoring/standalone/simulator.py
+?? ../temperature_monitoring/tests/test_plugin_detect.py
+?? ../thermal/README.md
+?? ../transformer_inspection/.agent_skills/
+?? ../transformer_inspection/PROJECT_CARD.md
+?? ../transformer_inspection/data/
+?? ../transformer_inspection/scripts/collect_root_cause.sh
+?? ../transformer_inspection/scripts/run_quality_gate.sh
+?? ../transformer_inspection/scripts/run_regression_tests.sh
+?? ../transformer_inspection/scripts/run_targeted_tests.sh
+?? ../transformer_inspection/tests/test_config_contract.py
+?? ../transformer_inspection/tests/test_detector_contract.py
+?? ../transformer_inspection/tests/test_fallback_chain.py
+?? ../transformer_inspection/tests/test_plugin_contract.py
+?? ../transformer_inspection/tests/test_plugin_postprocess.py
+?? ../transformer_inspection/tests/test_quality_gate_contract.py
+?? ../../scripts/agent_task_router.py
+?? ../../scripts/agent_task_router.sh
+?? ../../scripts/audit_agent_governance.py
+?? ../../scripts/sync_agent_commands.py
+?? ../../templates/
+?? ../../tests/test_acceptance_closure.py
+?? ../../tests/test_action_event_verification.py
+?? ../../tests/test_candidate_event_closure.py
+?? ../../tests/test_iec_adapter_integration.py
+?? ../../ui/.agent_skills/
+?? ../../ui/CLAUDE.md
+?? ../../ui/PROJECT_CARD.md
+?? ../../ui/cockpit_preview.html
+?? ../../ui/preview_server.py
+?? ../../ui/scripts/
+?? ../../ui/static/css/cockpit.css
+?? ../../ui/static/js/cockpit.js
+?? ../../ui/templates/pages/action_timeline.html
+?? ../../ui/templates/pages/cockpit.html

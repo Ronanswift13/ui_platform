@@ -1,0 +1,42 @@
+# 二次设备动作事件监测 - 时序训练配置模板
+plugin_id: action_event_monitoring
+display_name: 二次设备动作事件监测
+
+model:
+  family: event_sequence_encoder
+  backbone: transformer_encoder_small
+  input_modality: event_sequence
+  paradigm: transformer_encoder
+
+task:
+  primary: action_event_sequence_recognition
+  label_schema: action_event_sequence
+
+data_contract:
+  required_dirs: [events, labels]
+  optional_dirs: [metadata]
+  manifest_required_fields: [event_types, timestamp_field, temporal_schema]
+  notes:
+    - events/ 每行一条事件，需包含 timestamp、event_type、device_id 或 sequence_id
+    - labels/ 可为序列级类别、风险等级或关键状态转移标签
+
+training:
+  epochs: 80
+  batch_size: 128
+  learning_rate: 0.0005
+  optimizer: AdamW
+  scheduler: cosine
+  sequence_length: 128
+
+evaluation:
+  metrics: [sequence_accuracy, macro_f1, event_recall, edit_distance]
+  qualification:
+    sequence_accuracy: 0.85
+    event_recall: 0.85
+
+export:
+  formats: [onnx]
+  model_roles:
+    action_sequence_encoder:
+      task_type: action_event_sequence_recognition
+      runtime: onnxruntime

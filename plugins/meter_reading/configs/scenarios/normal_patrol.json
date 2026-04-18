@@ -1,0 +1,50 @@
+{
+    "scenario_id": "normal_patrol",
+    "name": "常规巡检",
+    "description": "模拟常规巡检场景: 各表计在正常范围内缓慢波动",
+    "step_interval_ms": 500,
+    "total_steps": 200,
+    "meters": [
+        {
+            "id": "pressure_A",
+            "type": "analog",
+            "label": "压强表 A",
+            "unit": "MPa",
+            "range_min": 0.0,
+            "range_max": 1.6,
+            "initial_value": 0.8,
+            "pattern": "sine",
+            "speed": 0.5
+        },
+        {
+            "id": "temp_B",
+            "type": "analog",
+            "label": "温度表 B",
+            "unit": "°C",
+            "range_min": -20,
+            "range_max": 100,
+            "initial_value": 45,
+            "pattern": "sine",
+            "speed": 0.3
+        },
+        {
+            "id": "digital_C",
+            "type": "digital",
+            "label": "数字表 C",
+            "unit": "kV",
+            "range_min": 0,
+            "range_max": 220,
+            "initial_value": 110,
+            "pattern": "sine",
+            "speed": 0.4
+        },
+        {
+            "id": "led_D",
+            "type": "led",
+            "label": "运行灯 D",
+            "led_color": "green",
+            "cycle": ["green", "green", "green", "green"],
+            "speed": 1.0
+        }
+    ]
+}

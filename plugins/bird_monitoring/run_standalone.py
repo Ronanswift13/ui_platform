@@ -61,16 +61,9 @@ if str(plugins_parent) not in sys.path:
 
 
 def main():
-    from darkbreaker_sdk.standalone import StandalonePluginRunner
-    from plugins.bird_monitoring.plugin import BirdMonitoringPlugin
-
-    plugin = BirdMonitoringPlugin.create_standalone()
-    runner = StandalonePluginRunner(
-        plugin,
-        plugin_templates_dir=PLUGIN_DIR / "standalone" / "templates",
-        plugin_static_dir=PLUGIN_DIR / "standalone" / "static",
-    )
-    runner.run(host="0.0.0.0", port=8092)
+    # 复用 standalone/app.py 的入口，确保仿真路由 / runtime_mode 边界一致。
+    from plugins.bird_monitoring.standalone.app import main as standalone_main
+    standalone_main()
 
 
 if __name__ == "__main__":

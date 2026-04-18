@@ -89,3 +89,88 @@ audit:
   enabled: true
   log_level: "event"
   log_dir: "logs/indoor_fence"
+
+# =============================================================================
+# V3.0 Extensions
+# =============================================================================
+
+# UWB定位配置
+uwb:
+  enabled: false
+  protocol: "simulate"
+  host: "192.168.1.200"
+  port: 5000
+  simulate_nlos: true
+  nlos_ratio: 0.2
+  noise_sigma_los: 0.1
+  noise_sigma_nlos: 0.5
+
+# IMU惯性传感器配置
+imu:
+  enabled: false
+  device_id: "imu_0"
+  sample_rate_hz: 100
+
+# 检测模块配置
+detection:
+  pose_enabled: true
+  behavior_enabled: true
+  auto_fence_enabled: false
+  pose_model_path: null
+  behavior_window_size: 30
+  prolonged_stay_threshold_s: 30.0
+
+# 融合算法配置
+fusion:
+  enabled: true
+  algorithm: "ekf"  # "ekf" or "simple"
+  max_time_diff_ms: 100
+  angle_match_threshold_deg: 5.0
+  distance_match_threshold_m: 0.5
+  process_noise: 0.05
+  max_association_distance: 2.0
+
+# 规则引擎配置
+rules:
+  enabled: true
+  rules_file: null  # Optional external YAML rules file
+  default_rules:
+    - rule_id: cross_line
+      condition: "person_state == 'cross_line'"
+      action: alarm_red
+      priority: 10
+      cooldown_seconds: 5
+    - rule_id: climbing
+      condition: "person_state == 'climbing'"
+      action: alarm_red
+      priority: 9
+      cooldown_seconds: 3
+    - rule_id: fallen
+      condition: "person_state == 'fallen'"
+      action: alarm_critical
+      priority: 10
+      cooldown_seconds: 1
+    - rule_id: prolonged_stay
+      condition: "person_state == 'prolonged_stay'"
+      action: alarm_yellow
+      priority: 5
+      cooldown_seconds: 30
+
+# 数据记录配置
+recording:
+  enabled: false
+  output_dir: "recordings"
+  auto_start: false
+
+# 训练管线配置
+training:
+  enabled: false
+  data_dir: "training_data"
+
+# 模拟器配置
+simulator:
+  enabled: false
+  num_persons: 2
+  scene_bounds: [0.0, 0.0, 10.0, 6.0]
+  sensor_types: ["camera", "lidar"]
+  path_type: "random"

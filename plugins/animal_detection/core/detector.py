@@ -22,9 +22,23 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
+import math
+
 from .event_schema import AnimalClass, AnimalDetectionResult, BoundingBox
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_confidence(value: float) -> float:
+    """置信度消毒: NaN/Inf/负数/超1 → 安全区间 [0, 1] (QR-11)"""
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return 0.0
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return float(value)
+
 
 # 类别映射: 模型输出index -> AnimalClass
 DEFAULT_CLASS_MAP: Dict[int, str] = {
@@ -394,14 +408,30 @@ class YOLOv8Detector:
             bw = w[i] / inp_w
             bh = h[i] / inp_h
 
-            # 边界裁剪
+            # 边界裁剪 (QR-9: 裁剪时记录警告并降低置信度)
+            bbox_clamped = False
+            if bx < 0.0 or bx > 1.0 or by < 0.0 or by > 1.0:
+                bbox_clamped = True
+            if bw < 0.0 or bw > (1.0 - max(0.0, bx)):
+                bbox_clamped = True
+            if bh < 0.0 or bh > (1.0 - max(0.0, by)):
+                bbox_clamped = True
+
             bx = max(0.0, min(1.0, bx))
             by = max(0.0, min(1.0, by))
             bw = max(0.0, min(1.0 - bx, bw))
             bh = max(0.0, min(1.0 - by, bh))
 
+            score_i = float(max_scores[i])
+            if bbox_clamped:
+                logger.warning(
+                    "bbox坐标越界被裁剪 (idx=%d), 置信度降低 %.3f → %.3f",
+                    i, score_i, score_i * 0.8,
+                )
+                score_i *= 0.8
+
             boxes.append([bx, by, bw, bh])
-            scores.append(float(max_scores[i]))
+            scores.append(score_i)
             classes.append(int(class_ids[i]))
 
         return boxes, scores, classes
@@ -444,7 +474,7 @@ class YOLOv8Detector:
 
             result = AnimalDetectionResult(
                 animal_class=animal_class,
-                confidence=float(scores[idx]),
+                confidence=_sanitize_confidence(float(scores[idx])),
                 bbox=BoundingBox(
                     x=float(boxes[idx, 0]),
                     y=float(boxes[idx, 1]),

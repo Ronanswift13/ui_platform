@@ -1,0 +1,95 @@
+# 设备状态监测 - 时序训练配置模板
+plugin_id: device_monitoring
+display_name: 设备状态监测
+
+model:
+  family: multivariate_autoencoder
+  backbone: stacked_autoencoder
+  input_modality: multivariate_timeseries
+  paradigm: autoencoder
+
+task:
+  primary: multivariate_sensor_anomaly
+  secondary:
+    - equipment_health_prediction
+    - health_index_calibration
+  label_schema: temporal_annotation
+  sensor_columns: [cpu_temp, cpu_usage, memory_usage, disk_usage, network_quality, uptime_hours, error_count, last_heartbeat]
+  output_heads:
+    - name: health_index
+      type: regression
+      range: [0, 100]
+      description: 健康指数输出层
+    - name: anomaly_score
+      type: anomaly_score
+      range: [0, 1]
+      description: 异常分数输出层
+    - name: predicted_failure
+      type: classification
+      horizon: 168h
+      description: 故障预测输出层
+
+data_contract:
+  required_dirs: [timeseries, labels]
+  optional_dirs: [metadata]
+  manifest_required_fields:
+    - sequence_length
+    - prediction_horizon
+    - sensor_columns
+    - temporal_schema
+    - target_schema
+  notes:
+    - health_index / anomaly_score / predicted_failure 三个输出层必须同时定义
+
+training:
+  epochs: 120
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: AdamW
+  scheduler: cosine
+  sequence_length: 336
+  prediction_horizon: 168
+
+task_profiles:
+  multivariate_sensor_anomaly:
+    paradigm: autoencoder
+    description: 无监督异常检测
+  equipment_health_prediction:
+    paradigm: lstm
+    description: 监督式故障预测
+  health_index_calibration:
+    paradigm: hybrid_statistical_ml
+    description: 健康指数校准
+
+output_mapping:
+  health_index:
+    source_model: health_calibrator
+    fallback: rule_based_health_calculator
+  anomaly_score:
+    source_model: device_anomaly_autoencoder
+    fallback: statistical_zscore
+  predicted_failure:
+    source_model: failure_predictor
+    fallback: trend_regression
+  recommendations:
+    source: recommendation_engine
+    inputs: [health_index, anomaly_score, predicted_failure, device_type, threshold_hits]
+
+evaluation:
+  metrics: [health_mae, health_rmse, anomaly_auc, failure_f1, failure_recall, lead_time_hours]
+  qualification:
+    anomaly_auc: 0.80
+    failure_recall: 0.75
+
+export:
+  formats: [onnx]
+  model_roles:
+    device_anomaly_autoencoder:
+      task_type: multivariate_sensor_anomaly
+      runtime: onnxruntime
+    failure_predictor:
+      task_type: equipment_health_prediction
+      runtime: onnxruntime
+    health_calibrator:
+      task_type: health_index_calibration
+      runtime: onnxruntime

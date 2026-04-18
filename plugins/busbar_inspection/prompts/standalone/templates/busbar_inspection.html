@@ -1,0 +1,119 @@
+{% extends "base_standalone.html" %}
+
+{% block title %}Busbar Inspection - DarkBreaker{% endblock %}
+{% block navbar_title %}Busbar Inspection Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .panel {
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .panel-title {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.05em;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-label {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+    }
+    .status-normal { color: var(--success); }
+    .status-warning { color: var(--warning); }
+    .status-alarm { color: var(--danger); }
+    .event-list {
+        max-height: 280px;
+        overflow-y: auto;
+    }
+    .event-item {
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+    .event-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 p-3">
+    <!-- Top Metrics -->
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Inference Count</div>
+            <div class="metric-value" id="inference-count">0</div>
+            <div class="metric-label">Total inspections</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Status</div>
+            <div class="metric-value status-normal" id="plugin-status">Ready</div>
+            <div class="metric-label">Plugin state</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Quality Failures</div>
+            <div class="metric-value" id="quality-fails">0</div>
+            <div class="metric-label">Quality gate rejections</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="panel text-center">
+            <div class="panel-title">Error Count</div>
+            <div class="metric-value" id="error-count">0</div>
+            <div class="metric-label">Processing errors</div>
+        </div>
+    </div>
+
+    <!-- Detection View -->
+    <div class="col-md-8">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-search me-1"></i>Inspection View</div>
+            <canvas id="detectionCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-md-4">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-list-check me-1"></i>Detection Results</div>
+            <div class="event-list" id="result-list">
+                <div class="event-item text-secondary">No results</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Defect History -->
+    <div class="col-md-12">
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Defect History</div>
+            <div class="event-list" id="defect-history">
+                <div class="event-item text-secondary">No defects recorded</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function updateDashboard(data) {
+        if (!data) return;
+        document.getElementById('inference-count').textContent = data.inference_count || 0;
+        document.getElementById('plugin-status').textContent = data.status || 'ready';
+        document.getElementById('quality-fails').textContent = data.quality_fail_count || 0;
+        document.getElementById('error-count').textContent = data.error_count || 0;
+    }
+</script>
+{% endblock %}

@@ -211,10 +211,27 @@ class RPLidarDriver(LidarDriver):
                 return True
 
         except serial.SerialException as e:
-            logger.error(f"RPLIDAR连接失败: {e}")
+            logger.error(
+                f"FALLBACK: RPLIDAR连接失败: {e}",
+                extra={
+                    "component": "lidar",
+                    "reason": "serial_connection_failed",
+                    "fallback_to": "simulation",
+                    "port": self.config.serial_port,
+                    "error": str(e),
+                }
+            )
             return False
         except Exception as e:
-            logger.error(f"RPLIDAR连接异常: {e}")
+            logger.error(
+                f"FALLBACK: RPLIDAR连接异常: {e}",
+                extra={
+                    "component": "lidar",
+                    "reason": "connection_error",
+                    "fallback_to": "simulation",
+                    "error": str(e),
+                }
+            )
             return False
 
     def disconnect(self) -> None:
@@ -1024,7 +1041,15 @@ class LidarAdapter(BaseAdapter):
 
             # 连接失败,尝试模拟模式
             if self.config.simulate_if_unavailable:
-                logger.warning(f"雷达 {self.config.protocol} 连接失败,切换到模拟模式")
+                logger.warning(
+                    f"FALLBACK: 雷达 {self.config.protocol} 连接失败,切换到模拟模式",
+                    extra={
+                        "component": "lidar",
+                        "reason": "hardware_unavailable",
+                        "fallback_to": "simulation",
+                        "protocol": self.config.protocol,
+                    }
+                )
                 self._driver = SimulationDriver(self.config)
                 self._driver.connect()
                 self._driver.start_scan()
@@ -1036,7 +1061,15 @@ class LidarAdapter(BaseAdapter):
                 return False
 
         except Exception as e:
-            logger.error(f"雷达连接异常: {e}")
+            logger.error(
+                f"FALLBACK: 雷达连接异常: {e}",
+                extra={
+                    "component": "lidar",
+                    "reason": "connection_exception",
+                    "fallback_to": "simulation" if self.config.simulate_if_unavailable else "none",
+                    "error": str(e),
+                }
+            )
             if self.config.simulate_if_unavailable:
                 self._driver = SimulationDriver(self.config)
                 self._driver.connect()

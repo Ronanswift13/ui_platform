@@ -1,23 +1,26 @@
 {% extends "base_standalone.html" %}
 
-{% block title %}Busbar Inspection - DarkBreaker{% endblock %}
-{% block navbar_title %}Busbar Inspection Dashboard{% endblock %}
+{% block title %}母线巡视 - DarkBreaker{% endblock %}
+{% block navbar_title %}母线自主巡视系统{% endblock %}
 
 {% block extra_head %}
 <style>
     .panel {
-        background-color: var(--panel-bg);
-        border: 1px solid var(--border-color);
+        background-color: var(--panel-bg, #1a1d23);
+        border: 1px solid var(--border-color, #2a2d35);
         border-radius: 8px;
         padding: 1rem;
         margin-bottom: 1rem;
     }
     .panel-title {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         text-transform: uppercase;
-        color: var(--text-secondary);
+        color: var(--text-secondary, #8b8fa3);
         margin-bottom: 0.75rem;
         letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
     }
     .metric-value {
         font-size: 1.8rem;
@@ -25,81 +28,385 @@
         line-height: 1.2;
     }
     .metric-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
+        font-size: 0.72rem;
+        color: var(--text-secondary, #8b8fa3);
     }
-    .status-normal { color: var(--success); }
-    .status-warning { color: var(--warning); }
-    .status-alarm { color: var(--danger); }
-    .event-list {
-        max-height: 280px;
+    .status-normal { color: #22c55e; }
+    .status-warning { color: #f59e0b; }
+    .status-alarm { color: #ef4444; }
+
+    /* 模式切换 */
+    .mode-switch {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .mode-btn {
+        flex: 1;
+        padding: 0.5rem;
+        border: 2px solid var(--border-color, #2a2d35);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-secondary, #8b8fa3);
+        cursor: pointer;
+        font-size: 0.82rem;
+        transition: all 0.2s;
+    }
+    .mode-btn.active {
+        border-color: #3b82f6;
+        color: #3b82f6;
+        background: rgba(59, 130, 246, 0.1);
+    }
+    .mode-btn:hover { border-color: #3b82f6; }
+
+    /* 仿真视窗 */
+    .sim-viewport {
+        position: relative;
+        width: 100%;
+        background: #0a0b0d;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+    .sim-viewport img, .sim-viewport canvas {
+        width: 100%;
+        display: block;
+    }
+    .sim-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: rgba(245, 158, 11, 0.9);
+        color: #000;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 3px;
+    }
+    .live-badge {
+        background: rgba(34, 197, 94, 0.9);
+    }
+
+    /* 场景选择 */
+    .scenario-card {
+        padding: 0.6rem;
+        border: 1px solid var(--border-color, #2a2d35);
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.82rem;
+    }
+    .scenario-card:hover { border-color: #3b82f6; }
+    .scenario-card.active {
+        border-color: #3b82f6;
+        background: rgba(59, 130, 246, 0.08);
+    }
+    .scenario-card .scenario-name {
+        font-weight: 600;
+        color: var(--text-primary, #e5e7eb);
+    }
+    .scenario-card .scenario-desc {
+        font-size: 0.72rem;
+        color: var(--text-secondary, #8b8fa3);
+        margin-top: 2px;
+    }
+    .scenario-tag {
+        display: inline-block;
+        font-size: 0.65rem;
+        padding: 1px 6px;
+        border-radius: 3px;
+        margin-top: 3px;
+    }
+    .tag-defect { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .tag-quality { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+    .tag-zoom { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+    .tag-normal { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+
+    /* 检测结果 */
+    .result-list {
+        max-height: 320px;
         overflow-y: auto;
     }
-    .event-item {
+    .result-item {
         padding: 0.5rem;
-        border-bottom: 1px solid var(--border-color);
-        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border-color, #2a2d35);
+        font-size: 0.82rem;
     }
-    .event-item:last-child { border-bottom: none; }
+    .result-item:last-child { border-bottom: none; }
+    .result-label {
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .label-pin_missing { color: #ef4444; }
+    .label-crack { color: #f59e0b; }
+    .label-foreign_object { color: #eab308; }
+    .label-quality_failed { color: #8b5cf6; }
+
+    /* 质量仪表 */
+    .quality-meter {
+        height: 6px;
+        background: #1f2937;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-top: 4px;
+    }
+    .quality-meter-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s;
+    }
+    .quality-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.78rem;
+        margin-bottom: 0.4rem;
+    }
+
+    /* 控制按钮 */
+    .sim-controls {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+    .sim-controls .btn { font-size: 0.82rem; }
+
+    /* 场景列表滚动 */
+    .scenario-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    /* 告警列表 */
+    .alarm-item {
+        padding: 0.5rem;
+        border-left: 3px solid;
+        margin-bottom: 0.5rem;
+        border-radius: 0 4px 4px 0;
+        background: rgba(0,0,0,0.2);
+        font-size: 0.82rem;
+    }
+    .alarm-ERROR { border-left-color: #ef4444; }
+    .alarm-WARNING { border-left-color: #f59e0b; }
+
+    .result-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+    }
+    .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.68rem;
+        padding: 0.18rem 0.45rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.06);
+        color: var(--text-secondary, #8b8fa3);
+    }
+    .meta-chip.review {
+        background: rgba(245, 158, 11, 0.16);
+        color: #f59e0b;
+    }
+    .result-details {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.35rem 0.75rem;
+        margin-top: 0.45rem;
+        font-size: 0.72rem;
+        color: var(--text-secondary, #8b8fa3);
+    }
+    .result-details div { line-height: 1.4; }
+    .review-item {
+        padding: 0.6rem;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-radius: 6px;
+        background: rgba(245, 158, 11, 0.08);
+        margin-bottom: 0.55rem;
+        font-size: 0.78rem;
+    }
+    .review-item:last-child { margin-bottom: 0; }
+    .compare-block {
+        font-size: 0.78rem;
+        color: var(--text-secondary, #8b8fa3);
+    }
+    .compare-block strong {
+        color: var(--text-primary, #e5e7eb);
+    }
+    .compare-row {
+        margin-bottom: 0.45rem;
+        line-height: 1.45;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row g-3 p-3">
-    <!-- Top Metrics -->
+
+    <!-- ============ 顶部指标 ============ -->
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Inference Count</div>
-            <div class="metric-value" id="inference-count">0</div>
-            <div class="metric-label">Total inspections</div>
+            <div class="panel-title"><i class="bi bi-eye"></i> 巡检帧数</div>
+            <div class="metric-value" id="frame-count">0</div>
+            <div class="metric-label">Total Frames</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Status</div>
-            <div class="metric-value status-normal" id="plugin-status">Ready</div>
-            <div class="metric-label">Plugin state</div>
+            <div class="panel-title"><i class="bi bi-cpu"></i> 检测状态</div>
+            <div class="metric-value status-normal" id="detect-status">Ready</div>
+            <div class="metric-label">Detection Status</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Quality Failures</div>
-            <div class="metric-value" id="quality-fails">0</div>
-            <div class="metric-label">Quality gate rejections</div>
+            <div class="panel-title"><i class="bi bi-exclamation-triangle"></i> 缺陷总数</div>
+            <div class="metric-value" id="defect-count">0</div>
+            <div class="metric-label">Defects Found</div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="panel text-center">
-            <div class="panel-title">Error Count</div>
-            <div class="metric-value" id="error-count">0</div>
-            <div class="metric-label">Processing errors</div>
+            <div class="panel-title"><i class="bi bi-clock-history"></i> 处理耗时</div>
+            <div class="metric-value" id="process-time">0<span style="font-size:0.9rem">ms</span></div>
+            <div class="metric-label">Processing Time</div>
         </div>
     </div>
 
-    <!-- Detection View -->
+    <!-- ============ 模式切换 ============ -->
+    <div class="col-12">
+        <div class="mode-switch">
+            <button class="mode-btn active" id="btn-mode-sim" onclick="switchMode('sim')">
+                <i class="bi bi-play-circle"></i> 仿真演示
+            </button>
+            <button class="mode-btn" id="btn-mode-live" onclick="switchMode('live')">
+                <i class="bi bi-camera-video"></i> 真实检测
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ 左侧: 场景视窗 ============ -->
     <div class="col-md-8">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-search me-1"></i>Inspection View</div>
-            <canvas id="detectionCanvas" width="640" height="480" style="width:100%; background:#111;"></canvas>
+        <!-- 仿真视窗 -->
+        <div class="panel" id="panel-sim-view">
+            <div class="panel-title"><i class="bi bi-display"></i> 巡视视窗</div>
+            <div class="sim-viewport" id="sim-viewport">
+                <img id="sim-frame" src="" alt="仿真帧" style="display:none;">
+                <canvas id="sim-canvas" width="1280" height="720"></canvas>
+                <span class="sim-badge" id="mode-badge">SIM</span>
+            </div>
+            <div class="sim-controls">
+                <button class="btn btn-sm btn-outline-primary" id="btn-step" onclick="simStep()">
+                    <i class="bi bi-skip-forward"></i> 单步
+                </button>
+                <button class="btn btn-sm btn-outline-success" id="btn-auto" onclick="toggleAutoRun()">
+                    <i class="bi bi-play"></i> 自动运行
+                </button>
+                <button class="btn btn-sm btn-outline-warning" id="btn-stop" onclick="stopAutoRun()" style="display:none;">
+                    <i class="bi bi-pause"></i> 暂停
+                </button>
+                <span class="ms-auto text-secondary" style="font-size:0.78rem;" id="scenario-label">未选择场景</span>
+            </div>
         </div>
-    </div>
 
-    <!-- Results -->
-    <div class="col-md-4">
+        <!-- 真实检测视窗 (隐藏) -->
+        <div class="panel" id="panel-live-view" style="display:none;">
+            <div class="panel-title"><i class="bi bi-camera-video"></i> 实时检测</div>
+            <div style="background:#0a0b0d; border-radius:6px; padding:2rem; text-align:center;">
+                <input type="file" id="image-upload" accept="image/*" class="form-control form-control-sm mb-2" style="max-width:400px; margin:0 auto;">
+                <img id="detection-image" src="" alt="" style="max-width:100%; display:none; border-radius:4px; margin-top:0.5rem;">
+                <div id="canvas-placeholder" class="text-secondary" style="padding:3rem 0;">
+                    上传图像进行真实检测
+                </div>
+            </div>
+            <div class="sim-controls">
+                <button class="btn btn-sm btn-primary" id="btn-detect" onclick="runRealDetection()">
+                    <i class="bi bi-search"></i> 执行检测
+                </button>
+            </div>
+        </div>
+
+        <!-- 告警列表 -->
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-list-check me-1"></i>Detection Results</div>
-            <div class="event-list" id="result-list">
-                <div class="event-item text-secondary">No results</div>
+            <div class="panel-title"><i class="bi bi-bell"></i> 告警信息</div>
+            <div id="alarm-list">
+                <div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">暂无告警</div>
             </div>
         </div>
     </div>
 
-    <!-- Defect History -->
-    <div class="col-md-12">
+    <!-- ============ 右侧: 场景选择 + 结果 ============ -->
+    <div class="col-md-4">
+        <!-- 场景选择 (仿真模式) -->
+        <div class="panel" id="panel-scenarios">
+            <div class="panel-title"><i class="bi bi-collection"></i> 仿真场景</div>
+            <div class="scenario-list" id="scenario-list">
+                <!-- JS 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 检测结果 -->
         <div class="panel">
-            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Defect History</div>
-            <div class="event-list" id="defect-history">
-                <div class="event-item text-secondary">No defects recorded</div>
+            <div class="panel-title"><i class="bi bi-list-check"></i> 检测结果</div>
+            <div class="result-list" id="result-list">
+                <div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">等待检测...</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-ui-checks-grid"></i> 错误判别 / 待复核</div>
+            <div id="review-list">
+                <div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">当前无待复核结果</div>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-scenario-compare">
+            <div class="panel-title"><i class="bi bi-diagram-3"></i> 仿真场景对照</div>
+            <div class="compare-block" id="scenario-compare">
+                <div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">选择仿真场景后显示预期/实际对照</div>
+            </div>
+        </div>
+
+        <!-- 图像质量 -->
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-image"></i> 图像质量</div>
+            <div id="quality-panel">
+                <div class="quality-row">
+                    <span>清晰度</span>
+                    <span id="q-clarity">--</span>
+                </div>
+                <div class="quality-meter"><div class="quality-meter-fill" id="q-clarity-bar" style="width:0%; background:#22c55e;"></div></div>
+
+                <div class="quality-row mt-2">
+                    <span>过曝</span>
+                    <span id="q-overexposed">--</span>
+                </div>
+                <div class="quality-row">
+                    <span>低对比</span>
+                    <span id="q-lowcontrast">--</span>
+                </div>
+                <div class="quality-row">
+                    <span>遮挡</span>
+                    <span id="q-occluded">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 变焦建议 -->
+        <div class="panel">
+            <div class="panel-title"><i class="bi bi-zoom-in"></i> 变焦建议</div>
+            <div id="zoom-panel">
+                <div class="quality-row">
+                    <span>建议倍率</span>
+                    <span id="z-zoom">1.0x</span>
+                </div>
+                <div class="quality-row">
+                    <span>建议动作</span>
+                    <span id="z-action">NONE</span>
+                </div>
             </div>
         </div>
     </div>
@@ -108,12 +415,444 @@
 
 {% block extra_scripts %}
 <script>
-    function updateDashboard(data) {
-        if (!data) return;
-        document.getElementById('inference-count').textContent = data.inference_count || 0;
-        document.getElementById('plugin-status').textContent = data.status || 'ready';
-        document.getElementById('quality-fails').textContent = data.quality_fail_count || 0;
-        document.getElementById('error-count').textContent = data.error_count || 0;
+// ============================================================
+// 全局状态
+// ============================================================
+let currentMode = 'sim';       // 'sim' | 'live'
+let autoRunTimer = null;
+let autoRunInterval = 1500;    // ms
+let totalDefects = 0;
+let totalFrames = 0;
+
+const canvas = document.getElementById('sim-canvas');
+const ctx = canvas.getContext('2d');
+
+// ============================================================
+// 模式切换
+// ============================================================
+function switchMode(mode) {
+    currentMode = mode;
+    document.getElementById('btn-mode-sim').classList.toggle('active', mode === 'sim');
+    document.getElementById('btn-mode-live').classList.toggle('active', mode === 'live');
+    document.getElementById('panel-sim-view').style.display = mode === 'sim' ? '' : 'none';
+    document.getElementById('panel-live-view').style.display = mode === 'live' ? '' : 'none';
+    document.getElementById('panel-scenarios').style.display = mode === 'sim' ? '' : 'none';
+    document.getElementById('panel-scenario-compare').style.display = mode === 'sim' ? '' : 'none';
+    document.getElementById('mode-badge').textContent = mode === 'sim' ? 'SIM' : 'LIVE';
+    document.getElementById('mode-badge').className = mode === 'sim' ? 'sim-badge' : 'sim-badge live-badge';
+
+    if (mode === 'live') stopAutoRun();
+}
+
+// ============================================================
+// 场景管理
+// ============================================================
+async function loadScenarios() {
+    try {
+        const resp = await fetch('/api/simulator/scenarios');
+        const data = await resp.json();
+        const list = document.getElementById('scenario-list');
+        list.innerHTML = '';
+
+        for (const s of data.scenarios) {
+            const tags = [];
+            if (s.has_defects) tags.push('<span class="scenario-tag tag-defect">缺陷</span>');
+            if (s.quality_issue) tags.push('<span class="scenario-tag tag-quality">质量</span>');
+            if (s.zoom_needed) tags.push('<span class="scenario-tag tag-zoom">变焦</span>');
+            if (!s.has_defects && !s.quality_issue) tags.push('<span class="scenario-tag tag-normal">正常</span>');
+
+            const card = document.createElement('div');
+            card.className = 'scenario-card';
+            card.dataset.id = s.scenario_id;
+            card.innerHTML = `
+                <div class="scenario-name">${s.name}</div>
+                <div class="scenario-desc">${s.description}</div>
+                <div>${tags.join(' ')}</div>
+            `;
+            card.onclick = () => selectScenario(s.scenario_id, s.name);
+            list.appendChild(card);
+        }
+    } catch (e) {
+        console.error('Failed to load scenarios:', e);
     }
+}
+
+async function selectScenario(id, name) {
+    try {
+        await fetch(`/api/simulator/load?scenario_id=${encodeURIComponent(id)}`, { method: 'POST' });
+        document.querySelectorAll('.scenario-card').forEach(c => {
+            c.classList.toggle('active', c.dataset.id === id);
+        });
+        document.getElementById('scenario-label').textContent = name;
+        // 立即执行一步
+        await simStep();
+    } catch (e) {
+        console.error('Failed to load scenario:', e);
+    }
+}
+
+// ============================================================
+// 仿真控制
+// ============================================================
+async function simStep() {
+    const statusEl = document.getElementById('detect-status');
+    statusEl.textContent = 'Running';
+    statusEl.className = 'metric-value status-warning';
+
+    try {
+        const resultResp = await fetch('/api/simulator/step', { method: 'POST' });
+        if (resultResp.ok) {
+            const data = await resultResp.json();
+            updateResults(data);
+        }
+
+        const frameResp = await fetch('/api/simulator/frame_with_annotations');
+        if (frameResp.ok && frameResp.headers.get('content-type')?.includes('image')) {
+            const blob = await frameResp.blob();
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+
+        statusEl.textContent = 'Ready';
+        statusEl.className = 'metric-value status-normal';
+    } catch (e) {
+        statusEl.textContent = 'Error';
+        statusEl.className = 'metric-value status-alarm';
+        console.error('Sim step error:', e);
+    }
+}
+
+function toggleAutoRun() {
+    document.getElementById('btn-auto').style.display = 'none';
+    document.getElementById('btn-stop').style.display = '';
+    autoRunTimer = setInterval(simStep, autoRunInterval);
+}
+
+function stopAutoRun() {
+    if (autoRunTimer) {
+        clearInterval(autoRunTimer);
+        autoRunTimer = null;
+    }
+    document.getElementById('btn-auto').style.display = '';
+    document.getElementById('btn-stop').style.display = 'none';
+}
+
+// ============================================================
+// 结果更新
+// ============================================================
+function normalizeDetection(rawDetection, index) {
+    const metadata = rawDetection.metadata || {};
+    const predLabel = rawDetection.pred_label || rawDetection.label || metadata.pred_label || 'unknown';
+    return {
+        detection_id: rawDetection.detection_id || metadata.detection_id || `det-${index + 1}`,
+        roi_id: rawDetection.roi_id || metadata.roi_id || 'full_frame',
+        bbox: rawDetection.bbox || metadata.bbox || {},
+        pred_label: predLabel,
+        confidence: rawDetection.confidence ?? 0,
+        candidate_labels: rawDetection.candidate_labels || metadata.candidate_labels || [predLabel],
+        source: rawDetection.source || metadata.source || 'unknown',
+        review_status: rawDetection.review_status || metadata.review_status || 'confirmed',
+        reason_code: rawDetection.reason_code ?? metadata.reason_code ?? rawDetection.failure_reason ?? null,
+        suggested_action: rawDetection.suggested_action || metadata.suggested_action || 'NONE',
+        suggested_zoom: rawDetection.suggested_zoom ?? metadata.suggested_zoom ?? 1.0,
+        description: rawDetection.description || metadata.reason || predLabel,
+        severity: rawDetection.severity || metadata.severity || '',
+        primary_score: rawDetection.primary_score ?? metadata.primary_score ?? rawDetection.confidence ?? 0,
+        secondary_label: rawDetection.secondary_label ?? metadata.secondary_label ?? null,
+        secondary_score: rawDetection.secondary_score ?? metadata.secondary_score ?? null,
+        score_gap: rawDetection.score_gap ?? metadata.score_gap ?? null,
+        review_reason: rawDetection.review_reason || metadata.review_reason || '',
+        quality: rawDetection.quality || metadata.quality || {},
+        metadata,
+    };
+}
+
+function buildImageSummary(detections, summary = {}, stats = {}) {
+    const quality = {
+        clarity_score: summary.quality?.clarity_score ?? stats.quality?.clarity_score ?? 0,
+        is_overexposed: summary.quality?.is_overexposed ?? stats.quality?.is_overexposed ?? false,
+        is_low_contrast: summary.quality?.is_low_contrast ?? stats.quality?.is_low_contrast ?? false,
+        is_occluded: summary.quality?.is_occluded ?? stats.quality?.is_occluded ?? false,
+    };
+    const zoom = {
+        suggested_zoom: summary.zoom?.suggested_zoom ?? stats.zoom?.suggested_zoom ?? 1.0,
+        suggested_action: summary.zoom?.suggested_action ?? stats.zoom?.suggested_action ?? 'NONE',
+    };
+    const countsByLabel = {};
+
+    for (const detection of detections) {
+        countsByLabel[detection.pred_label] = (countsByLabel[detection.pred_label] || 0) + 1;
+        const q = detection.quality || {};
+        quality.clarity_score = Math.max(quality.clarity_score ?? 0, q.clarity_score ?? 0);
+        quality.is_overexposed = Boolean(quality.is_overexposed || q.is_overexposed);
+        quality.is_low_contrast = Boolean(quality.is_low_contrast || q.is_low_contrast);
+        quality.is_occluded = Boolean(quality.is_occluded || q.is_occluded);
+        if ((detection.suggested_zoom || 1.0) > zoom.suggested_zoom) {
+            zoom.suggested_zoom = detection.suggested_zoom;
+            zoom.suggested_action = detection.suggested_action || zoom.suggested_action;
+        } else if (zoom.suggested_action === 'NONE' && detection.suggested_action && detection.suggested_action !== 'NONE') {
+            zoom.suggested_action = detection.suggested_action;
+        }
+    }
+
+    return {
+        total_detections: summary.total_detections ?? detections.filter(d => d.pred_label !== 'quality_failed').length,
+        counts_by_label: countsByLabel,
+        review_required_count: summary.review_required_count ?? detections.filter(d => d.review_status === 'review_required').length,
+        quality,
+        zoom,
+    };
+}
+
+function formatBbox(bbox) {
+    if (!bbox) return '--';
+    const x = bbox.x ?? 0;
+    const y = bbox.y ?? 0;
+    const width = bbox.width ?? 0;
+    const height = bbox.height ?? 0;
+    return `${x.toFixed(3)}, ${y.toFixed(3)}, ${width.toFixed(3)}, ${height.toFixed(3)}`;
+}
+
+function renderDetectionList(detections) {
+    const resultList = document.getElementById('result-list');
+    if (!detections.length) {
+        resultList.innerHTML = '<div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">本帧无检测结果</div>';
+        return;
+    }
+
+    resultList.innerHTML = detections.map(detection => {
+        const labelClass = `label-${detection.pred_label}`;
+        const icon = detection.pred_label === 'quality_failed' ? 'bi-shield-exclamation' :
+            detection.pred_label === 'pin_missing' ? 'bi-circle' :
+            detection.pred_label === 'crack' ? 'bi-lightning' : 'bi-exclamation-diamond';
+        const candidateLabels = (detection.candidate_labels || []).join(', ') || '--';
+        const reviewChip = detection.review_status === 'review_required'
+            ? '<span class="meta-chip review">待复核</span>'
+            : '';
+        return `
+            <div class="result-item">
+                <div class="result-label ${labelClass}">
+                    <i class="bi ${icon}"></i> ${detection.description}
+                </div>
+                <div class="result-meta">
+                    <span class="meta-chip">${detection.detection_id}</span>
+                    <span class="meta-chip">${detection.pred_label}</span>
+                    <span class="meta-chip">${detection.source}</span>
+                    <span class="meta-chip">${(detection.confidence * 100).toFixed(1)}%</span>
+                    ${reviewChip}
+                </div>
+                <div class="result-details">
+                    <div>ROI: ${detection.roi_id}</div>
+                    <div>BBox: ${formatBbox(detection.bbox)}</div>
+                    <div>候选类别: ${candidateLabels}</div>
+                    <div>复核状态: ${detection.review_status}</div>
+                    <div>原因码: ${detection.reason_code ?? '--'}</div>
+                    <div>建议动作: ${detection.suggested_action}</div>
+                    <div>建议倍率: ${(detection.suggested_zoom || 1.0).toFixed(1)}x</div>
+                    <div>严重度: ${detection.severity || '--'}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderReviewWindow(detections) {
+    const reviewList = document.getElementById('review-list');
+    const reviewItems = detections.filter(detection =>
+        detection.review_status === 'review_required' ||
+        (detection.candidate_labels || []).length > 1
+    );
+
+    if (!reviewItems.length) {
+        reviewList.innerHTML = '<div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">当前无待复核结果</div>';
+        return;
+    }
+
+    reviewList.innerHTML = reviewItems.map(detection => `
+        <div class="review-item">
+            <div><strong>主预测:</strong> ${detection.pred_label}</div>
+            <div><strong>次预测:</strong> ${detection.secondary_label || (detection.candidate_labels[1] || '--')}</div>
+            <div><strong>分数差距:</strong> ${detection.score_gap != null ? Number(detection.score_gap).toFixed(3) : '--'}</div>
+            <div><strong>是否待复核:</strong> ${detection.review_status === 'review_required' ? '是' : '否'}</div>
+            <div><strong>原因说明:</strong> ${detection.review_reason || '类别冲突或低稳定性'}</div>
+            <div><strong>建议动作:</strong> ${detection.suggested_action}</div>
+        </div>
+    `).join('');
+}
+
+function renderScenarioComparison(sceneComparison) {
+    const compareEl = document.getElementById('scenario-compare');
+    if (!sceneComparison) {
+        compareEl.innerHTML = '<div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">当前无仿真对照信息</div>';
+        return;
+    }
+
+    const conflicts = sceneComparison.conflicts || [];
+    compareEl.innerHTML = `
+        <div class="compare-row"><strong>场景名:</strong> ${sceneComparison.scenario_name || '--'}</div>
+        <div class="compare-row"><strong>预期缺陷:</strong> ${(sceneComparison.expected_defects || []).join(', ') || '无'}</div>
+        <div class="compare-row"><strong>实际识别:</strong> ${(sceneComparison.actual_detections || []).join(', ') || '无'}</div>
+        <div class="compare-row"><strong>误报:</strong> ${(sceneComparison.false_positives || []).join(', ') || '无'}</div>
+        <div class="compare-row"><strong>漏报:</strong> ${(sceneComparison.false_negatives || []).join(', ') || '无'}</div>
+        <div class="compare-row"><strong>冲突:</strong> ${conflicts.length ? conflicts.map(item => item.pred_label).join(', ') : '无'}</div>
+    `;
+}
+
+function updateResults(data) {
+    const detections = (data.detections || []).map((detection, index) => normalizeDetection(detection, index));
+    const summary = buildImageSummary(detections, data.summary || {}, data.stats || {});
+
+    totalFrames++;
+    document.getElementById('frame-count').textContent = totalFrames;
+    document.getElementById('process-time').innerHTML =
+        `${data.processing_time_ms?.toFixed(1) || 0}<span style="font-size:0.9rem">ms</span>`;
+
+    const newDefects = detections.filter(detection => detection.pred_label !== 'quality_failed').length;
+    totalDefects += newDefects;
+    document.getElementById('defect-count').textContent = totalDefects;
+
+    renderDetectionList(detections);
+    renderReviewWindow(detections);
+    renderScenarioComparison(currentMode === 'sim' ? data.scene_comparison || null : null);
+
+    // 告警列表
+    const alarmList = document.getElementById('alarm-list');
+    if (data.alarms && data.alarms.length > 0) {
+        alarmList.innerHTML = data.alarms.map(a => `
+            <div class="alarm-item alarm-${a.level}">
+                <strong>${a.title}</strong>
+                <div style="font-size:0.72rem; margin-top:2px;">${a.message}</div>
+            </div>
+        `).join('');
+    } else {
+        alarmList.innerHTML = '<div class="text-secondary" style="font-size:0.82rem; padding:0.5rem;">暂无告警</div>';
+    }
+
+    // 图像质量
+    const q = summary.quality || {};
+    const clarity = q.clarity_score ?? 0;
+    document.getElementById('q-clarity').textContent = (clarity * 100).toFixed(1) + '%';
+    const clarityBar = document.getElementById('q-clarity-bar');
+    clarityBar.style.width = (clarity * 100) + '%';
+    clarityBar.style.background = clarity > 0.6 ? '#22c55e' : clarity > 0.35 ? '#f59e0b' : '#ef4444';
+    document.getElementById('q-overexposed').textContent = q.is_overexposed ? 'YES' : 'NO';
+    document.getElementById('q-overexposed').style.color = q.is_overexposed ? '#ef4444' : '#22c55e';
+    document.getElementById('q-lowcontrast').textContent = q.is_low_contrast ? 'YES' : 'NO';
+    document.getElementById('q-lowcontrast').style.color = q.is_low_contrast ? '#f59e0b' : '#22c55e';
+    document.getElementById('q-occluded').textContent = q.is_occluded ? 'YES' : 'NO';
+    document.getElementById('q-occluded').style.color = q.is_occluded ? '#ef4444' : '#22c55e';
+
+    // 变焦建议
+    const z = summary.zoom || {};
+    document.getElementById('z-zoom').textContent = (z.suggested_zoom || 1.0).toFixed(1) + 'x';
+    const action = z.suggested_action || 'NONE';
+    document.getElementById('z-action').textContent = action;
+    document.getElementById('z-action').style.color =
+        action === 'NONE' ? '#22c55e' :
+        action === 'ZOOM_IN' ? '#3b82f6' : '#f59e0b';
+}
+
+// ============================================================
+// 真实检测 (Live 模式)
+// ============================================================
+const imageUpload = document.getElementById('image-upload');
+if (imageUpload) {
+    imageUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const img = document.getElementById('detection-image');
+            img.src = ev.target.result;
+            img.style.display = 'block';
+            document.getElementById('canvas-placeholder').style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function runRealDetection() {
+    const fileInput = document.getElementById('image-upload');
+    if (!fileInput.files || !fileInput.files[0]) {
+        alert('请先上传一张图像');
+        return;
+    }
+
+    const statusEl = document.getElementById('detect-status');
+    statusEl.textContent = 'Running';
+    statusEl.className = 'metric-value status-warning';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const resp = await fetch('/api/detect', { method: 'POST', body: formData });
+        if (resp.ok) {
+            const data = await resp.json();
+            const detections = (data.results || []).map((result, index) => normalizeDetection({
+                detection_id: result.metadata?.detection_id,
+                roi_id: result.roi_id,
+                bbox: result.bbox,
+                label: result.label,
+                pred_label: result.metadata?.pred_label || result.label,
+                confidence: result.confidence,
+                candidate_labels: result.metadata?.candidate_labels,
+                source: result.metadata?.source,
+                review_status: result.metadata?.review_status,
+                reason_code: result.metadata?.reason_code ?? result.failure_reason,
+                suggested_action: result.metadata?.suggested_action,
+                suggested_zoom: result.metadata?.suggested_zoom,
+                description: result.metadata?.reason || result.label,
+                severity: result.metadata?.severity,
+                primary_score: result.metadata?.primary_score,
+                secondary_label: result.metadata?.secondary_label,
+                secondary_score: result.metadata?.secondary_score,
+                score_gap: result.metadata?.score_gap,
+                review_reason: result.metadata?.review_reason,
+                quality: result.metadata?.quality,
+                metadata: result.metadata || {},
+            }, index));
+            const adapted = {
+                detections,
+                alarms: (data.alarms || []).map(a => ({
+                    level: a.level,
+                    title: a.title,
+                    message: a.message,
+                })),
+                processing_time_ms: data.inference_time_ms || data.processing_time_ms || 0,
+                summary: buildImageSummary(detections),
+                stats: data.stats || {},
+            };
+            updateResults(adapted);
+        }
+        statusEl.textContent = 'Ready';
+        statusEl.className = 'metric-value status-normal';
+    } catch (e) {
+        statusEl.textContent = 'Error';
+        statusEl.className = 'metric-value status-alarm';
+        console.error('Detection error:', e);
+    }
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+    loadScenarios();
+    // 渲染初始画布
+    ctx.fillStyle = '#0a0b0d';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#3b3f4a';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('选择仿真场景后点击"单步"或"自动运行"', canvas.width / 2, canvas.height / 2);
+});
 </script>
 {% endblock %}

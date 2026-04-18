@@ -2,6 +2,14 @@
 # 设备状态监测插件配置 - device_monitoring
 # =============================================================================
 
+sampling:
+  sample_interval_seconds: 30
+  source_mode: simulated_or_agent
+
+window:
+  size: 720
+  unit: hours
+
 health_weights:
   cpu_temp: 0.15
   cpu_usage: 0.15
@@ -17,6 +25,8 @@ thresholds:
   heartbeat_timeout_sec: 60
   cpu_temp_warning: 70
   cpu_temp_alarm: 85
+  cpu_usage_warning_percent: 70
+  cpu_usage_alarm_percent: 90
   memory_warning_percent: 85
   disk_warning_percent: 90
   error_rate_warning: 5            # 每小时错误数
@@ -39,6 +49,20 @@ protocols:
   snmp_enabled: false
   modbus_enabled: false
   api_polling_interval_sec: 30
+
+runtime:
+  mode: standalone
+  require_hardware: false
+  rule_confidence: 1.0
+
+model:
+  status: placeholder
+  anomaly_detection_enabled: true
+  failure_prediction_enabled: true
+
+alarm_rules:
+  min_status: warning
+  auto_ticket: true
 
 managed_devices:
   - device_id: "cam_01"
@@ -63,3 +87,14 @@ managed_devices:
 performance:
   scan_interval_sec: 30
   async_processing: true
+
+upgrade_placeholders:
+  prediction_model: device failure prediction model hook
+  anomaly_detection_model: device anomaly detection model hook
+  protocol_adapter: SNMP/Modbus/API adapter hook
+  online_learning: online device baseline hook
+  model_features_placeholder: []
+  sequence_embedding_placeholder: null
+  temporal_pattern_placeholder: null
+  anomaly_score_trace_placeholder: []
+  root_cause_feature_placeholder: null

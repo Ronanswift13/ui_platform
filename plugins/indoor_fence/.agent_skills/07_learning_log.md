@@ -198,3 +198,24 @@ grep "相关文件.*fusion" .agent_skills/07_learning_log.md
 - `run_standalone.py` 必须在**导入任何项目模块之前**完成 venv 切换，否则 guard 形同虚设。
 - 对启动链路做验证时，不要求所有硬件都在线；只要能进入 Uvicorn 启动阶段，硬件缺失应走模拟/降级路径而不是 import fail。
 - 端口占用属于运行态问题，不应与 `numpy`/依赖缺失混为一谈；两者要分层诊断。
+
+---
+
+### 多目标跟踪贪婪分配导致交叉匹配 + 融合管道断裂
+
+| 字段 | 内容 |
+|------|------|
+| 日期 | 2026-03-27 |
+| 症状 | 1) 多人场景下目标 ID 频繁跳变，轨迹交叉错乱<br>2) 仿真界面无法显示实时轨迹和距离，连接外设后仍无法正常跟踪<br>3) UWB/IMU 传感器数据未参与定位融合<br>4) 仿真仅使用 Camera 单传感器数据 |
+| 根因 | 1) `RealtimeMultiPersonTracker._associate()` 使用贪婪最近邻匹配，O(n²) 扫描取局部最优，多目标场景下产生交叉分配<br>2) 代价矩阵仅使用 2D 距离 (dx²+dy²)，忽略 UWB 提供的 z 维度<br>3) `SensorFusionV3` 未集成到 `RealtimeMultiPersonPipeline`，管道直接从 Simulator 提取原始 Camera 检测跳过融合<br>4) `SensorFusionV3._associate()` 同样使用贪婪匹配<br>5) IMU 数据在 `_extract_observations()` 中被 `pass` 跳过<br>6) `SimulatorConfig` 默认仅启用 `[SensorType.CAMERA]`，仿真模式下 UWB/LiDAR/IMU 数据不生成 |
+| 类别 | 算法发散 |
+| 修复 | 1) 替换 `RealtimeMultiPersonTracker._associate()` 为 Hungarian 最优分配 (`core/tracking/hungarian.py`)<br>2) 代价矩阵升级为 3D 欧几里得距离 (dx²+dy²+dz²)<br>3) 替换 `SensorFusionV3._associate()` 为 Hungarian 最优分配<br>4) 在 `SensorFusionV3.update()` 中集成 IMU 速度更新 (`ekf.update_imu()`)<br>5) 在 `RealtimeMultiPersonPipeline` 中插入 `SensorFusionV3` 融合阶段<br>6) 新增 `_get_sensor_data()` 方法将多传感器原始数据送入融合引擎<br>7) 更新 `SimulatorConfig` 默认启用 Camera+LiDAR+UWB+IMU<br>8) 新增 14 个测试覆盖 Hungarian 分配、3D 跟踪、IMU 融合、多传感器管道 |
+| 预防 | `tests/test_realtime_tracking.py::TestHungarianAssociation` (6 tests)<br>`tests/test_realtime_tracking.py::TestMultiSensorFusionPipeline` (3 tests)<br>`tests/test_realtime_tracking.py::TestSensorFusionV3Hungarian` (3 tests)<br>`tests/test_fusion_v3.py::test_fusion_multi_target_hungarian`<br>`tests/test_fusion_v3.py::test_fusion_imu_integration`<br>`tests/test_ekf.py::test_ekf_update_imu` |
+| 相关文件 | `core/tracking/realtime_tracker.py`<br>`core/fusion/sensor_fusion_v3.py`<br>`standalone/realtime_pipeline.py`<br>`core/tracking/hungarian.py` |
+
+**通用化结论**:
+- 多目标跟踪必须使用 Hungarian 最优分配而非贪婪匹配，特别是目标数 > 3 时贪婪会产生明显的交叉分配
+- 有 3D 传感器 (UWB) 时，代价矩阵必须使用 3D 距离，否则同 (x,y) 不同 z 的目标会被错误合并
+- 融合引擎必须完整嵌入管道主循环，不能跳过直接使用原始检测
+- 仿真模式必须模拟全部传感器类型，否则融合算法在仿真中永远不被测试到
+- IMU 数据虽然不提供位置，但通过 EKF 速度更新可以显著改善运动状态估计

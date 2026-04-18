@@ -514,6 +514,10 @@ class CameraAdapter(BaseAdapter):
         self._latest_frame: Optional[np.ndarray] = None
         self._frame_lock = threading.Lock()
 
+        # 仿真注入 (由 plugin.py 设置, 与生产路径隔离)
+        self._simulator = None           # Simulator 实例
+        self._sim_renderer = None        # SimulationRenderer 实例
+
         logger.info(f"相机适配器初始化: source={config.source}")
 
     def connect(self) -> bool:
@@ -584,7 +588,15 @@ class CameraAdapter(BaseAdapter):
             self._capture = cv2.VideoCapture(source)
 
             if not self._capture.isOpened():
-                logger.error(f"无法打开视频源: {self.config.source}")
+                logger.error(
+                    f"FALLBACK: 无法打开视频源: {self.config.source}",
+                    extra={
+                        "component": "camera",
+                        "reason": "camera_open_failed",
+                        "fallback_to": "simulation",
+                        "source": str(self.config.source),
+                    }
+                )
                 return False
 
             # 设置分辨率
@@ -595,14 +607,29 @@ class CameraAdapter(BaseAdapter):
             # 读取测试帧
             ret, frame = self._capture.read()
             if not ret:
-                logger.error("无法读取视频帧")
+                logger.error(
+                    "FALLBACK: 无法读取视频帧",
+                    extra={
+                        "component": "camera",
+                        "reason": "frame_read_failed",
+                        "fallback_to": "simulation",
+                    }
+                )
                 return False
 
             logger.info(f"相机已打开: {frame.shape[1]}x{frame.shape[0]} @ {self.config.fps}fps")
             return True
 
         except Exception as e:
-            logger.error(f"相机连接失败: {e}")
+            logger.error(
+                f"FALLBACK: 相机连接失败: {e}",
+                extra={
+                    "component": "camera",
+                    "reason": "camera_connection_error",
+                    "fallback_to": "simulation",
+                    "error": str(e),
+                }
+            )
             return False
 
     def _load_detector(self) -> bool:
@@ -610,7 +637,15 @@ class CameraAdapter(BaseAdapter):
         model_path = Path(self.config.model_path)
 
         if not model_path.exists():
-            logger.warning(f"模型文件不存在: {model_path}")
+            logger.error(
+                f"FALLBACK: 模型文件不存在: {model_path}, 使用模拟检测",
+                extra={
+                    "component": "camera",
+                    "reason": "model_file_not_found",
+                    "fallback_to": "simulation_detection",
+                    "model_path": str(model_path),
+                }
+            )
             return False
 
         self._detector = YOLOv8Detector(
@@ -620,7 +655,17 @@ class CameraAdapter(BaseAdapter):
             nms_threshold=self.config.nms_threshold
         )
 
-        return self._detector.load()
+        load_success = self._detector.load()
+        if not load_success:
+            logger.error(
+                f"FALLBACK: 模型加载失败: {model_path}, 使用模拟检测",
+                extra={
+                    "component": "camera",
+                    "reason": "model_load_failed",
+                    "fallback_to": "simulation_detection",
+                }
+            )
+        return load_success
 
     def _start_capture_thread(self):
         """启动采集线程"""
@@ -681,6 +726,21 @@ class CameraAdapter(BaseAdapter):
 
         logger.info("相机适配器已断开")
 
+    def set_simulator(self, simulator, renderer=None) -> None:
+        """
+        注入仿真器和渲染器 (由 plugin.py 在仿真模式下调用).
+
+        隔离设计: CameraAdapter 不 import Simulator/SimulationRenderer,
+        只通过鸭子类型使用 .step()/.render() 接口.
+        """
+        self._simulator = simulator
+        self._sim_renderer = renderer
+        if simulator is not None:
+            logger.info(
+                f"仿真器已注入: {simulator.num_persons} persons, "
+                f"renderer={'attached' if renderer else 'none'}"
+            )
+
     def healthcheck(self) -> bool:
         """健康检查"""
         if self._simulated:
@@ -701,7 +761,7 @@ class CameraAdapter(BaseAdapter):
         Returns:
             List[PersonDetection]: 检测结果列表
         """
-        if not self.is_connected:
+        if not self.is_connected and not self.is_simulated:
             logger.warning("相机未连接")
             return []
 
@@ -807,15 +867,58 @@ class CameraAdapter(BaseAdapter):
         return self._convert_detections(tracked, (480, 640, 3), timestamp)
 
     def _simulate_raw_detections(self, frame_shape: Tuple) -> List[Dict]:
-        """生成模拟的原始检测"""
+        """调度器: 有 Simulator 时走轨迹仿真, 否则 fallback 到随机检测"""
+        if self._simulator is not None:
+            return self._simulate_from_simulator(frame_shape)
+        return self._simulate_random_detections(frame_shape)
+
+    def _simulate_from_simulator(self, frame_shape: Tuple) -> List[Dict]:
+        """从 Simulator 获取轨迹驱动的检测结果"""
+        from ..protocols import SensorType
+
+        h, w = frame_shape[:2]
+        step_data = self._simulator.step()
+
+        camera_data = step_data.get(SensorType.CAMERA)
+        if camera_data is None:
+            return self._simulate_random_detections(frame_shape)
+
+        detections = []
+        for det in camera_data.data.get("detections", []):
+            pos = det.get("position", [0, 0])
+            world_x, world_y = pos[0], pos[1]
+
+            bounds = self._simulator._config.scene_bounds
+            x_min, y_min, x_max, y_max = bounds
+            norm_x = (world_x - x_min) / (x_max - x_min + 1e-8)
+            norm_y = (world_y - y_min) / (y_max - y_min + 1e-8)
+
+            px = norm_x * w
+            py = norm_y * h
+
+            bw = random.uniform(0.06 * w, 0.12 * w)
+            bh = random.uniform(0.25 * h, 0.35 * h)
+
+            x1 = max(0, px - bw / 2)
+            y1 = max(0, py - bh)
+            x2 = min(w, px + bw / 2)
+            y2 = min(h, py)
+
+            detections.append({
+                'bbox': [x1, y1, x2, y2],
+                'confidence': det.get("confidence", 0.85),
+                'class_id': 0,
+            })
+
+        return detections
+
+    def _simulate_random_detections(self, frame_shape: Tuple) -> List[Dict]:
+        """纯随机检测 fallback (无 Simulator 时使用)"""
         h, w = frame_shape[:2]
         detections = []
-
-        # 模拟1-3个人
         num_persons = random.randint(1, 3)
 
         for i in range(num_persons):
-            # 随机位置
             cx = random.uniform(0.2 * w, 0.8 * w)
             cy = random.uniform(0.3 * h, 0.7 * h)
             bw = random.uniform(0.05 * w, 0.15 * w)
@@ -829,18 +932,75 @@ class CameraAdapter(BaseAdapter):
             detections.append({
                 'bbox': [x1, y1, x2, y2],
                 'confidence': random.uniform(0.7, 0.98),
-                'class_id': 0
+                'class_id': 0,
             })
 
         return detections
 
     def get_frame(self) -> Optional[np.ndarray]:
-        """获取当前帧"""
+        """获取当前帧 (调度器: 有渲染器时走仿真俯视图)"""
         if self._simulated:
-            h, w = self.config.resolution[1], self.config.resolution[0]
-            return np.zeros((h, w, 3), dtype=np.uint8)
+            if self._sim_renderer is not None and self._simulator is not None:
+                return self._generate_renderer_frame()
+            return self._generate_legacy_simulation_frame()
 
         return self._get_frame()
+
+    def _generate_renderer_frame(self) -> np.ndarray:
+        """使用 SimulationRenderer 渲染工程级俯视图帧"""
+        persons = []
+        for p in self._simulator._persons:
+            persons.append({
+                "id": p.person_id,
+                "x": p.x,
+                "y": p.y,
+                "z": getattr(p, 'z', 0.0),
+            })
+        return self._sim_renderer.render(persons, self._simulator._step_count)
+
+    def _generate_legacy_simulation_frame(self) -> np.ndarray:
+        """旧版模拟帧 fallback (网格 + 随机检测框)"""
+        w, h = self.config.resolution[0], self.config.resolution[1]
+
+        frame = np.full((h, w, 3), 26, dtype=np.uint8)
+
+        if not CV2_AVAILABLE:
+            return frame
+
+        grid_spacing = 40
+        grid_color = (50, 45, 45)
+        for gx in range(0, w, grid_spacing):
+            cv2.line(frame, (gx, 0), (gx, h), grid_color, 1)
+        for gy in range(0, h, grid_spacing):
+            cv2.line(frame, (0, gy), (w, gy), grid_color, 1)
+
+        raw_dets = self._simulate_raw_detections((h, w, 3))
+        for det in raw_dets:
+            bbox = det['bbox']
+            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            conf = det.get('confidence', 0.8)
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 200), 2)
+
+            label = f"Person {conf:.0%}"
+            cv2.putText(
+                frame, label, (x1, y1 - 8),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 200), 1,
+            )
+
+        cv2.putText(
+            frame, "SIM", (w - 55, 25),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2,
+        )
+
+        self._frame_count += 1
+        info = f"Frame: {self._frame_count} | Persons: {len(raw_dets)}"
+        cv2.putText(
+            frame, info, (8, h - 12),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (180, 180, 180), 1,
+        )
+
+        return frame
 
 
 __all__ = ['CameraConfig', 'PersonDetection', 'CameraAdapter', 'YOLOv8Detector', 'SimpleTracker']

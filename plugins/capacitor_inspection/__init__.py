@@ -7,19 +7,36 @@
 - 电容器组状态监控: 三相电容器组排列检测
 
 版本: 3.6.0
+
+注意: 延迟导入以避免模块级触发 training → torch 初始化链。
 """
 
-from plugins.capacitor_inspection.plugin import CapacitorInspectionPlugin
-from plugins.capacitor_inspection.detector_enhanced import (
-    CapacitorDetectorEnhanced,
-    CapacitorDefectType,
-    CapacitorDetection,
-    IntrusionType,
-    IntrusionDetection,
-    IntrusionTracker,
-    CapacitorBankStatus,
-    CapacitorInspectionResult,
-)
+import importlib as _importlib
+
+
+def __getattr__(name: str):
+    """PEP 562 延迟属性加载，仅在实际访问时触发 import。"""
+    _plugin_names = {"CapacitorInspectionPlugin"}
+    _detector_names = {
+        "CapacitorDetectorEnhanced",
+        "CapacitorDefectType",
+        "CapacitorDetection",
+        "IntrusionType",
+        "IntrusionDetection",
+        "IntrusionTracker",
+        "CapacitorBankStatus",
+        "CapacitorInspectionResult",
+    }
+
+    if name in _plugin_names:
+        mod = _importlib.import_module("plugins.capacitor_inspection.plugin")
+        return getattr(mod, name)
+    if name in _detector_names:
+        mod = _importlib.import_module("plugins.capacitor_inspection.detector_enhanced")
+        return getattr(mod, name)
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "CapacitorInspectionPlugin",

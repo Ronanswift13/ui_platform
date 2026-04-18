@@ -1,0 +1,72 @@
+# 高光谱检测 - 训练配置模板
+plugin_id: hyperspectral_detection
+display_name: 高光谱检测
+
+# 主模型: 谱空联合 CNN
+model:
+  family: spectral_cnn
+  backbone: spectral_resnet  # 或 hybrid_sn / 3d_cnn / 1d_cnn
+  input_modality: hyperspectral
+  model_type: hybrid_sn
+
+task:
+  primary: hyperspectral_classification
+  secondary: hyperspectral_anomaly
+  label_schema: hyperspectral_defect
+  classes:
+    surface_defect:
+      - rust
+      - corrosion
+      - paint_peeling
+      - normal
+    thermal_anomaly:
+      - localized_heating
+      - normal_thermal
+    material_degradation:
+      - insulation_aging
+      - conductor_oxidation
+      - normal_material
+
+# 高光谱专用配置
+spectral_config:
+  num_bands: 224
+  wavelength_range_nm: [400, 2500]
+  pca_components: 30
+  spatial_patch_size: 11
+  # 降维方法: pca / mnf / ica / none
+  dimensionality_reduction: pca
+  # 归一化: min_max / z_score / continuum_removal
+  normalization: min_max
+  # 波段选择 (可选，null 表示使用全部)
+  selected_bands: null
+
+training:
+  epochs: 200
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: Adam
+  scheduler: step
+  step_size: 50
+  gamma: 0.5
+  warmup_epochs: 5
+
+augmentation:
+  # 高光谱增强
+  spectral_noise: 0.05
+  spatial_flip: 0.5
+  spatial_rotation: [0, 90, 180, 270]
+  # PCA 空间的随机偏移
+  pca_jitter: 0.02
+
+evaluation:
+  metrics: [overall_accuracy, kappa, per_class_f1, anomaly_auc]
+  qualification:
+    overall_accuracy: 0.85
+    kappa: 0.80
+
+export:
+  formats: [onnx]
+  # 高光谱模型输入维度
+  input_shape: [1, 30, 11, 11]  # [batch, pca_components, patch_h, patch_w]
+
+voltage_levels: [EHV_500kV, HV_220kV, HV_110kV]

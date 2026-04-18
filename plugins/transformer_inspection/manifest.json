@@ -12,6 +12,31 @@
         "state_recognition",
         "thermal_analysis"
     ],
+    "verified_capabilities": [
+        "state_recognition"
+    ],
+    "experimental_capabilities": [
+        "defect_detection",
+        "thermal_analysis"
+    ],
+    "blocked_capabilities": [],
+    "required_fixtures": [
+        "transformer_silicagel_sample.jpg",
+        "transformer_oil_level_sample.jpg",
+        "transformer_thermal_sample.jpg"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "无真实图像回放数据集",
+        "YOLOv8-ViT 模型为可选导入，当前环境不可用",
+        "defect_detection 仅有 smoke test，无 fixture 级回归",
+        "thermal_analysis 代码存在但缺少热成像样本验证",
+        "已验证状态链路仅覆盖呼吸器硅胶和油位计"
+    ],
     "device_types": [
         "transformer",
         "thermal_camera"

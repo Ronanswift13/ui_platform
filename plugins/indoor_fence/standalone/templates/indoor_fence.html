@@ -149,7 +149,35 @@
         font-size: 0.75em;
         color: var(--accent-green);
         font-family: monospace;
+        z-index: 10;
     }
+    .tracking-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .trajectory-legend {
+        position: absolute;
+        bottom: 8px;
+        right: 12px;
+        font-size: 0.7em;
+        color: var(--text-secondary);
+        background: rgba(0,0,0,0.6);
+        padding: 4px 8px;
+        border-radius: 4px;
+        z-index: 10;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    .legend-color { width: 12px; height: 3px; border-radius: 1px; }
+    .legend-safe { background: #3fb950; }
+    .legend-warn { background: #d29922; }
+    .legend-danger { background: #f85149; }
+    .legend-prediction { background: #a371f7; border-style: dashed; }
+    .legend-velocity { background: #58a6ff; }
 
     /* Right panel - Detection results */
     .detection-item {
@@ -217,7 +245,7 @@
 </style>
 {% endblock %}
 
-{% block plugin_content %}
+{% block content %}
 <div class="dashboard-header">
     <div>
         <span class="header-title">{{ plugin_name }}</span>
@@ -247,7 +275,19 @@
         </div>
         <div class="zone-overlay-item">
             <span class="zone-name">Tracking Trails</span>
-            <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+            <div class="toggle-switch active" id="toggleTrails" onclick="toggleOverlay('trails', this)"></div>
+        </div>
+        <div class="zone-overlay-item">
+            <span class="zone-name">Distance Lines</span>
+            <div class="toggle-switch active" id="toggleDistances" onclick="toggleOverlay('distances', this)"></div>
+        </div>
+        <div class="zone-overlay-item">
+            <span class="zone-name">Velocity Vectors</span>
+            <div class="toggle-switch" id="toggleVelocity" onclick="toggleOverlay('velocity', this)"></div>
+        </div>
+        <div class="zone-overlay-item">
+            <span class="zone-name">Predictions</span>
+            <div class="toggle-switch" id="togglePredictions" onclick="toggleOverlay('predictions', this)"></div>
         </div>
 
         <div class="panel-header">Detection Settings</div>
@@ -264,6 +304,14 @@
             <input type="number" value="1" step="1" min="1" max="5">
         </div>
 
+        <div class="panel-header">Simulation Scenario</div>
+        <div class="control-group">
+            <label>Select Scenario</label>
+            <select id="scenarioSelect" onchange="loadScenario(this.value)">
+                <option value="">-- Default --</option>
+            </select>
+        </div>
+
         <div class="panel-header">Authorization Panel</div>
         <div class="auth-panel" id="authPanel"></div>
     </div>
@@ -272,11 +320,21 @@
     <div class="panel">
         <div class="video-container">
             <div class="video-frame" id="videoFrame">
+                <img id="videoStream" src=""
+                     style="width:100%;height:100%;object-fit:contain;display:none;border-radius:6px;">
+                <canvas id="trackingCanvas" class="tracking-canvas"></canvas>
                 <div class="video-overlay-info">
-                    <div>{{ plugin_id }} | LIVE</div>
+                    <div>{{ plugin_id }} | <span id="streamMode">IDLE</span></div>
                     <div id="overlayStats">Frames: 0 | Tracked: 0</div>
                 </div>
-                <span>Awaiting video feed...</span>
+                <div class="trajectory-legend" id="trajectoryLegend" style="display:none;">
+                    <div class="legend-item"><span class="legend-color legend-safe"></span>Safe</div>
+                    <div class="legend-item"><span class="legend-color legend-warn"></span>Warning</div>
+                    <div class="legend-item"><span class="legend-color legend-danger"></span>Danger</div>
+                    <div class="legend-item"><span class="legend-color legend-prediction"></span>Prediction</div>
+                    <div class="legend-item"><span class="legend-color legend-velocity"></span>Velocity</div>
+                </div>
+                <span id="videoPlaceholder">点击左侧"模拟数据"或连接摄像头以启动视频流</span>
             </div>
         </div>
     </div>
@@ -289,8 +347,9 @@
                 <tr>
                     <th>ID</th>
                     <th>State</th>
-                    <th>Cabinet</th>
-                    <th>Dist (m)</th>
+                    <th>Pos (m)</th>
+                    <th>Vel (m/s)</th>
+                    <th>Fence</th>
                 </tr>
             </thead>
             <tbody id="trackingTable"></tbody>
@@ -328,32 +387,315 @@
 </div>
 {% endblock %}
 
-{% block plugin_scripts %}
+{% block extra_scripts %}
 <script>
     const wsUrl = `ws://${window.location.host}/ws/stream`;
+    const wsTrackingUrl = `ws://${window.location.host}/ws/tracking`;
     let ws = null;
+    let wsTracking = null;
+
+    // 场景配置
+    const sceneConfig = {
+        bounds: { xMin: 0, yMin: 0, xMax: 10, yMax: 6 },
+        fenceLineY: 3.0,
+        resolution: { width: 640, height: 480 }
+    };
+
+    // 显示选项
+    const displayOptions = {
+        trails: true,
+        distances: true,
+        velocity: false,
+        predictions: false
+    };
+
+    // 轨迹历史缓存
+    const trajectoryCache = {};
+    const maxTrailLength = 30;
+
+    // 颜色定义
+    const colors = {
+        safe: '#3fb950',
+        warning: '#d29922',
+        danger: '#f85149',
+        critical: '#ff0000',
+        trail: 'rgba(88, 166, 255, 0.6)',
+        prediction: '#a371f7',
+        velocity: '#58a6ff',
+        distanceLine: 'rgba(200, 200, 100, 0.7)'
+    };
+
+    function toggleOverlay(type, elem) {
+        elem.classList.toggle('active');
+        displayOptions[type] = elem.classList.contains('active');
+    }
 
     function stateClass(state) {
-        if (state === 'cross_line' || state === 'high_risk') return 'state-danger';
-        if (state === 'on_line' || state === 'misplaced') return 'state-warning';
+        if (state === 'cross_line' || state === 'high_risk' || state === 'critical') return 'state-danger';
+        if (state === 'on_line' || state === 'misplaced' || state === 'warning') return 'state-warning';
         return 'state-normal';
+    }
+
+    function distanceLevelColor(level) {
+        if (level === 'critical' || level === 'danger') return colors.danger;
+        if (level === 'warning') return colors.warning;
+        return colors.safe;
+    }
+
+    // 世界坐标转 Canvas 像素
+    function worldToCanvas(wx, wy, canvas) {
+        const margin = 40;
+        const { xMin, yMin, xMax, yMax } = sceneConfig.bounds;
+        const sceneW = xMax - xMin;
+        const sceneH = yMax - yMin;
+        const drawW = canvas.width - 2 * margin;
+        const drawH = canvas.height - 2 * margin;
+        const scaleX = drawW / sceneW;
+        const scaleY = drawH / sceneH;
+        const px = margin + (wx - xMin) * scaleX;
+        const py = margin + (wy - yMin) * scaleY;
+        return { x: px, y: py };
+    }
+
+    // 绘制轨迹
+    function drawTrajectory(ctx, canvas, personId, trajectory) {
+        if (!displayOptions.trails || !trajectory || trajectory.length < 2) return;
+
+        ctx.beginPath();
+        const n = trajectory.length;
+        for (let i = 0; i < n; i++) {
+            const pt = trajectory[i];
+            const { x, y } = worldToCanvas(pt.x, pt.y, canvas);
+            const alpha = (i + 1) / n;
+            ctx.strokeStyle = `rgba(88, 166, 255, ${alpha * 0.8})`;
+            ctx.lineWidth = 2;
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+    }
+
+    // 绘制人员标记
+    function drawPerson(ctx, canvas, person) {
+        const { x, y } = worldToCanvas(person.x, person.y, canvas);
+        const color = distanceLevelColor(person.distance_level);
+
+        // 圆形标记
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // ID 标签
+        ctx.fillStyle = color;
+        ctx.font = '11px monospace';
+        ctx.fillText(`P${person.id}`, x + 12, y + 4);
+    }
+
+    // 绘制速度矢量
+    function drawVelocity(ctx, canvas, person) {
+        if (!displayOptions.velocity) return;
+        const vx = person.vx || 0;
+        const vy = person.vy || 0;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        if (speed < 0.05) return;
+
+        const { x, y } = worldToCanvas(person.x, person.y, canvas);
+        const scale = 30;
+        const endX = x + vx * scale;
+        const endY = y + vy * scale;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = colors.velocity;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 箭头
+        const angle = Math.atan2(vy, vx);
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - 6 * Math.cos(angle - 0.4), endY - 6 * Math.sin(angle - 0.4));
+        ctx.lineTo(endX - 6 * Math.cos(angle + 0.4), endY - 6 * Math.sin(angle + 0.4));
+        ctx.closePath();
+        ctx.fillStyle = colors.velocity;
+        ctx.fill();
+
+        // 速度标签
+        ctx.fillStyle = colors.velocity;
+        ctx.font = '9px monospace';
+        ctx.fillText(`${speed.toFixed(1)}m/s`, endX + 4, endY - 4);
+    }
+
+    // 绘制预测轨迹
+    function drawPrediction(ctx, canvas, person) {
+        if (!displayOptions.predictions || !person.prediction || person.prediction.length < 1) return;
+
+        const { x: startX, y: startY } = worldToCanvas(person.x, person.y, canvas);
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+
+        for (const pred of person.prediction) {
+            const { x, y } = worldToCanvas(pred.x, pred.y, canvas);
+            ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = colors.prediction;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 预测终点圆圈
+        if (person.prediction.length > 0) {
+            const last = person.prediction[person.prediction.length - 1];
+            const { x, y } = worldToCanvas(last.x, last.y, canvas);
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.strokeStyle = colors.prediction;
+            ctx.stroke();
+        }
+    }
+
+    // 绘制围栏距离线
+    function drawFenceDistance(ctx, canvas, person) {
+        if (!displayOptions.distances) return;
+        const dist = person.distance_to_fence;
+        if (dist === undefined || dist > 1.5) return;
+
+        const { x: px, y: py } = worldToCanvas(person.x, person.y, canvas);
+        const { x: fx, y: fy } = worldToCanvas(person.x, sceneConfig.fenceLineY, canvas);
+        const color = distanceLevelColor(person.distance_level);
+
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(fx, fy);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 距离标签
+        const midY = (py + fy) / 2;
+        ctx.fillStyle = color;
+        ctx.font = '9px monospace';
+        ctx.fillText(`${Math.abs(dist).toFixed(2)}m`, px + 6, midY);
+    }
+
+    // 绘制人与人距离线
+    function drawPersonDistances(ctx, canvas, persons) {
+        if (!displayOptions.distances || persons.length < 2) return;
+
+        for (let i = 0; i < persons.length; i++) {
+            for (let j = i + 1; j < persons.length; j++) {
+                const p1 = persons[i];
+                const p2 = persons[j];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist > 3.0) continue; // 只显示近距离
+
+                const { x: x1, y: y1 } = worldToCanvas(p1.x, p1.y, canvas);
+                const { x: x2, y: y2 } = worldToCanvas(p2.x, p2.y, canvas);
+
+                let color = colors.distanceLine;
+                if (dist < 0.8) color = colors.danger;
+                else if (dist < 1.5) color = colors.warning;
+
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 中点距离标签
+                const mx = (x1 + x2) / 2;
+                const my = (y1 + y2) / 2;
+                ctx.fillStyle = color;
+                ctx.font = '9px monospace';
+                ctx.fillText(`${dist.toFixed(2)}m`, mx - 15, my - 4);
+            }
+        }
+    }
+
+    // 主渲染函数
+    function renderTrackingOverlay(trackingData) {
+        const canvas = document.getElementById('trackingCanvas');
+        if (!canvas) return;
+
+        const container = document.getElementById('videoFrame');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const persons = trackingData.persons || [];
+        if (persons.length === 0) return;
+
+        // 更新轨迹缓存
+        for (const p of persons) {
+            if (!trajectoryCache[p.id]) {
+                trajectoryCache[p.id] = [];
+            }
+            trajectoryCache[p.id].push({ x: p.x, y: p.y, t: Date.now() });
+            if (trajectoryCache[p.id].length > maxTrailLength) {
+                trajectoryCache[p.id].shift();
+            }
+        }
+
+        // 绘制人与人距离
+        drawPersonDistances(ctx, canvas, persons);
+
+        // 绘制每个人
+        for (const p of persons) {
+            // 轨迹
+            drawTrajectory(ctx, canvas, p.id, trajectoryCache[p.id]);
+            // 预测
+            drawPrediction(ctx, canvas, p);
+            // 围栏距离
+            drawFenceDistance(ctx, canvas, p);
+            // 速度
+            drawVelocity(ctx, canvas, p);
+            // 人员标记
+            drawPerson(ctx, canvas, p);
+        }
+
+        // 显示图例
+        const legend = document.getElementById('trajectoryLegend');
+        if (legend) legend.style.display = 'block';
     }
 
     function renderTrackedPersons(persons) {
         const tbody = document.getElementById('trackingTable');
         if (!tbody) return;
         if (!persons || persons.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" class="det-details">No tracked persons</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="det-details">No tracked persons</td></tr>`;
             return;
         }
-        tbody.innerHTML = persons.map(p => `
+        tbody.innerHTML = persons.map(p => {
+            const speed = Math.sqrt((p.vx || 0) ** 2 + (p.vy || 0) ** 2);
+            const stateVal = p.distance_level || p.state || 'safe';
+            return `
             <tr>
-                <td>${p.person_id}</td>
-                <td class="${stateClass(p.state)}">${p.state}</td>
-                <td>${p.cabinet_id ?? '-'}</td>
-                <td>${typeof p.distance_to_line_m === 'number' ? p.distance_to_line_m.toFixed(2) : '-'}</td>
+                <td>P${p.id}</td>
+                <td class="${stateClass(stateVal)}">${stateVal}</td>
+                <td>${p.x?.toFixed(1)}, ${p.y?.toFixed(1)}</td>
+                <td>${speed.toFixed(2)}</td>
+                <td class="${stateClass(stateVal)}">${(p.distance_to_fence ?? p.distance_to_line_m ?? 0).toFixed(2)}</td>
             </tr>
-        `).join('');
+        `}).join('');
     }
 
     function renderCabinetAuth(cabinetStatus, allowList) {
@@ -415,6 +757,68 @@
         };
     }
 
+    function connectTrackingWebSocket() {
+        wsTracking = new WebSocket(wsTrackingUrl);
+        wsTracking.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.persons) {
+                    renderTrackingOverlay(data);
+                    renderTrackedPersons(data.persons);
+                    // 更新统计
+                    if (data.stats) {
+                        document.getElementById('statTracked').textContent = data.stats.active_persons || 0;
+                        document.getElementById('statAlerts').textContent = data.stats.total_alerts || 0;
+                    }
+                    if (data.fps) {
+                        document.getElementById('fpsCounter').textContent = data.fps.toFixed(1) + ' FPS';
+                    }
+                    if (data.frame_count) {
+                        document.getElementById('statFrames').textContent = data.frame_count;
+                        document.getElementById('overlayStats').textContent =
+                            `Frames: ${data.frame_count} | Tracked: ${data.persons.length}`;
+                    }
+                    // 处理告警
+                    if (data.alerts && data.alerts.length > 0) {
+                        renderAlerts(data.alerts);
+                    }
+                }
+            } catch (e) {
+                console.error('Tracking WS parse error:', e);
+            }
+        };
+        wsTracking.onclose = function() {
+            setTimeout(connectTrackingWebSocket, 3000);
+        };
+        wsTracking.onerror = function() {
+            // 如果专用 tracking WS 不可用，回退到轮询
+            console.log('Tracking WS not available, using polling');
+        };
+    }
+
+    function renderAlerts(alerts) {
+        const log = document.getElementById('alarmLog');
+        if (!log || !alerts || alerts.length === 0) return;
+
+        const newItems = alerts.map(a => {
+            const ts = new Date().toTimeString().split(' ')[0];
+            const levelClass = a.level === 'critical' ? 'alarm-level-critical' : 'alarm-level-warning';
+            return `
+                <div class="alarm-log-item">
+                    <span class="alarm-time">${ts}</span>
+                    <span class="${levelClass}">${(a.level || 'WARNING').toUpperCase()}</span>
+                    <span class="alarm-message">${a.message || a.type}</span>
+                </div>
+            `;
+        }).join('');
+
+        log.insertAdjacentHTML('afterbegin', newItems);
+        // 限制日志条数
+        while (log.children.length > 50) {
+            log.removeChild(log.lastChild);
+        }
+    }
+
     async function refreshStatus() {
         try {
             const res = await fetch('/api/status');
@@ -466,10 +870,162 @@
         }
     }
 
+    /* ──────────────────────────────────────────────────────
+       Video Stream Control
+       ────────────────────────────────────────────────────── */
+    let streamActive = false;
+
+    function startVideoStream(source) {
+        const img = document.getElementById('videoStream');
+        const placeholder = document.getElementById('videoPlaceholder');
+        const modeLabel = document.getElementById('streamMode');
+
+        // 发送 start 请求
+        fetch('/api/indoor-fence/stream/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({source: source})
+        }).then(function() {
+            // 设置 MJPEG 源 (加时间戳防缓存)
+            img.src = '/api/indoor-fence/stream?' + Date.now();
+            img.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+            if (modeLabel) modeLabel.textContent = source === 'simulated' ? 'SIM' : 'LIVE';
+            streamActive = true;
+        }).catch(function(err) {
+            console.error('Stream start failed:', err);
+        });
+    }
+
+    function stopVideoStream() {
+        const img = document.getElementById('videoStream');
+        const placeholder = document.getElementById('videoPlaceholder');
+        const modeLabel = document.getElementById('streamMode');
+
+        img.src = '';
+        img.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'block';
+        if (modeLabel) modeLabel.textContent = 'IDLE';
+        streamActive = false;
+
+        fetch('/api/indoor-fence/stream/stop', {method: 'POST'}).catch(function(){});
+    }
+
+    // 监听数据源切换 (覆盖 base_standalone 的默认行为)
+    document.querySelectorAll('.data-source-option').forEach(function(opt) {
+        opt.addEventListener('click', function() {
+            var src = this.getAttribute('data-source');
+            if (src === 'simulated') {
+                startVideoStream('simulated');
+            } else if (src === 'rtsp') {
+                // RTSP 模式: 等用户点击"连接"按钮再启动
+                stopVideoStream();
+            } else {
+                stopVideoStream();
+            }
+        });
+    });
+
+    // RTSP 连接按钮增强
+    var rtspBtn = document.getElementById('btn-connect-rtsp');
+    if (rtspBtn) {
+        rtspBtn.addEventListener('click', function() {
+            var url = document.getElementById('cfg-rtsp-url');
+            if (url && url.value.trim()) {
+                // 先更新配置中的摄像头源
+                fetch('/api/indoor-fence/config', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({config: {camera: {source: url.value.trim()}}})
+                }).then(function() {
+                    startVideoStream('rtsp');
+                });
+            }
+        });
+    }
+
+    // 定期更新流统计
+    async function refreshStreamStats() {
+        if (!streamActive) return;
+        try {
+            var res = await fetch('/api/indoor-fence/stream/stats');
+            if (!res.ok) return;
+            var stats = await res.json();
+            if (stats.fps) {
+                document.getElementById('fpsCounter').textContent = stats.fps + ' FPS';
+            }
+            if (stats.frame_count) {
+                document.getElementById('statFrames').textContent = stats.frame_count;
+            }
+        } catch (err) {}
+    }
+
+    /* ──────────────────────────────────────────────────────
+       Simulation Scenario Control
+       ────────────────────────────────────────────────────── */
+    async function fetchScenarios() {
+        try {
+            var res = await fetch('/api/indoor-fence/simulator/scenarios');
+            if (!res.ok) return;
+            var data = await res.json();
+            var sel = document.getElementById('scenarioSelect');
+            if (!sel) return;
+            (data.scenarios || []).forEach(function(s) {
+                var opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name + ' (' + s.num_persons + 'P, ' + s.path_type + ')';
+                if (s.id === data.active) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.error('Failed to fetch scenarios:', err);
+        }
+    }
+
+    async function loadScenario(id) {
+        if (!id) return;
+        try {
+            var res = await fetch('/api/indoor-fence/simulator/load', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({scenario: id})
+            });
+            var data = await res.json();
+            if (data.error) {
+                console.error('Scenario load error:', data.error);
+                return;
+            }
+            if (!streamActive) {
+                startVideoStream('simulated');
+            }
+        } catch (err) {
+            console.error('Failed to load scenario:', err);
+        }
+    }
+
     connectWebSocket();
+    connectTrackingWebSocket();
     refreshStatus();
     refreshEvents();
+    fetchScenarios();
     setInterval(refreshStatus, 1000);
     setInterval(refreshEvents, 3000);
+    setInterval(refreshStreamStats, 1000);
+    setInterval(pollTrackingData, 200); // 5Hz 轮询备用
+
+    // 轮询跟踪数据（WebSocket 不可用时的备用）
+    async function pollTrackingData() {
+        if (wsTracking && wsTracking.readyState === WebSocket.OPEN) return;
+        if (!streamActive) return;
+        try {
+            const res = await fetch('/api/indoor-fence/tracking');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.persons) {
+                renderTrackingOverlay(data);
+                renderTrackedPersons(data.persons);
+            }
+        } catch (e) {}
+    }
 </script>
 {% endblock %}

@@ -1,0 +1,82 @@
+# Gas detection default configuration.
+
+sampling:
+  sample_interval_seconds: 3600
+  unit: ppm
+  source_mode: simulated_or_sensor
+
+window:
+  size: 24
+  unit: samples
+  history_length: 24
+  history_buffer_size: 1000
+  trend_window_hours: 24
+  leak_detection_window: 10
+
+thresholds:
+  SF6:
+    attention: 800
+    warning: 1000
+    alarm: 1500
+    critical: 2000
+  H2:
+    attention: 100
+    warning: 150
+    alarm: 300
+    critical: 500
+  CO:
+    attention: 200
+    warning: 300
+    alarm: 600
+    critical: 1000
+  C2H2:
+    attention: 1
+    warning: 5
+    alarm: 10
+    critical: 50
+  CH4:
+    attention: 50
+    warning: 100
+    alarm: 200
+    critical: 500
+  C2H4:
+    attention: 50
+    warning: 100
+    alarm: 200
+    critical: 500
+  C2H6:
+    attention: 50
+    warning: 100
+    alarm: 150
+    critical: 300
+
+runtime:
+  mode: standalone
+  require_hardware: false
+  rule_confidence: 1.0
+
+model:
+  status: placeholder
+  trend_prediction_enabled: true
+  prediction_horizon: 24
+  ids:
+    sf6_forecast: sf6_forecast
+    multi_gas_forecast: multi_gas_forecast
+    health_trend: equipment_health_trend
+    lstm: sf6_forecast
+    transformer: multi_gas_forecast
+
+alarm_rules:
+  leak_rate_threshold: 5.0
+  warning_statuses: ["warning", "alarm", "critical"]
+
+upgrade_placeholders:
+  prediction_model: GL-TransLSTM/Transformer model hook
+  anomaly_detection_model: multi-gas anomaly model hook
+  protocol_adapter: gas sensor protocol adapter hook
+  online_learning: online calibration hook
+  model_features_placeholder: []
+  sequence_embedding_placeholder: null
+  temporal_pattern_placeholder: null
+  anomaly_score_trace_placeholder: []
+  root_cause_feature_placeholder: null

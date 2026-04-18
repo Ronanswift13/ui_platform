@@ -11,6 +11,31 @@
         "defect_detection",
         "intrusion_detection"
     ],
+    "verified_capabilities": [],
+    "experimental_capabilities": [
+        "defect_detection",
+        "intrusion_detection"
+    ],
+    "blocked_capabilities": [
+        "real_dl_onnx_inference"
+    ],
+    "required_fixtures": [
+        "capacitor_tilt_sample.jpg",
+        "capacitor_collapse_sample.jpg",
+        "capacitor_intrusion_sample.jpg"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "测试存在 import 错误(ModuleNotFoundError: detector_enhanced)，全部无法收集",
+        "无 fixtures 目录，无 regression 目录",
+        "intrusion 正向识别缺少真实样本回放证据",
+        "传统 CV 降级链仍有硬编码阈值技术债",
+        "YOLOv8-ViT 和 YOLOv8-OBB 均为可选导入，当前环境不可用"
+    ],
     "device_types": [
         "capacitor_bank",
         "capacitor_unit",

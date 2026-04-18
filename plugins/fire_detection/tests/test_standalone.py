@@ -36,6 +36,23 @@ class TestFireDetectionStandalone(unittest.TestCase):
         results = self.plugin.infer(frame, [], None)
         self.assertIsInstance(results, list)
 
+    def test_detect_returns_contract_keys(self):
+        """Standalone smoke test should expose minimal contract semantics."""
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        result = self.plugin.detect(frame)
+        for key in [
+            "semantic_type",
+            "severity",
+            "confidence",
+            "reason",
+            "recommended_action",
+            "runtime_mode",
+            "capability_states",
+        ]:
+            self.assertIn(key, result)
+        self.assertEqual(result["semantic_type"], "visual_detection")
+        self.assertEqual(result["runtime_mode"]["analysis_mode"], "simulation_only")
+
     def test_runner_creates_app(self):
         """Test StandalonePluginRunner can create Flask app."""
         from darkbreaker_sdk.standalone import StandalonePluginRunner

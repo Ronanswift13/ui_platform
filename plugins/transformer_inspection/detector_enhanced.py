@@ -24,6 +24,7 @@ V3.5更新 (室外监测迭代):
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 import hashlib
 import time
@@ -77,6 +78,9 @@ except ImportError:
     GaborFilterConfig = None
     TextureAnomalyType = None
     TextureAnomaly = None
+
+
+logger = logging.getLogger(__name__)
 
 
 class DefectType(Enum):
@@ -228,9 +232,20 @@ class TransformerDetectorEnhanced:
         self._initialized = False
 
         # 配置参数
-        self._confidence_threshold = config.get("confidence_threshold", 0.5)
-        self._nms_threshold = config.get("nms_threshold", 0.4)
-        self._use_deep_learning = config.get("use_deep_learning", True)
+        inference_config = config.get("inference", {})
+        model_config = config.get("model", {})
+        self._confidence_threshold = inference_config.get(
+            "confidence_threshold",
+            config.get("confidence_threshold", 0.5),
+        )
+        self._nms_threshold = inference_config.get(
+            "nms_threshold",
+            config.get("nms_threshold", 0.4),
+        )
+        self._use_deep_learning = config.get(
+            "use_deep_learning",
+            model_config.get("use_deep_learning", True),
+        )
 
         # V3.0: YOLOv8-ViT深度学习检测器
         self._yolov8_vit_detector: Optional[YOLOv8ViTDetector] = None
@@ -275,18 +290,18 @@ class TransformerDetectorEnhanced:
                     try:
                         self._model_registry.load(model_id)
                     except Exception as e:
-                        print(f"[TransformerDetector] 模型 {model_id} 加载失败: {e}")
+                        logger.warning("[TransformerDetector] 模型 %s 加载失败: %s", model_id, e)
 
             self._initialized = True
             return True
         except Exception as e:
-            print(f"[TransformerDetector] 初始化失败: {e}")
+            logger.exception("[TransformerDetector] 初始化失败")
             return False
 
     def _init_segformer(self) -> bool:
         """初始化SegFormer语义分割器 (V3.5)"""
         if not SEGFORMER_AVAILABLE or SegFormerSegmenter is None:
-            print("[TransformerDetector] SegFormer模块不可用")
+            logger.info("[TransformerDetector] SegFormer模块不可用")
             return False
 
         try:
@@ -304,17 +319,17 @@ class TransformerDetectorEnhanced:
             self._segformer = SegFormerSegmenter(config)
             self._segformer.load()
 
-            print("[TransformerDetector] SegFormer语义分割器初始化成功 (V3.5)")
+            logger.info("[TransformerDetector] SegFormer语义分割器初始化成功 (V3.5)")
             return True
 
         except Exception as e:
-            print(f"[TransformerDetector] SegFormer初始化失败: {e}")
+            logger.warning("[TransformerDetector] SegFormer初始化失败: %s", e)
             return False
 
     def _init_gabor_analyzer(self) -> bool:
         """初始化Gabor纹理分析器 (V3.5)"""
         if not GABOR_AVAILABLE or GaborTextureAnalyzer is None:
-            print("[TransformerDetector] Gabor纹理分析模块不可用")
+            logger.info("[TransformerDetector] Gabor纹理分析模块不可用")
             return False
 
         try:
@@ -331,23 +346,24 @@ class TransformerDetectorEnhanced:
                 window_stride=gabor_config.get("window_stride", 32)
             )
 
-            print("[TransformerDetector] Gabor纹理分析器初始化成功 (V3.5)")
+            logger.info("[TransformerDetector] Gabor纹理分析器初始化成功 (V3.5)")
             return True
 
         except Exception as e:
-            print(f"[TransformerDetector] Gabor分析器初始化失败: {e}")
+            logger.warning("[TransformerDetector] Gabor分析器初始化失败: %s", e)
             return False
 
     def _init_yolov8_vit(self) -> bool:
         """初始化YOLOv8-ViT检测器 (V3.0)"""
         if not DL_AVAILABLE:
-            print("[TransformerDetector] YOLOv8-ViT模块不可用")
+            logger.info("[TransformerDetector] YOLOv8-ViT模块不可用")
             return False
 
         try:
+            model_config = self.config.get("model", {})
             # 创建配置
-            model_path = self.config.get("yolov8_model_path", None)
-            device = self.config.get("device", "cpu")
+            model_path = model_config.get("path", self.config.get("yolov8_model_path"))
+            device = model_config.get("device", self.config.get("device", "cpu"))
             use_thermal = self.config.get("use_thermal_fusion", False)
 
             config = YOLOv8ViTConfig(
@@ -368,11 +384,11 @@ class TransformerDetectorEnhanced:
             self._yolov8_vit_detector.load()
             self._dl_initialized = True
 
-            print(f"[TransformerDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
+            logger.info("[TransformerDetector] YOLOv8-ViT检测器初始化成功 (V3.0)")
             return True
 
         except Exception as e:
-            print(f"[TransformerDetector] YOLOv8-ViT初始化失败: {e}")
+            logger.warning("[TransformerDetector] YOLOv8-ViT初始化失败: %s", e)
             self._dl_initialized = False
             return False
     
@@ -464,7 +480,7 @@ class TransformerDetectorEnhanced:
                 ))
 
         except Exception as e:
-            print(f"[TransformerDetector] 热成像融合检测失败: {e}")
+            logger.warning("[TransformerDetector] 热成像融合检测失败: %s", e)
 
         return detections
     
@@ -502,7 +518,7 @@ class TransformerDetectorEnhanced:
                 return detections
 
             except Exception as e:
-                print(f"[TransformerDetector] YOLOv8-ViT检测失败: {e}")
+                logger.warning("[TransformerDetector] YOLOv8-ViT检测失败: %s", e)
 
         # 兼容旧版：回退到model_registry
         if self._model_registry is not None:
@@ -525,7 +541,7 @@ class TransformerDetectorEnhanced:
                         }
                     ))
             except Exception as e:
-                print(f"[TransformerDetector] model_registry检测失败: {e}")
+                logger.warning("[TransformerDetector] model_registry检测失败: %s", e)
 
         return detections
 
@@ -784,7 +800,7 @@ class TransformerDetectorEnhanced:
                         metadata={"source": "deep_learning"}
                     )
         except Exception as e:
-            print(f"[TransformerDetector] 深度学习油位检测失败: {e}")
+            logger.warning("[TransformerDetector] 深度学习油位检测失败: %s", e)
         
         return None
     
@@ -887,7 +903,7 @@ class TransformerDetectorEnhanced:
                     metadata={"source": "deep_learning"}
                 )
         except Exception as e:
-            print(f"[TransformerDetector] 深度学习硅胶识别失败: {e}")
+            logger.warning("[TransformerDetector] 深度学习硅胶识别失败: %s", e)
         
         return None
     
@@ -1023,7 +1039,7 @@ class TransformerDetectorEnhanced:
             aligned = cv2.addWeighted(visible, 0.6, thermal_color, 0.4, 0)
             return aligned
         except Exception as e:
-            print(f"[TransformerDetector] 图像对齐失败: {e}")
+            logger.warning("[TransformerDetector] 图像对齐失败: %s", e)
             return None
     
     def inspect(
@@ -1190,7 +1206,7 @@ class TransformerDetectorEnhanced:
             }
 
         except Exception as e:
-            print(f"[TransformerDetector] 组件分割失败: {e}")
+            logger.warning("[TransformerDetector] 组件分割失败: %s", e)
             return {
                 "success": False,
                 "error": str(e),
@@ -1261,7 +1277,7 @@ class TransformerDetectorEnhanced:
             }
 
         except Exception as e:
-            print(f"[TransformerDetector] 纹理分析失败: {e}")
+            logger.warning("[TransformerDetector] 纹理分析失败: %s", e)
             return {
                 "success": False,
                 "error": str(e),
@@ -1330,32 +1346,37 @@ class TransformerDetectorEnhanced:
                 "status": oil_result.level_status,
                 "confidence": oil_result.confidence
             }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[TransformerDetector] 油位综合分析失败: %s", exc)
 
         # 5. 硅胶状态
         try:
-            silica_result = self.detect_silica_gel(image, roi_bbox)
+            silica_result = self.recognize_silica_gel(image, roi_bbox)
             result["silica_gel"] = {
                 "state": silica_result.state.value,
                 "confidence": silica_result.confidence,
                 "color_rgb": silica_result.color_rgb
             }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[TransformerDetector] 硅胶综合分析失败: %s", exc)
 
         # 6. 热成像分析
         if thermal_image is not None:
             try:
-                thermal_result = self.analyze_thermal(thermal_image, roi_bbox)
+                visible_image = self._crop_roi(image, roi_bbox) if roi_bbox else image
+                thermal_input = self._crop_roi(thermal_image, roi_bbox) if roi_bbox else thermal_image
+                thermal_result = self.analyze_thermal(
+                    thermal_input,
+                    visible_image=visible_image,
+                )
                 result["thermal"] = {
                     "max_temperature": thermal_result.max_temperature,
                     "avg_temperature": thermal_result.avg_temperature,
                     "level": thermal_result.level.value,
                     "hotspot_count": thermal_result.hotspot_count
                 }
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[TransformerDetector] 热成像综合分析失败: %s", exc)
 
         # 7. 融合评估
         result["fused_assessment"] = self._fuse_analysis_results(

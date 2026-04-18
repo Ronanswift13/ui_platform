@@ -1,0 +1,22 @@
+{
+  "name": "Cross Line Scenario",
+  "description": "Person walks from safe zone, crosses yellow line into danger zone",
+  "num_persons": 1,
+  "scene_bounds": [0.0, 0.0, 10.0, 6.0],
+  "yellow_line_y": 2.5,
+  "sensor_types": ["camera", "lidar"],
+  "path_type": "cross_line",
+  "persons": [
+    {
+      "id": "person_0",
+      "waypoints": [
+        [5.0, 0.5],
+        [5.0, 1.5],
+        [5.0, 2.5],
+        [5.0, 3.5],
+        [5.0, 4.5]
+      ],
+      "speed": 0.8
+    }
+  ]
+}

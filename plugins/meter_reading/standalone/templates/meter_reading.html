@@ -1,94 +1,396 @@
 {% extends "base_standalone.html" %}
 
-{% block title %}Meter Reading - DarkBreaker{% endblock %}
-{% block navbar_title %}Meter Reading Dashboard{% endblock %}
+{% block title %}表计读数 - DarkBreaker{% endblock %}
+{% block navbar_title %}表计读数监控面板{% endblock %}
 
-{% block extra_head %}
+{% block plugin_styles %}
 <style>
+    :root {
+        --bg-primary: #0d1117;
+        --bg-secondary: #161b22;
+        --bg-tertiary: #21262d;
+        --border-color: #30363d;
+        --text-primary: #e6edf3;
+        --text-secondary: #8b949e;
+        --accent-green: #3fb950;
+        --accent-yellow: #d29922;
+        --accent-red: #f85149;
+        --accent-blue: #58a6ff;
+        --accent-cyan: #39d2c0;
+    }
+    body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; }
+
+    .dashboard-header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 12px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .header-title { font-size: 1.3em; font-weight: 600; }
+    .header-meta { display: flex; gap: 16px; align-items: center; }
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: 600;
+    }
+    .status-ready { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+    .status-error { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+    .version-tag { color: var(--text-secondary); font-size: 0.85em; }
+
+    .dashboard-layout {
+        display: grid;
+        grid-template-columns: 280px 1fr 320px;
+        grid-template-rows: 1fr auto;
+        gap: 1px;
+        background: var(--border-color);
+        height: calc(100vh - 52px);
+    }
+
     .panel {
-        background-color: var(--panel-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-    .panel-title {
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        color: var(--text-secondary);
-        margin-bottom: 0.75rem;
-        letter-spacing: 0.05em;
-    }
-    .metric-value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        line-height: 1.2;
-    }
-    .metric-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
-    }
-    .status-normal { color: var(--success); }
-    .status-warning { color: var(--warning); }
-    .status-alarm, .status-critical { color: var(--danger); }
-    .event-list {
-        max-height: 280px;
+        background: var(--bg-secondary);
         overflow-y: auto;
     }
-    .event-item {
-        padding: 0.5rem;
+    .panel-header {
+        padding: 10px 16px;
+        font-weight: 600;
+        font-size: 0.85em;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         border-bottom: 1px solid var(--border-color);
-        font-size: 0.85rem;
+        position: sticky;
+        top: 0;
+        background: var(--bg-secondary);
+        z-index: 1;
     }
-    .event-item:last-child { border-bottom: none; }
+
+    /* Left panel controls */
+    .control-group {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .control-group label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.8em;
+        color: var(--text-secondary);
+    }
+    .control-group select,
+    .control-group input[type="number"],
+    .control-group input[type="text"] {
+        width: 100%;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        color: var(--text-primary);
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 0.85em;
+    }
+    .control-group input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent-blue);
+    }
+
+    .btn-action {
+        width: 100%;
+        padding: 8px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.85em;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .btn-action:hover { opacity: 0.85; }
+    .btn-sim { background: var(--accent-blue); color: #fff; }
+    .btn-stop { background: var(--accent-red); color: #fff; }
+    .btn-snapshot { background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); }
+
+    .overlay-toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 16px;
+        font-size: 0.82em;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .toggle-switch {
+        position: relative;
+        width: 34px;
+        height: 18px;
+        background: var(--bg-tertiary);
+        border-radius: 9px;
+        cursor: pointer;
+        border: 1px solid var(--border-color);
+        flex-shrink: 0;
+    }
+    .toggle-switch.active { background: var(--accent-green); border-color: var(--accent-green); }
+    .toggle-switch::after {
+        content: '';
+        position: absolute;
+        width: 12px; height: 12px;
+        background: white;
+        border-radius: 50%;
+        top: 2px; left: 2px;
+        transition: transform 0.2s;
+    }
+    .toggle-switch.active::after { transform: translateX(16px); }
+
+    /* Center: Video display */
+    .video-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: 20px;
+    }
+    .video-frame {
+        width: 100%;
+        max-width: 800px;
+        aspect-ratio: 4/3;
+        background: var(--bg-primary);
+        border: 2px solid var(--border-color);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        position: relative;
+        overflow: hidden;
+    }
+    .video-overlay {
+        position: absolute;
+        top: 8px;
+        left: 12px;
+        font-size: 0.7em;
+        color: var(--accent-green);
+        font-family: monospace;
+        z-index: 2;
+    }
+
+    /* Right panel: readings */
+    .reading-item {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .reading-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+    .reading-label { font-weight: 600; font-size: 0.88em; }
+    .reading-value {
+        font-size: 1.3em;
+        font-weight: 700;
+        font-family: 'SF Mono', 'Consolas', monospace;
+    }
+    .reading-unit { font-size: 0.75em; color: var(--text-secondary); margin-left: 4px; }
+    .reading-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 0.75em;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+    .conf-high { color: var(--accent-green); }
+    .conf-mid { color: var(--accent-yellow); }
+    .conf-low { color: var(--accent-red); }
+
+    .reading-value-success { color: var(--accent-green); }
+    .reading-value-warning { color: var(--accent-yellow); }
+    .reading-value-danger { color: var(--accent-red); }
+    .reading-value-led-green { color: #3fb950; }
+    .reading-value-led-red { color: #f85149; }
+    .reading-value-led-yellow { color: #d29922; }
+    .reading-value-led-off { color: #555; }
+
+    /* Mini bar */
+    .reading-bar {
+        height: 4px;
+        background: var(--bg-tertiary);
+        border-radius: 2px;
+        margin-top: 6px;
+        overflow: hidden;
+    }
+    .reading-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.3s;
+    }
+
+    /* Bottom panel */
+    .bottom-panel {
+        grid-column: 1 / -1;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-color);
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .stats-bar {
+        display: flex;
+        gap: 24px;
+        padding: 6px 16px;
+        background: var(--bg-tertiary);
+        font-size: 0.78em;
+        color: var(--text-secondary);
+        flex-wrap: wrap;
+    }
+    .stat-item span { color: var(--text-primary); font-weight: 600; }
+    .alarm-log-item {
+        display: flex;
+        gap: 12px;
+        padding: 6px 16px;
+        font-size: 0.78em;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .alarm-time { color: var(--text-secondary); font-family: monospace; white-space: nowrap; }
+    .alarm-level-critical { color: var(--accent-red); font-weight: 600; }
+    .alarm-level-warning { color: var(--accent-yellow); font-weight: 600; }
+    .alarm-level-info { color: var(--accent-blue); }
+    .alarm-message { flex: 1; }
+
+    /* History list */
+    .history-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 16px;
+        font-size: 0.78em;
+        border-bottom: 1px solid var(--border-color);
+        color: var(--text-secondary);
+    }
+    .history-item .h-time { font-family: monospace; }
+    .history-item .h-value { color: var(--text-primary); font-weight: 500; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row g-3 p-3">
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Reading Status</div>
-            <div class="metric-value status-normal" id="reading-status">Ready</div>
-            <div class="metric-label">Meter reading engine</div>
-        </div>
+<div class="dashboard-header">
+    <div>
+        <span class="header-title">{{ plugin_name }}</span>
+        <span class="version-tag">v{{ plugin_version }}</span>
     </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Success Rate</div>
-            <div class="metric-value" id="success-rate">0%</div>
-            <div class="metric-label">Reading accuracy</div>
-        </div>
+    <div class="header-meta">
+        <span class="status-badge status-ready" id="statusBadge">READY</span>
+        <span class="version-tag" id="fpsCounter">0 FPS</span>
     </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Inference Count</div>
-            <div class="metric-value" id="inference-count">0</div>
-            <div class="metric-label">Total processed</div>
+</div>
+
+<div class="dashboard-layout">
+    <!-- Left Panel: Controls -->
+    <div class="panel">
+        <div class="panel-header">Simulation Controls</div>
+        <div class="control-group">
+            <label>Scenario</label>
+            <select id="scenarioSelect" onchange="loadScenario(this.value)">
+                <option value="">-- Select Scenario --</option>
+            </select>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="panel text-center">
-            <div class="panel-title">Manual Review</div>
-            <div class="metric-value" id="manual-review-count">0</div>
-            <div class="metric-label">Pending reviews</div>
+        <div class="control-group" style="display:flex;gap:8px;">
+            <button class="btn-action btn-sim" onclick="startSimulation()" id="btnStart">Start Simulation</button>
+            <button class="btn-action btn-stop" onclick="stopSimulation()" id="btnStop" style="display:none;">Stop</button>
+        </div>
+
+        <div class="panel-header">Detection Settings</div>
+        <div class="control-group">
+            <label>Confidence Threshold: <span id="confVal">0.60</span></label>
+            <input type="range" min="0.1" max="1.0" step="0.05" value="0.60"
+                   oninput="document.getElementById('confVal').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <div class="control-group">
+            <label>Retry Count</label>
+            <input type="number" value="3" min="1" max="5" step="1" id="retryCount">
+        </div>
+        <div class="control-group">
+            <label>Manual Review Threshold: <span id="mrVal">0.50</span></label>
+            <input type="range" min="0.1" max="1.0" step="0.05" value="0.50"
+                   oninput="document.getElementById('mrVal').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+
+        <div class="panel-header">Display Options</div>
+        <div class="overlay-toggle">
+            <span>Reading Annotations</span>
+            <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+        </div>
+        <div class="overlay-toggle">
+            <span>Keypoint Overlay</span>
+            <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+        </div>
+        <div class="overlay-toggle">
+            <span>Confidence Bars</span>
+            <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+        </div>
+        <div class="overlay-toggle">
+            <span>Range Limits</span>
+            <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+        </div>
+
+        <div class="panel-header">Camera Source</div>
+        <div class="control-group">
+            <label>RTSP URL</label>
+            <input type="text" id="rtspUrl" placeholder="rtsp://192.168.1.x/stream">
+        </div>
+        <div class="control-group">
+            <button class="btn-action btn-snapshot" onclick="connectCamera()">Connect Camera</button>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-speedometer2 me-1"></i>Recent Readings</div>
-            <div class="event-list" id="reading-events">
-                <div class="event-item text-secondary">No readings yet</div>
+    <!-- Center Panel: Video Display -->
+    <div class="panel">
+        <div class="video-container">
+            <div class="video-frame" id="videoFrame">
+                <img id="videoStream" src=""
+                     style="width:100%;height:100%;object-fit:contain;display:none;border-radius:6px;">
+                <div class="video-overlay">
+                    <div>{{ plugin_id }} | <span id="streamMode">IDLE</span></div>
+                    <div id="overlayStats">Frames: 0 | Readings: 0</div>
+                </div>
+                <span id="videoPlaceholder" style="text-align:center;padding:20px;">
+                    Select a scenario and click "Start Simulation"<br>
+                    or connect a camera to begin meter reading
+                </span>
             </div>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="panel">
-            <div class="panel-title"><i class="bi bi-exclamation-triangle me-1"></i>Alerts</div>
-            <div class="event-list" id="alert-events">
-                <div class="event-item text-secondary">No alerts</div>
+    <!-- Right Panel: Reading Results -->
+    <div class="panel">
+        <div class="panel-header">Live Readings</div>
+        <div id="readingResults">
+            <div class="reading-item">
+                <div class="reading-label" style="color:var(--text-secondary)">Waiting for data...</div>
+            </div>
+        </div>
+
+        <div class="panel-header">Reading History</div>
+        <div id="readingHistory" style="max-height:200px;overflow-y:auto;">
+            <div class="history-item">
+                <span class="h-time">--:--:--</span>
+                <span>No readings yet</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Panel: Stats & Alarm Log -->
+    <div class="bottom-panel">
+        <div class="stats-bar">
+            <div class="stat-item">Frames: <span id="statFrames">0</span></div>
+            <div class="stat-item">Readings: <span id="statReadings">0</span></div>
+            <div class="stat-item">Success: <span id="statSuccess">0%</span></div>
+            <div class="stat-item">Manual Review: <span id="statReview">0</span></div>
+            <div class="stat-item">Latency: <span id="statLatency">-</span></div>
+            <div class="stat-item">FPS: <span id="statFps">0</span></div>
+        </div>
+        <div class="panel-header">Event Log</div>
+        <div id="alarmLog">
+            <div class="alarm-log-item">
+                <span class="alarm-time">--:--:--</span>
+                <span class="alarm-level-info">INFO</span>
+                <span class="alarm-message">System ready. Select a scenario to start.</span>
             </div>
         </div>
     </div>
@@ -97,17 +399,329 @@
 
 {% block extra_scripts %}
 <script>
-    function updateDashboard(data) {
-        if (!data) return;
-        if (data.inference_count !== undefined) {
-            document.getElementById('inference-count').textContent = data.inference_count;
-        }
-        if (data.success_rate !== undefined) {
-            document.getElementById('success-rate').textContent = (data.success_rate * 100).toFixed(1) + '%';
-        }
-        if (data.manual_review_count !== undefined) {
-            document.getElementById('manual-review-count').textContent = data.manual_review_count;
+    /* ══════════════════════════════════════════════════════
+       State
+       ══════════════════════════════════════════════════════ */
+    let streamActive = false;
+    let ws = null;
+    const readingHistory = [];
+    const MAX_HISTORY = 100;
+
+    /* ══════════════════════════════════════════════════════
+       Simulation Control
+       ══════════════════════════════════════════════════════ */
+    async function fetchScenarios() {
+        try {
+            const res = await fetch('/api/meter-reading/simulator/scenarios');
+            if (!res.ok) return;
+            const data = await res.json();
+            const sel = document.getElementById('scenarioSelect');
+            (data.scenarios || []).forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = `${s.name} (${s.meter_count} meters)`;
+                if (s.id === data.active) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.error('Failed to load scenarios:', err);
         }
     }
+
+    async function loadScenario(id) {
+        if (!id) return;
+        try {
+            const res = await fetch('/api/meter-reading/simulator/load', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({scenario: id})
+            });
+            const data = await res.json();
+            if (data.error) {
+                addLogEntry('error', `Scenario load failed: ${data.error}`);
+                return;
+            }
+            addLogEntry('info', `Loaded scenario: ${data.scenario_name || id}`);
+        } catch (err) {
+            console.error('Scenario load error:', err);
+        }
+    }
+
+    function startSimulation() {
+        const scenario = document.getElementById('scenarioSelect').value;
+        if (!scenario) {
+            addLogEntry('warning', 'Please select a scenario first');
+            return;
+        }
+        loadScenario(scenario).then(() => startStream('simulated'));
+    }
+
+    function stopSimulation() {
+        stopStream();
+    }
+
+    function connectCamera() {
+        const url = document.getElementById('rtspUrl').value.trim();
+        if (!url) {
+            addLogEntry('warning', 'Please enter a camera URL');
+            return;
+        }
+        startStream('camera');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       Video Stream Control
+       ══════════════════════════════════════════════════════ */
+    function startStream(source) {
+        fetch('/api/meter-reading/stream/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({source: source})
+        }).then(() => {
+            const img = document.getElementById('videoStream');
+            const placeholder = document.getElementById('videoPlaceholder');
+            img.src = '/api/meter-reading/stream?' + Date.now();
+            img.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+            document.getElementById('streamMode').textContent = source === 'simulated' ? 'SIM' : 'LIVE';
+            document.getElementById('btnStart').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'block';
+            streamActive = true;
+            addLogEntry('info', `Stream started (${source})`);
+        }).catch(err => {
+            addLogEntry('error', `Stream start failed: ${err}`);
+        });
+    }
+
+    function stopStream() {
+        const img = document.getElementById('videoStream');
+        const placeholder = document.getElementById('videoPlaceholder');
+        img.src = '';
+        img.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'block';
+        document.getElementById('streamMode').textContent = 'IDLE';
+        document.getElementById('btnStart').style.display = 'block';
+        document.getElementById('btnStop').style.display = 'none';
+        streamActive = false;
+
+        fetch('/api/meter-reading/stream/stop', {method: 'POST'}).catch(() => {});
+        addLogEntry('info', 'Stream stopped');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       Data Refresh & Rendering
+       ══════════════════════════════════════════════════════ */
+    async function refreshStatus() {
+        try {
+            const res = await fetch('/api/status');
+            if (!res.ok) return;
+            const data = await res.json();
+            const health = data.health || {};
+            const details = health.details || {};
+
+            const badge = document.getElementById('statusBadge');
+            const status = (data.status || 'unknown').toUpperCase();
+            badge.textContent = status;
+            badge.className = 'status-badge ' + (data.status === 'ready' ? 'status-ready' : 'status-error');
+
+            const ic = details.inference_count || 0;
+            const sr = details.success_rate || 0;
+            const mr = details.manual_review_count || 0;
+            document.getElementById('statReadings').textContent = ic;
+            document.getElementById('statSuccess').textContent = (sr * 100).toFixed(1) + '%';
+            document.getElementById('statReview').textContent = mr;
+        } catch (err) {}
+    }
+
+    async function refreshStreamStats() {
+        if (!streamActive) return;
+        try {
+            const res = await fetch('/api/meter-reading/stream/stats');
+            if (!res.ok) return;
+            const stats = await res.json();
+            document.getElementById('statFrames').textContent = stats.frame_count || 0;
+            document.getElementById('statFps').textContent = (stats.fps || 0).toFixed(1);
+            document.getElementById('statLatency').textContent = (stats.avg_inference_ms || 0).toFixed(1) + ' ms';
+            document.getElementById('fpsCounter').textContent = (stats.fps || 0).toFixed(1) + ' FPS';
+            document.getElementById('overlayStats').textContent =
+                `Frames: ${stats.frame_count || 0} | Readings: ${document.getElementById('statReadings').textContent}`;
+        } catch (err) {}
+    }
+
+    async function refreshReadings() {
+        if (!streamActive) return;
+        try {
+            const res = await fetch('/api/meter-reading/stream/readings?limit=10');
+            if (!res.ok) return;
+            const readings = await res.json();
+            renderLiveReadings(readings);
+        } catch (err) {}
+    }
+
+    async function refreshEvents() {
+        if (!streamActive) return;
+        try {
+            const res = await fetch('/api/meter-reading/events?limit=30');
+            if (!res.ok) return;
+            const events = await res.json();
+            renderEventLog(events);
+        } catch (err) {}
+    }
+
+    /* ══════════════════════════════════════════════════════
+       Renderers
+       ══════════════════════════════════════════════════════ */
+    function renderLiveReadings(readings) {
+        const container = document.getElementById('readingResults');
+        if (!readings || readings.length === 0) return;
+
+        const latest = {};
+        readings.forEach(r => { latest[r.meter_id] = r; });
+        const meters = Object.values(latest);
+
+        container.innerHTML = meters.map(r => {
+            const isLed = r.meter_type === 'led';
+            let valueHtml, barHtml = '';
+
+            if (isLed) {
+                const colorClass = `reading-value-led-${r.led_color || 'off'}`;
+                valueHtml = `<span class="reading-value ${colorClass}">${(r.led_color || 'off').toUpperCase()}</span>`;
+            } else {
+                const rng = (r.range_max || 1) - (r.range_min || 0);
+                const frac = rng > 0 ? ((r.value - (r.range_min || 0)) / rng) : 0.5;
+                const valClass = frac > 0.9 ? 'reading-value-danger' : frac > 0.75 ? 'reading-value-warning' : 'reading-value-success';
+                valueHtml = `<span class="reading-value ${valClass}">${r.value}</span><span class="reading-unit">${r.unit || ''}</span>`;
+
+                const barColor = frac > 0.9 ? 'var(--accent-red)' : frac > 0.75 ? 'var(--accent-yellow)' : 'var(--accent-green)';
+                barHtml = `<div class="reading-bar"><div class="reading-bar-fill" style="width:${(frac*100).toFixed(1)}%;background:${barColor}"></div></div>`;
+            }
+
+            const conf = r.confidence || 0;
+            const confClass = conf >= 0.6 ? 'conf-high' : conf >= 0.5 ? 'conf-mid' : 'conf-low';
+
+            return `
+                <div class="reading-item">
+                    <div class="reading-header">
+                        <span class="reading-label">${r.label || r.meter_id}</span>
+                        <span class="${confClass}" style="font-size:0.75em;">conf: ${conf.toFixed(2)}</span>
+                    </div>
+                    ${valueHtml}
+                    <div class="reading-meta">
+                        <span>Type: ${r.meter_type}</span>
+                        <span>Status: ${r.status || '-'}</span>
+                    </div>
+                    ${barHtml}
+                </div>
+            `;
+        }).join('');
+
+        meters.forEach(r => {
+            if (r.meter_type !== 'led') {
+                const ts = (r.timestamp || '').split('T')[1]?.split('.')[0] || '--:--:--';
+                readingHistory.unshift({time: ts, label: r.label || r.meter_id, value: r.value, unit: r.unit || ''});
+                if (readingHistory.length > MAX_HISTORY) readingHistory.pop();
+            }
+        });
+        renderHistory();
+    }
+
+    function renderHistory() {
+        const container = document.getElementById('readingHistory');
+        if (readingHistory.length === 0) return;
+        container.innerHTML = readingHistory.slice(0, 30).map(h => `
+            <div class="history-item">
+                <span class="h-time">${h.time}</span>
+                <span>${h.label}</span>
+                <span class="h-value">${h.value} ${h.unit}</span>
+            </div>
+        `).join('');
+    }
+
+    function renderEventLog(events) {
+        const log = document.getElementById('alarmLog');
+        if (!events || events.length === 0) return;
+
+        log.innerHTML = events.slice().reverse().map(e => {
+            const d = e.data || {};
+            const msg = d.message || e.type || 'Event';
+            const level = (d.level || 'info').toLowerCase();
+            const ts = (e.timestamp || '').split('T')[1]?.split('.')[0] || '--:--:--';
+            const cls = level === 'critical' ? 'alarm-level-critical'
+                      : level === 'warning' ? 'alarm-level-warning'
+                      : 'alarm-level-info';
+            return `
+                <div class="alarm-log-item">
+                    <span class="alarm-time">${ts}</span>
+                    <span class="${cls}">${level.toUpperCase()}</span>
+                    <span class="alarm-message">${msg}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function addLogEntry(level, message) {
+        const log = document.getElementById('alarmLog');
+        const now = new Date().toTimeString().split(' ')[0];
+        const cls = level === 'error' ? 'alarm-level-critical'
+                  : level === 'warning' ? 'alarm-level-warning'
+                  : 'alarm-level-info';
+        const html = `
+            <div class="alarm-log-item">
+                <span class="alarm-time">${now}</span>
+                <span class="${cls}">${level.toUpperCase()}</span>
+                <span class="alarm-message">${message}</span>
+            </div>
+        `;
+        log.insertAdjacentHTML('afterbegin', html);
+        while (log.children.length > 50) log.removeChild(log.lastChild);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       WebSocket
+       ══════════════════════════════════════════════════════ */
+    function connectWebSocket() {
+        const url = `ws://${window.location.host}/ws/stream`;
+        ws = new WebSocket(url);
+        ws.onmessage = function(event) {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'detection' && msg.data) {
+                    // Handle WS detection messages
+                }
+            } catch (e) {}
+        };
+        ws.onclose = function() {
+            setTimeout(connectWebSocket, 3000);
+        };
+    }
+
+    /* ══════════════════════════════════════════════════════
+       Data source hooks (override base_standalone)
+       ══════════════════════════════════════════════════════ */
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.data-source-option').forEach(opt => {
+            opt.addEventListener('click', function() {
+                const src = this.getAttribute('data-source');
+                if (src === 'simulated') {
+                    startSimulation();
+                } else if (src === 'rtsp') {
+                    stopStream();
+                } else {
+                    stopStream();
+                }
+            });
+        });
+    });
+
+    /* ══════════════════════════════════════════════════════
+       Initialize
+       ══════════════════════════════════════════════════════ */
+    connectWebSocket();
+    fetchScenarios();
+    refreshStatus();
+    setInterval(refreshStatus, 2000);
+    setInterval(refreshStreamStats, 1000);
+    setInterval(refreshReadings, 1000);
+    setInterval(refreshEvents, 3000);
 </script>
 {% endblock %}

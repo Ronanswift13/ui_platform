@@ -16,7 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import numpy as np
 from plugins.transformer_inspection.plugin import TransformerInspectionPlugin
 from darkbreaker_sdk.interfaces import PluginContext
-from darkbreaker_sdk.schemas import ROI, BoundingBox
+from darkbreaker_sdk.schemas import BoundingBox, ROI, ROIType
 
 NUM_ITERATIONS = 100
 
@@ -37,13 +37,16 @@ def main():
     rois = [
         ROI(
             id="roi-bench",
-            name="transformer_body",
+            name="radiator",
             component_id="transformer-01",
+            roi_type=ROIType.DEFECT,
             bbox=BoundingBox(x=0.0, y=0.0, width=1.0, height=1.0),
         )
     ]
 
-    dummy_frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+    dummy_frame = np.full((480, 640, 3), 255, dtype=np.uint8)
+    dummy_frame[80:220, 60:220] = [20, 20, 20]
+    dummy_frame[260:360, 300:430] = [0, 100, 180]
 
     # Warm-up
     print("Warming up...")

@@ -10,6 +10,57 @@
     "capabilities": [
         "meter_reading"
     ],
+    "verified_capabilities": [
+        "output_structure_contract"
+    ],
+    "experimental_capabilities": [
+        "analog_meter_reading",
+        "digital_ocr_reading",
+        "led_indicator_reading",
+        "perspective_correction",
+        "fallback_chain"
+    ],
+    "blocked_capabilities": [
+        "real_dl_keypoint_inference",
+        "real_dl_ocr_inference"
+    ],
+    "required_fixtures": [
+        "meter_analog_normal_001.jpg",
+        "meter_analog_boundary_001.jpg",
+        "meter_analog_quality_fail_001.jpg",
+        "meter_digital_display_001.jpg",
+        "meter_led_indicator_green_001.fixture.json",
+        "meter_glare_or_tilt_review_required_001.jpg"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "插件测试已可收集并通过，但大多仍是契约/单元/合成测试",
+        "当前 replay 只有一个 LED mock fixture 可执行，不能证明真实 LED 现场识别性能",
+        "analog/digital/perspective 仅固定 planned 槽位，尚无 present_labeled 真实图像",
+        "tests/regression/ 仍为空，真实标定样本回归尚未建立",
+        "HRNet keypoint 模型和 CRNN OCR 模型为可选依赖，当前不可用",
+        "analog/digital 的精度目标尚无 fixture 级回放验证"
+    ],
+    "replay_baseline": {
+        "expected_results": "tests/replay/expected_results.json",
+        "collection_status": "partial_assets_available",
+        "verified_scope": [
+            "output_structure_contract",
+            "expected_results_schema",
+            "mock_led_replay_runner"
+        ],
+        "experimental_scope": [
+            "analog_meter_reading",
+            "digital_ocr_reading",
+            "led_indicator_real_image_reading",
+            "perspective_correction",
+            "fallback_chain"
+        ]
+    },
     "device_types": [
         "pressure_gauge",
         "temperature_gauge",

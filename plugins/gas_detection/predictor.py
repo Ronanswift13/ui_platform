@@ -248,7 +248,7 @@ class GasConcentrationPredictor:
                         predictions["predicted_alarms"].append({
                             "gas": gas,
                             "predicted_value": gas_prediction.predictions[-1] if gas_prediction.predictions else 0,
-                            "threshold": self.config.thresholds.get(gas, {}).get('alarm', 1000),
+                            "threshold": self._threshold_value(gas, "alarm", 1000),
                             "hours_until": gas_prediction.time_to_alarm,
                             "predicted_time": f"+{gas_prediction.time_to_alarm:.1f}h",
                             "severity": "alarm" if gas_prediction.time_to_alarm < 6 else "warning"
@@ -457,6 +457,14 @@ class GasConcentrationPredictor:
                         break  # 只记录首次超阈值
         
         return predictions
+
+    def _threshold_value(self, gas: str, level: str, default: float) -> float:
+        threshold = self.config.thresholds.get(gas)
+        if threshold is None:
+            return default
+        if isinstance(threshold, dict):
+            return threshold.get(level, default)
+        return getattr(threshold, level, default)
     
     def _predict_by_traditional(self, history: Dict) -> Dict[str, Any]:
         """使用传统方法预测 (线性外推 + 移动平均)"""
@@ -476,12 +484,11 @@ class GasConcentrationPredictor:
             window_size = min(24, len(values))
             smoothed = np.convolve(values, np.ones(window_size)/window_size, mode='valid')
             
-            if len(smoothed) < 2:
-                continue
-            
             # 线性趋势
-            x = np.arange(len(smoothed))
-            slope = (smoothed[-1] - smoothed[0]) / (len(smoothed) - 1)
+            if len(smoothed) >= 2:
+                slope = (smoothed[-1] - smoothed[0]) / (len(smoothed) - 1)
+            else:
+                slope = (values[-1] - values[0]) / max(len(values) - 1, 1)
             
             # 外推预测
             last_value = values[-1]

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="zh-CN" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -239,7 +239,7 @@
             </div>
             <div class="d-flex align-items-center gap-3">
                 <span id="connection-status" class="badge bg-secondary">
-                    <i class="bi bi-circle-fill me-1"></i>Disconnected
+                    <i class="bi bi-circle-fill me-1"></i>未连接
                 </span>
                 <span class="text-secondary small">
                     v{{ plugin_version | default("1.0.0") }}
@@ -261,7 +261,7 @@
         <!-- Voltage Level -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">
-                <i class="bi bi-lightning"></i> Voltage Level
+                <i class="bi bi-lightning"></i> 电压等级
             </div>
             <select id="sel-voltage-level" class="form-select form-select-sm">
                 <option value="0.4kV">低压 0.4kV</option>
@@ -277,28 +277,28 @@
         <!-- Device Type -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">
-                <i class="bi bi-cpu"></i> Device Type
+                <i class="bi bi-cpu"></i> 设备类型
             </div>
             <select id="sel-device-type" class="form-select form-select-sm">
-                <option value="">-- Select Device --</option>
+                <option value="">-- 选择设备 --</option>
             </select>
             <div id="device-type-hint" class="form-text text-secondary" style="font-size:0.72rem; margin-top:0.25rem;">
-                Available types loaded from platform
+                可用类型从平台加载
             </div>
         </div>
 
         <!-- Model Configuration -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">
-                <i class="bi bi-sliders"></i> Model Configuration
+                <i class="bi bi-sliders"></i> 模型配置
             </div>
             <div class="mb-2">
-                <label class="form-label" for="cfg-model-path">Model Path</label>
+                <label class="form-label" for="cfg-model-path">模型路径</label>
                 <input type="text" class="form-control form-control-sm" id="cfg-model-path"
                        placeholder="models/best.onnx">
             </div>
             <div class="mb-2">
-                <label class="form-label" for="cfg-input-size">Input Size</label>
+                <label class="form-label" for="cfg-input-size">输入尺寸</label>
                 <select id="cfg-input-size" class="form-select form-select-sm">
                     <option value="320">320 x 320</option>
                     <option value="416">416 x 416</option>
@@ -307,7 +307,7 @@
                 </select>
             </div>
             <div class="mb-2">
-                <label class="form-label" for="cfg-conf-threshold">Confidence Threshold</label>
+                <label class="form-label" for="cfg-conf-threshold">置信度阈值</label>
                 <div class="d-flex align-items-center gap-2">
                     <input type="range" class="form-range flex-grow-1" id="cfg-conf-threshold"
                            min="0.05" max="0.95" step="0.05" value="0.45">
@@ -315,7 +315,7 @@
                 </div>
             </div>
             <div class="mb-1">
-                <label class="form-label" for="cfg-nms-threshold">NMS Threshold</label>
+                <label class="form-label" for="cfg-nms-threshold">NMS阈值</label>
                 <div class="d-flex align-items-center gap-2">
                     <input type="range" class="form-range flex-grow-1" id="cfg-nms-threshold"
                            min="0.1" max="0.9" step="0.05" value="0.50">
@@ -323,27 +323,27 @@
                 </div>
             </div>
             <button id="btn-apply-config" class="btn btn-sm btn-primary w-100 mt-2">
-                <i class="bi bi-check2-circle me-1"></i>Apply Config
+                <i class="bi bi-check2-circle me-1"></i>应用配置
             </button>
         </div>
 
         <!-- Data Source -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">
-                <i class="bi bi-database"></i> Data Source
+                <i class="bi bi-database"></i> 数据源
             </div>
             <div id="data-source-options">
                 <div class="data-source-option active" data-source="file" tabindex="0">
                     <i class="bi bi-file-earmark-image"></i>
-                    <span>File Upload</span>
+                    <span>文件上传</span>
                 </div>
                 <div class="data-source-option" data-source="rtsp" tabindex="0">
                     <i class="bi bi-camera-video"></i>
-                    <span>RTSP Camera</span>
+                    <span>RTSP 摄像头</span>
                 </div>
                 <div class="data-source-option" data-source="simulated" tabindex="0">
                     <i class="bi bi-broadcast"></i>
-                    <span>Simulated Data</span>
+                    <span>模拟数据</span>
                 </div>
             </div>
             <!-- RTSP URL input (hidden by default) -->
@@ -351,7 +351,7 @@
                 <input type="text" class="form-control form-control-sm" id="cfg-rtsp-url"
                        placeholder="rtsp://192.168.1.100:554/stream">
                 <button id="btn-connect-rtsp" class="btn btn-sm btn-outline-primary w-100 mt-1">
-                    <i class="bi bi-plug me-1"></i>Connect
+                    <i class="bi bi-plug me-1"></i>连接
                 </button>
             </div>
         </div>
@@ -362,22 +362,22 @@
         <!-- Plugin Info -->
         <div class="sidebar-section">
             <div class="sidebar-section-title">
-                <i class="bi bi-info-circle"></i> Plugin Info
+                <i class="bi bi-info-circle"></i> 插件信息
             </div>
             <div class="plugin-info-row">
-                <span class="info-label">Name</span>
+                <span class="info-label">名称</span>
                 <span id="info-plugin-name">{{ plugin_name | default(plugin_id | default("unknown")) }}</span>
             </div>
             <div class="plugin-info-row">
-                <span class="info-label">Version</span>
+                <span class="info-label">版本</span>
                 <span id="info-plugin-version">{{ plugin_version | default("1.0.0") }}</span>
             </div>
             <div class="plugin-info-row">
-                <span class="info-label">Status</span>
-                <span id="info-plugin-status" class="badge bg-secondary" style="font-size:0.72rem;">Loading</span>
+                <span class="info-label">状态</span>
+                <span id="info-plugin-status" class="badge bg-secondary" style="font-size:0.72rem;">加载中</span>
             </div>
             <div class="plugin-info-row">
-                <span class="info-label">Plugin ID</span>
+                <span class="info-label">插件 ID</span>
                 <span class="text-secondary" style="font-size:0.72rem;">{{ plugin_id | default("--") }}</span>
             </div>
         </div>
@@ -398,7 +398,7 @@
     <div class="offcanvas offcanvas-end" tabindex="-1" id="settingsOffcanvas" aria-labelledby="settingsOffcanvasLabel">
         <div class="offcanvas-header">
             <h6 class="offcanvas-title" id="settingsOffcanvasLabel">
-                <i class="bi bi-gear me-2"></i>Settings
+                <i class="bi bi-gear me-2"></i>设置
             </h6>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
@@ -406,10 +406,10 @@
             <!-- Inference Settings -->
             <div class="settings-group">
                 <div class="settings-group-title">
-                    <i class="bi bi-gpu-card me-1"></i> Inference Settings
+                    <i class="bi bi-gpu-card me-1"></i> 推理设置
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="set-backend-type">Backend Type</label>
+                    <label class="form-label" for="set-backend-type">后端类型</label>
                     <select id="set-backend-type" class="form-select form-select-sm">
                         <option value="onnxruntime" selected>ONNX Runtime</option>
                         <option value="tensorrt">TensorRT</option>
@@ -419,7 +419,7 @@
                     </select>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="set-device">Device</label>
+                    <label class="form-label" for="set-device">设备</label>
                     <select id="set-device" class="form-select form-select-sm">
                         <option value="cpu">CPU</option>
                         <option value="cuda:0" selected>CUDA:0</option>
@@ -427,7 +427,7 @@
                     </select>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="set-precision">Precision</label>
+                    <label class="form-label" for="set-precision">精度</label>
                     <select id="set-precision" class="form-select form-select-sm">
                         <option value="fp32">FP32</option>
                         <option value="fp16" selected>FP16</option>
@@ -437,7 +437,7 @@
                 <div class="form-check mb-1">
                     <input class="form-check-input" type="checkbox" id="set-warmup" checked>
                     <label class="form-check-label" for="set-warmup" style="font-size:0.85rem;">
-                        Warm-up on start
+                        启动预热
                     </label>
                 </div>
             </div>
@@ -445,34 +445,34 @@
             <!-- Alarm Settings -->
             <div class="settings-group">
                 <div class="settings-group-title">
-                    <i class="bi bi-bell me-1"></i> Alarm Settings
+                    <i class="bi bi-bell me-1"></i> 告警设置
                 </div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="set-alarm-sound" checked>
                     <label class="form-check-label" for="set-alarm-sound" style="font-size:0.85rem;">
-                        Sound notifications
+                        声音通知
                     </label>
                 </div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="set-alarm-visual" checked>
                     <label class="form-check-label" for="set-alarm-visual" style="font-size:0.85rem;">
-                        Visual flash alerts
+                        视觉闪烁告警
                     </label>
                 </div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="set-alarm-push">
                     <label class="form-check-label" for="set-alarm-push" style="font-size:0.85rem;">
-                        Push notifications
+                        推送通知
                     </label>
                 </div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="set-alarm-webhook">
                     <label class="form-check-label" for="set-alarm-webhook" style="font-size:0.85rem;">
-                        Webhook callback
+                        Webhook 回调
                     </label>
                 </div>
                 <div id="webhook-url-group" class="mb-1" style="display:none;">
-                    <label class="form-label" for="set-webhook-url">Webhook URL</label>
+                    <label class="form-label" for="set-webhook-url">Webhook 地址</label>
                     <input type="text" class="form-control form-control-sm" id="set-webhook-url"
                            placeholder="https://example.com/hook">
                 </div>
@@ -481,27 +481,27 @@
             <!-- Training Data Export -->
             <div class="settings-group">
                 <div class="settings-group-title">
-                    <i class="bi bi-download me-1"></i> Training Data Export
+                    <i class="bi bi-download me-1"></i> 训练数据导出
                 </div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="set-export-images">
                     <label class="form-check-label" for="set-export-images" style="font-size:0.85rem;">
-                        Auto-save detection images
+                        自动保存检测图像
                     </label>
                 </div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="set-export-labels">
                     <label class="form-check-label" for="set-export-labels" style="font-size:0.85rem;">
-                        Export YOLO-format labels
+                        导出YOLO格式标注
                     </label>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="set-export-path">Export Directory</label>
+                    <label class="form-label" for="set-export-path">导出目录</label>
                     <input type="text" class="form-control form-control-sm" id="set-export-path"
                            placeholder="./exports/training_data">
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="set-export-format">Label Format</label>
+                    <label class="form-label" for="set-export-format">标注格式</label>
                     <select id="set-export-format" class="form-select form-select-sm">
                         <option value="yolo">YOLO TXT</option>
                         <option value="coco">COCO JSON</option>
@@ -509,14 +509,14 @@
                     </select>
                 </div>
                 <button id="btn-export-now" class="btn btn-sm btn-outline-primary w-100">
-                    <i class="bi bi-box-arrow-up-right me-1"></i>Export Now
+                    <i class="bi bi-box-arrow-up-right me-1"></i>立即导出
                 </button>
             </div>
 
             <!-- Save Settings -->
             <div class="p-3">
                 <button id="btn-save-settings" class="btn btn-primary w-100">
-                    <i class="bi bi-save me-1"></i>Save All Settings
+                    <i class="bi bi-save me-1"></i>保存所有设置
                 </button>
             </div>
         </div>
@@ -529,14 +529,14 @@
     <div class="status-bar" style="background-color: var(--panel-bg); border-top: 1px solid var(--border-color);">
         <div class="container-fluid d-flex justify-content-between align-items-center py-1 px-3">
             <div class="d-flex gap-4 small">
-                <span><i class="bi bi-speedometer2 me-1"></i>FPS: <span id="stat-fps">0</span></span>
-                <span><i class="bi bi-image me-1"></i>Frames: <span id="stat-frames">0</span></span>
-                <span><i class="bi bi-bullseye me-1"></i>Detections: <span id="stat-detections">0</span></span>
-                <span><i class="bi bi-exclamation-triangle me-1"></i>Alarms: <span id="stat-alarms">0</span></span>
-                <span><i class="bi bi-clock me-1"></i>Avg: <span id="stat-avg-time">0</span>ms</span>
+                <span><i class="bi bi-speedometer2 me-1"></i>帧率: <span id="stat-fps">0</span></span>
+                <span><i class="bi bi-image me-1"></i>帧数: <span id="stat-frames">0</span></span>
+                <span><i class="bi bi-bullseye me-1"></i>检测数: <span id="stat-detections">0</span></span>
+                <span><i class="bi bi-exclamation-triangle me-1"></i>告警数: <span id="stat-alarms">0</span></span>
+                <span><i class="bi bi-clock me-1"></i>平均: <span id="stat-avg-time">0</span>ms</span>
             </div>
             <div class="small text-secondary">
-                Plugin: {{ plugin_id | default("unknown") }}
+                插件: {{ plugin_id | default("unknown") }}
             </div>
         </div>
     </div>
@@ -690,9 +690,9 @@
             selVoltage.addEventListener('change', async function() {
                 var result = await apiPut('/api/settings/voltage_level', { voltage_level: this.value });
                 if (result && result.status === 'updated') {
-                    showToast('Voltage level updated: ' + this.value, 'success');
+                    showToast('电压等级已更新: ' + this.value, 'success');
                 } else {
-                    showToast('Failed to update voltage level', 'error');
+                    showToast('电压等级更新失败', 'error');
                 }
             });
         }
@@ -706,9 +706,9 @@
                 if (!this.value) return;
                 var result = await apiPut('/api/settings/device_type', { device_type: this.value });
                 if (result && result.status === 'updated') {
-                    showToast('Device type updated: ' + this.value, 'success');
+                    showToast('设备类型已更新: ' + this.value, 'success');
                 } else {
-                    showToast('Failed to update device type', 'error');
+                    showToast('设备类型更新失败', 'error');
                 }
             });
         }
@@ -728,18 +728,18 @@
                     }
                 };
                 btnApplyConfig.disabled = true;
-                btnApplyConfig.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Applying...';
+                btnApplyConfig.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>应用中...';
                 var result = await apiPut('/api/config', configPayload);
                 if (result && (result.status === 'updated' || result.success)) {
-                    showToast('Model config applied', 'success');
-                    btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Applied';
+                    showToast('模型配置已应用', 'success');
+                    btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>已应用';
                     setTimeout(function() {
-                        btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Apply Config';
+                        btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>应用配置';
                         btnApplyConfig.disabled = false;
                     }, 1500);
                 } else {
-                    showToast('Failed to apply config', 'error');
-                    btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Apply Config';
+                    showToast('配置应用失败', 'error');
+                    btnApplyConfig.innerHTML = '<i class="bi bi-check2-circle me-1"></i>应用配置';
                     btnApplyConfig.disabled = false;
                 }
             });
@@ -775,14 +775,14 @@
                     }
                 };
                 btnSaveSettings.disabled = true;
-                btnSaveSettings.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving...';
+                btnSaveSettings.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>保存中...';
                 var result = await apiPut('/api/config', settingsPayload);
                 if (result && (result.status === 'updated' || result.success)) {
-                    showToast('Settings saved', 'success');
+                    showToast('设置已保存', 'success');
                 } else {
-                    showToast('Failed to save settings', 'error');
+                    showToast('设置保存失败', 'error');
                 }
-                btnSaveSettings.innerHTML = '<i class="bi bi-save me-1"></i>Save All Settings';
+                btnSaveSettings.innerHTML = '<i class="bi bi-save me-1"></i>保存所有设置';
                 btnSaveSettings.disabled = false;
             });
         }
@@ -794,7 +794,7 @@
         if (btnExportNow) {
             btnExportNow.addEventListener('click', async function() {
                 btnExportNow.disabled = true;
-                btnExportNow.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Exporting...';
+                btnExportNow.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>导出中...';
                 var result = await apiPut('/api/config', {
                     action: 'export_training_data',
                     config: {
@@ -803,11 +803,11 @@
                     }
                 });
                 if (result && (result.status === 'updated' || result.success)) {
-                    showToast('Export started', 'success');
+                    showToast('导出已开始', 'success');
                 } else {
-                    showToast('Export failed', 'error');
+                    showToast('导出失败', 'error');
                 }
-                btnExportNow.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i>Export Now';
+                btnExportNow.innerHTML = '<i class="bi bi-box-arrow-up-right me-1"></i>立即导出';
                 btnExportNow.disabled = false;
             });
         }
@@ -819,15 +819,15 @@
         if (btnRtsp) {
             btnRtsp.addEventListener('click', async function() {
                 var url = document.getElementById('cfg-rtsp-url').value.trim();
-                if (!url) { showToast('Please enter an RTSP URL', 'error'); return; }
+                if (!url) { showToast('请输入RTSP地址', 'error'); return; }
                 btnRtsp.disabled = true;
                 var result = await apiPut('/api/config', {
                     config: { data_source: 'rtsp', rtsp_url: url }
                 });
                 if (result && (result.status === 'updated' || result.success)) {
-                    showToast('RTSP stream connected', 'success');
+                    showToast('RTSP 流已连接', 'success');
                 } else {
-                    showToast('Failed to connect RTSP', 'error');
+                    showToast('RTSP 连接失败', 'error');
                 }
                 btnRtsp.disabled = false;
             });
@@ -842,7 +842,7 @@
 
             // Populate device types
             if (data.device_types && selDevice) {
-                selDevice.innerHTML = '<option value="">-- Select Device --</option>';
+                selDevice.innerHTML = '<option value="">-- 选择设备 --</option>';
                 data.device_types.forEach(function(dt) {
                     var opt = document.createElement('option');
                     opt.value = dt.value || dt;

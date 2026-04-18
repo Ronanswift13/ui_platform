@@ -397,13 +397,14 @@
         }
         document.getElementById('anomaly-type').textContent = data.anomaly_type || '无异常';
 
-        // Mode indicator
+        // Mode indicator + data source badge
         const modeEl = document.getElementById('active-mode-indicator');
         if (modeEl && data.mode) {
+            const srcLabel = data.data_source === 'simulation' ? ' [仿真数据]' : ' [实测数据]';
             if (data.mode === 'simulation') {
-                modeEl.innerHTML = '<span class="mode-indicator mode-sim">SIM</span>';
+                modeEl.innerHTML = '<span class="mode-indicator mode-sim">SIM' + srcLabel + '</span>';
             } else if (data.mode === 'monitoring') {
-                modeEl.innerHTML = '<span class="mode-indicator mode-mon">MON</span>';
+                modeEl.innerHTML = '<span class="mode-indicator mode-mon">MON' + srcLabel + '</span>';
             }
         }
 

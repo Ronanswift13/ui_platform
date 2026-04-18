@@ -1,0 +1,53 @@
+# ============================================================
+# 高光谱缺陷检测插件配置
+# 输变电激光星芒破夜绘明监测平台
+# 版本: 1.0.0
+# ============================================================
+
+# 模型配置
+model:
+  path: "models/hyperspectral_detector.onnx"
+  device: "cpu"
+  status: "placeholder"
+
+# 运行时配置
+runtime:
+  mode: "simulation"
+  fallback_enabled: true
+
+# 光谱参数
+spectral:
+  bands: 224
+  wavelength_start_nm: 400
+  wavelength_end_nm: 2500
+  pca_components: 30
+
+# 检测阈值
+thresholds:
+  confidence_threshold: 0.6
+  defect_score_threshold: 0.5
+
+# 质量门控
+quality:
+  min_spectral_bands: 10
+  valid_intensity_range: [0.0, 1.0]
+  noise_threshold: 0.1
+
+# 缺陷标签
+labels:
+  - normal
+  - overheating
+  - corrosion
+  - insulation_aging
+  - oil_leakage
+  - surface_damage
+  - paint_peeling
+  - moisture_ingress
+
+# 升级占位
+upgrade_placeholders:
+  model_registry_id: null
+  model_asset_status: "not_available"
+  calibration_required: true
+  dataset_requirements: "hyperspectral_labeled_5k"
+  annotation_status: "not_started"

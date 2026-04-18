@@ -32,6 +32,15 @@ try:
 except ImportError:
     FASTAPI_AVAILABLE = False
 
+try:
+    from plugins.switch_inspection.switch_consistency import (
+        ConsistencyChecker, SensorAdapter, VideoJudgment, SensorReading,
+        ConsistencyResult, ConsistencyStatus,
+    )
+    CONSISTENCY_AVAILABLE = True
+except ImportError:
+    CONSISTENCY_AVAILABLE = False
+
 
 class AlarmLevel(str, Enum):
     INFO = "info"
@@ -486,12 +495,25 @@ class OutdoorDataGenerator:
 _data_generator = OutdoorDataGenerator()
 _websocket_connections: List = []
 
+# 一致性校核引擎单例
+_sensor_adapter: Optional["SensorAdapter"] = None
+_consistency_checker: Optional["ConsistencyChecker"] = None
+
+def _get_consistency_checker() -> Optional["ConsistencyChecker"]:
+    global _sensor_adapter, _consistency_checker
+    if not CONSISTENCY_AVAILABLE:
+        return None
+    if _consistency_checker is None:
+        _sensor_adapter = SensorAdapter()
+        _consistency_checker = ConsistencyChecker(sensor_adapter=_sensor_adapter)
+    return _consistency_checker
+
 
 def create_outdoor_router() -> "APIRouter":
     """创建室外监测API路由"""
     if not FASTAPI_AVAILABLE:
         return None
-    
+
     router = APIRouter(prefix="/api/outdoor", tags=["室外监测中心"])
     
     @router.get("/busbar")
@@ -500,8 +522,98 @@ def create_outdoor_router() -> "APIRouter":
     
     @router.get("/switch")
     async def get_switch_data():
-        return _data_generator.generate_switch_data()
-    
+        data = _data_generator.generate_switch_data()
+        # 附加一致性校核结果(如可用)
+        checker = _get_consistency_checker()
+        if checker and data.get("detections"):
+            consistency_results = []
+            for det in data["detections"]:
+                label = det.get("label", "")
+                if "断路器" in label:
+                    dev_type, dev_id = "breaker", "CB-001"
+                elif "隔离开关" in label:
+                    dev_type, dev_id = "isolator", "DS-001"
+                elif "接地开关" in label:
+                    dev_type, dev_id = "grounding", "ES-001"
+                else:
+                    continue
+                state = "closed" if "合" in det.get("details", "") else "open"
+                vj = VideoJudgment(
+                    device_id=dev_id, device_type=dev_type, state=state,
+                    confidence=det.get("confidence", 0.0), clarity_score=0.85,
+                    evidence_sources=["dl", "color"],
+                    timestamp=datetime.now().isoformat(),
+                )
+                result = checker.check_consistency(
+                    device_id=dev_id, device_type=dev_type,
+                    station_id="station-demo", bay_id="bay-01",
+                    video_judgment=vj,
+                )
+                consistency_results.append(result.to_dict())
+            data["consistency_results"] = consistency_results
+        return data
+
+    @router.post("/switch/consistency")
+    async def run_switch_consistency(
+        device_id: str = Query(...),
+        device_type: str = Query("breaker"),
+        video_state: str = Query(""),
+        video_confidence: float = Query(0.0),
+        video_clarity: float = Query(0.85),
+        sensor_state: str = Query(""),
+        sensor_quality: float = Query(1.0),
+        sensor_protocol: str = Query("manual"),
+        station_id: str = Query(""),
+        bay_id: str = Query(""),
+    ):
+        """手动触发一致性校核"""
+        checker = _get_consistency_checker()
+        if not checker:
+            raise HTTPException(status_code=503, detail="一致性校核模块不可用")
+
+        vj = None
+        if video_state:
+            vj = VideoJudgment(
+                device_id=device_id, device_type=device_type,
+                state=video_state, confidence=video_confidence,
+                clarity_score=video_clarity, evidence_sources=["api"],
+                timestamp=datetime.now().isoformat(),
+            )
+
+        sr = None
+        if sensor_state:
+            sr = SensorReading(
+                device_id=device_id, state=sensor_state,
+                source_protocol=sensor_protocol,
+                timestamp=datetime.now().isoformat(),
+                quality=sensor_quality,
+            )
+
+        result = checker.check_consistency(
+            device_id=device_id, device_type=device_type,
+            station_id=station_id, bay_id=bay_id,
+            video_judgment=vj, sensor_reading=sr,
+        )
+        return {"success": True, "data": result.to_dict()}
+
+    @router.post("/switch/sensor")
+    async def set_sensor_reading(
+        device_id: str = Query(...),
+        state: str = Query(...),
+        protocol: str = Query("manual"),
+        quality: float = Query(1.0),
+    ):
+        """设置传感/遥信读数(供协议适配器回调)"""
+        checker = _get_consistency_checker()
+        if not checker:
+            raise HTTPException(status_code=503, detail="一致性校核模块不可用")
+
+        reading = checker.sensor_adapter.set_from_protocol(
+            device_id=device_id, state=state,
+            source_protocol=protocol, quality=quality,
+        )
+        return {"success": True, "data": reading.to_dict()}
+
     @router.get("/transformer")
     async def get_transformer_data():
         return _data_generator.generate_transformer_data()

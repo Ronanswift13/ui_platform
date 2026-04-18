@@ -10,8 +10,50 @@
     "capabilities": [
         "bird_detection",
         "species_identification",
-        "risk_assessment",
-        "deterrent_control"
+        "risk_assessment"
+    ],
+    "verified_capabilities": [
+        "input_quality_assessment",
+        "simulation_empty_detection",
+        "input_quality_fail_path",
+        "runtime_truth_basic",
+        "review_required_result_path",
+        "deterrent_suggestion_output",
+        "training_placeholder_metadata",
+        "alarm_generation_contract",
+        "standalone_lifecycle"
+    ],
+    "experimental_capabilities": [
+        "risk_scoring_contract",
+        "species_identification_mapping",
+        "legacy_bird_detector_enhanced",
+        "advanced_bird_detector_demo",
+        "multi_species_database_lookup"
+    ],
+    "blocked_capabilities": [
+        "real_dl_onnx_inference",
+        "deterrent_hardware_control",
+        "wingspan_estimation_from_bbox",
+        "behavior_classification"
+    ],
+    "required_fixtures": [
+        "bird_on_powerline_sample.jpg",
+        "bird_yolov8n.onnx",
+        "bird_species_database.json"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": false,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "ONNX 模型不存在，detector 始终运行于 simulation 模式（返回空检测）",
+        "simulation 模式下 infer 永远输出 no_bird，不生成合成鸟检测",
+        "驱离模块仅输出建议 JSON，不控制任何真实硬件",
+        "BirdDetectorEnhanced 与 experimental/advanced_bird_detector.py 为 experimental/demo，不属于生产主链；顶层 advanced_bird_detector.py 仅为兼容 shim",
+        "鸟类数据库为内置 8 种 dict，外部 JSON 数据库未加载",
+        "翼展估计、行为分类等依赖真实模型，当前为占位",
+        "距离估计当前使用启发式（bbox 位置），需真实相机标定"
     ],
     "device_types": [
         "power_line",
@@ -50,8 +92,12 @@
                     "safe_distance_m": {"type": "number"},
                     "warning_distance_m": {"type": "number"},
                     "danger_distance_m": {"type": "number"},
-                    "wingspan_factor_weight": {"type": "number"},
-                    "species_factor_weight": {"type": "number"}
+                    "critical_distance_m": {"type": "number"},
+                    "distance_weight": {"type": "number"},
+                    "species_weight": {"type": "number"},
+                    "wingspan_weight": {"type": "number"},
+                    "behavior_weight": {"type": "number"},
+                    "default_phase_spacing_m": {"type": "number"}
                 }
             },
             "deterrent": {

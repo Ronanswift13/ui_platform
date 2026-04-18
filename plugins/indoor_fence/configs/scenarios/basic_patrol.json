@@ -1,0 +1,11 @@
+{
+  "name": "basic_patrol",
+  "description": "Single person patrolling along the main passage",
+  "num_persons": 1,
+  "scene_bounds": [0.0, 0.0, 10.0, 6.0],
+  "sensor_types": ["camera", "lidar"],
+  "path_type": "fixed",
+  "waypoints": [[1.0, 1.0], [5.0, 1.0], [9.0, 1.0], [5.0, 1.0]],
+  "speed_m_per_step": 0.1,
+  "loop": true
+}

@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0",
+  "schema_ref": "docs/minimal_fixture_replay_schema.md",
+  "plugin_id": "fire_detection",
+  "asset_root": "plugins/fire_detection/tests/fixtures",
+  "collection_status": "planned_slots_only",
+  "samples": [
+    {
+      "sample_id": "fire_visible_flame_001",
+      "asset_relpath": "plugins/fire_detection/tests/fixtures/anomaly/fire_visible_flame_001.png",
+      "source_type": "mock",
+      "plugin_id": "fire_detection",
+      "scenario_type": "anomaly",
+      "expected_runtime_mode": "simulation_only",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "fire"
+      ],
+      "expected_alarm_level": "alarm",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "当前可先复用 pytest mock flame frame；后续应替换为真实或脱敏火焰场景。"
+    },
+    {
+      "sample_id": "fire_visible_smoke_001",
+      "asset_relpath": "plugins/fire_detection/tests/fixtures/anomaly/fire_visible_smoke_001.png",
+      "source_type": "mock",
+      "plugin_id": "fire_detection",
+      "scenario_type": "anomaly",
+      "expected_runtime_mode": "simulation_only",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [
+        "smoke"
+      ],
+      "expected_alarm_level": "warning",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "当前可先复用 pytest mock smoke frame；后续应替换为真实或脱敏烟雾场景。"
+    },
+    {
+      "sample_id": "fire_drill_electrical_001",
+      "asset_relpath": "plugins/fire_detection/tests/fixtures/drill/fire_drill_electrical_001.json",
+      "source_type": "mock",
+      "plugin_id": "fire_detection",
+      "scenario_type": "drill_simulation",
+      "expected_runtime_mode": "simulation_only",
+      "expected_review_status": "simulation_only",
+      "expected_primary_labels": [
+        "drill_simulation"
+      ],
+      "expected_alarm_level": "simulation",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "当前以 drill API 和配置语义固定，不代表真实火情检测结论。"
+    },
+    {
+      "sample_id": "fire_clear_scene_001",
+      "asset_relpath": "plugins/fire_detection/tests/fixtures/normal/fire_clear_scene_001.png",
+      "source_type": "mock",
+      "plugin_id": "fire_detection",
+      "scenario_type": "normal",
+      "expected_runtime_mode": "simulation_only",
+      "expected_review_status": "clear",
+      "expected_primary_labels": [],
+      "expected_alarm_level": "none",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "当前可先复用 blank_frame mock；后续建议补无火无烟真实场景。"
+    },
+    {
+      "sample_id": "fire_lowlight_occlusion_001",
+      "asset_relpath": "plugins/fire_detection/tests/fixtures/quality_fail/fire_lowlight_occlusion_001.jpg",
+      "source_type": "placeholder",
+      "plugin_id": "fire_detection",
+      "scenario_type": "quality_fail",
+      "expected_runtime_mode": "simulation_only",
+      "expected_review_status": "manual_review_required",
+      "expected_primary_labels": [],
+      "expected_alarm_level": "info",
+      "collection_status": "planned",
+      "candidate_source_refs": [],
+      "notes": "待人工补充低照度/遮挡样本，用于固定不沉默失败的质量语义。"
+    }
+  ],
+  "candidate_sources": []
+}

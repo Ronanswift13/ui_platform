@@ -1,0 +1,50 @@
+{
+    "scenario_id": "fluctuating",
+    "name": "波动异常",
+    "description": "模拟表计读数剧烈波动, 伴随尖峰脉冲",
+    "step_interval_ms": 300,
+    "total_steps": 400,
+    "meters": [
+        {
+            "id": "pressure_A",
+            "type": "analog",
+            "label": "压强表 A",
+            "unit": "MPa",
+            "range_min": 0.0,
+            "range_max": 1.6,
+            "initial_value": 0.8,
+            "pattern": "spike",
+            "speed": 2.0
+        },
+        {
+            "id": "voltage_B",
+            "type": "digital",
+            "label": "电压表 B",
+            "unit": "V",
+            "range_min": 0,
+            "range_max": 500,
+            "initial_value": 220,
+            "pattern": "random",
+            "speed": 1.0
+        },
+        {
+            "id": "temp_C",
+            "type": "analog",
+            "label": "温度表 C",
+            "unit": "°C",
+            "range_min": -20,
+            "range_max": 100,
+            "initial_value": 50,
+            "pattern": "sine",
+            "speed": 3.0
+        },
+        {
+            "id": "led_E",
+            "type": "led",
+            "label": "状态灯 E",
+            "led_color": "yellow",
+            "cycle": ["green", "yellow", "red", "yellow", "green", "off"],
+            "speed": 2.0
+        }
+    ]
+}

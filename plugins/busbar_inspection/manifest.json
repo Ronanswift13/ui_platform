@@ -10,6 +10,40 @@
     "capabilities": [
         "defect_detection"
     ],
+    "verified_capabilities": [
+        "defect_detection_pin_missing",
+        "defect_detection_crack",
+        "defect_detection_foreign_object",
+        "quality_gate_tristate"
+    ],
+    "experimental_capabilities": [
+        "small_object_enhancement",
+        "tile_detection_4k",
+        "noise_filtering"
+    ],
+    "blocked_capabilities": [
+        "broken_part",
+        "fitting_loose",
+        "real_dl_onnx_inference"
+    ],
+    "required_fixtures": [
+        "busbar_pin_missing_sample.jpg",
+        "busbar_crack_sample.jpg",
+        "busbar_foreign_object_sample.jpg",
+        "busbar_onnx_dummy.onnx"
+    ],
+    "runtime_mode_support": {
+        "real_dl": false,
+        "traditional_fallback": true,
+        "simulation": true
+    },
+    "current_known_limits": [
+        "ONNX preflight 框架已建立但无真实模型文件",
+        "broken_part 和 fitting_loose 标签已冻结为 blocked",
+        "fixtures/ 和 regression/ 仅有 README 占位",
+        "runtime_mode 默认锁定为 traditional_fallback",
+        "4K 大视场拼接检测代码存在但无真实场景回归"
+    ],
     "device_types": [
         "busbar",
         "insulator",
